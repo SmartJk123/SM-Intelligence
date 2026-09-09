@@ -37,7 +37,7 @@ import { AccountApi, AccountDetails } from './account-api';
               </div>
             </div>
             <button class="button full" (click)="addAnother()">Add another account</button
-            ><a class="text-link" routerLink="/">Back to home →</a>
+            ><a class="button full" routerLink="/dashboard">Continue to dashboard →</a>
           </div>
         } @else {
           <h2>Add your bank account</h2>

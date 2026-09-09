@@ -18,7 +18,7 @@ import { AccountApi, AccountKind } from './account-api';
       </aside>
       <div class="auth-panel">
         <a class="text-link back" routerLink="/">← Back to home</a>
-        <p class="eyebrow">{{ register ? 'LET’S GET YOU STARTED' : 'GOOD TO SEE YOU AGAIN' }}</p>
+        <p class="eyebrow">{{ register ? 'LET US GET YOU STARTED' : 'GOOD TO SEE YOU AGAIN' }}</p>
         <h1>{{ register ? 'Create your account' : 'Welcome back' }}</h1>
         <p class="muted">
           {{
@@ -186,7 +186,9 @@ export class Auth {
           kind: value.kind,
         });
       else await this.api.login({ email: value.email.trim(), password: value.password });
-      await this.router.navigate(['/setup']);
+      await this.router.navigate([
+        this.register || !this.api.setupCompleted() ? '/setup' : '/dashboard',
+      ]);
     } catch (e) {
       this.error.set(
         'Unable to ' +

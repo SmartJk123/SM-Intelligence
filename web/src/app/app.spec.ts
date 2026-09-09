@@ -10,6 +10,7 @@ import { setupGuard } from './setup.guard';
 describe('Account journey', () => {
   const api = {
     authenticated: signal(false),
+    setupCompleted: signal(false),
     kind: signal<'individual' | 'organization'>('individual'),
     login: vi.fn(),
     register: vi.fn(),
@@ -19,6 +20,7 @@ describe('Account journey', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     api.authenticated.set(false);
+    api.setupCompleted.set(false);
     TestBed.configureTestingModule({
       providers: [provideRouter([]), { provide: AccountApi, useValue: api }],
     });
@@ -112,7 +114,7 @@ describe('Account API contract', () => {
     expect(api.authenticated()).toBe(false);
     TestBed.inject(HttpTestingController)
       .expectOne('/api/auth/login')
-      .flush({ user: { id: 'test', kind: 'individual' } });
+      .flush({ user: { id: 'test', kind: 'individual', setupCompleted: false } });
     await pending;
     expect(api.authenticated()).toBe(true);
   });

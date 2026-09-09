@@ -14,3 +14,11 @@ Backend responsibilities: authorize account ownership using the server session, 
 No credentials or bank numbers are stored in browser storage. The full number is cleared from the form after a successful save; confirmation retains only the last four digits. Failure keeps the form available to retry. The setup route restores a server session on reload and redirects unauthenticated visits to login. Network failures do not create a successful session or saved confirmation.
 
 Real registration, login, and saving remain unavailable until this backend contract is implemented. Automated tests can mock the contract to verify the frontend journey.
+
+## Setup-based routing
+
+All auth/session responses must include `user.setupCompleted` as a boolean persisted by the backend. Registration returns false. Login and session restoration return the user's actual status. Do not derive this from login count: a user who left setup unfinished must return to setup on their next login. Missing or invalid status is rejected.
+
+A confirmed `POST /api/accounts` save must also persist setup completion server-side. The frontend marks it complete after the confirmed save, and offers Continue to dashboard. Reloads use the server's saved flag. `/dashboard` redirects unfinished users to `/setup`; completed users visiting `/setup`, `/login`, or `/register` are redirected to `/dashboard`. Unauthenticated dashboard/setup visits go to login.
+
+The dashboard route currently contains a minimal destination screen; financial dashboard modules are a separate milestone.
