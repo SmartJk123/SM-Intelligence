@@ -6,8 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
-    "start:seed": "node tools/dev-with-seed.mjs"
+    "test": "ng test"
   },
   "private": true,
   "packageManager": "npm@11.19.1",
