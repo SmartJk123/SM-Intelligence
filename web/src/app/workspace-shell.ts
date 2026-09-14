@@ -2,16 +2,16 @@ import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AccountApi } from './account-api';
 export const workspaceLinks = [
-  { path: 'dashboard', label: 'Overview', group: '', icon: '▦' },
-  { path: 'accounts', label: 'Accounts', group: 'FINANCES', icon: '▣' },
-  { path: 'transactions', label: 'Transactions', group: '', icon: '⇄' },
-  { path: 'cashflow', label: 'Cash Flow', group: '', icon: '↗' },
-  { path: 'budgets', label: 'Budgets', group: '', icon: '◉' },
-  { path: 'investments', label: 'Investments', group: '', icon: '◇' },
-  { path: 'analysis', label: 'Analysis', group: 'INSIGHTS', icon: '▥' },
-  { path: 'reports', label: 'Reports', group: '', icon: '▤' },
-  { path: 'notifications', label: 'Notifications', group: 'ACCOUNT', icon: '♧' },
-  { path: 'settings', label: 'Profile & Settings', group: '', icon: '⚙' },
+  { path: 'dashboard', label: 'Financial Overview', group: '', icon: '🌌' },
+  { path: 'accounts', label: 'Accounts', group: 'FINANCES', icon: '💳' },
+  { path: 'transactions', label: 'Transactions', group: '', icon: '🧾' },
+  { path: 'cashflow', label: 'Cash Flow', group: '', icon: '💸' },
+  { path: 'budgets', label: 'Budgets', group: '', icon: '🛡️' },
+  { path: 'investments', label: 'Investments', group: '', icon: '💼' },
+  { path: 'analysis', label: 'Analytics', group: '', icon: '📐' },
+  { path: 'reports', label: 'Reports', group: '', icon: '📄' },
+  { path: 'notifications', label: 'Notifications', group: 'ACCOUNT', icon: '🔔' },
+  { path: 'settings', label: 'Profile and Settings', group: '', icon: '👤' },
 ];
 @Component({
   imports: [RouterLink, RouterLinkActive, RouterOutlet],
@@ -71,7 +71,7 @@ export const workspaceLinks = [
         <div>
           <span class="ws-currency">KES</span
           ><a routerLink="/notifications" aria-label="Open notifications"
-            >Notifications <span aria-hidden="true">↗</span></a
+            >Notifications <span aria-hidden="true">🔔</span></a
           ><a class="ws-avatar" routerLink="/settings" aria-label="Open profile and settings">SM</a>
         </div>
       </header>
@@ -81,10 +81,14 @@ export const workspaceLinks = [
       <router-outlet />
     </div>
     <nav class="ws-bottom" aria-label="Mobile navigation">
-      <a routerLink="/dashboard" routerLinkActive="active">▦<small>Overview</small></a
-      ><a routerLink="/accounts" routerLinkActive="active">▣<small>Accounts</small></a
-      ><a routerLink="/transactions" routerLinkActive="active">⇄<small>Activity</small></a
-      ><a routerLink="/analysis" routerLinkActive="active">▥<small>Insights</small></a
+      <a routerLink="/dashboard" routerLinkActive="active"
+        ><span aria-hidden="true">🌌</span><small>Overview</small></a
+      ><a routerLink="/accounts" routerLinkActive="active"
+        ><span aria-hidden="true">💳</span><small>Accounts</small></a
+      ><a routerLink="/transactions" routerLinkActive="active"
+        ><span aria-hidden="true">🧾</span><small>Activity</small></a
+      ><a routerLink="/reports" routerLinkActive="active"
+        ><span aria-hidden="true">📄</span><small>Reports</small></a
       ><button
         (click)="menu.set(!menu())"
         [attr.aria-expanded]="menu()"

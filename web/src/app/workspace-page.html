@@ -310,7 +310,9 @@
           </article>
           <article>
             <p>Net cash flow</p>
-            <strong [class.money-in]="cashIn>cashOut" [class.money-out]="cashOut>cashIn">{{ (cashIn - cashOut) / 100 | currency: 'KES' : 'code' }}</strong>
+            <strong [class.money-in]="cashIn > cashOut" [class.money-out]="cashOut > cashIn">{{
+              (cashIn - cashOut) / 100 | currency: 'KES' : 'code'
+            }}</strong>
           </article>
         </div>
         <article class="ws-card">
@@ -357,7 +359,7 @@
       }
       @case ('budgets') {
         <div class="ws-section-title">
-          <h2>Category allocations</h2>
+          <h2><span aria-hidden="true">📊</span> Category allocations</h2>
           <button class="button" (click)="open('budgets')">+ Add budget</button>
         </div>
         <p class="ws-muted">
@@ -377,7 +379,8 @@
               <strong class="ws-amount">{{ spent(b) / 100 | currency: 'KES' : 'code' }}</strong>
               <p>of {{ b.allocatedMinor / 100 | currency: 'KES' : 'code' }} allocated</p>
               <progress
-                [attr.data-budget]="budgetStatus(b)" [value]="spent(b)"
+                [attr.data-budget]="budgetStatus(b)"
+                [value]="spent(b)"
                 [max]="b.allocatedMinor || 1"
                 [attr.aria-label]="b.category + ' budget usage'"
               ></progress>
@@ -471,7 +474,9 @@
           </article>
           <article>
             <p>Net deposit flow</p>
-            <strong [class.money-in]="cashIn>cashOut" [class.money-out]="cashOut>cashIn">{{ (cashIn - cashOut) / 100 | currency: 'KES' : 'code' }}</strong>
+            <strong [class.money-in]="cashIn > cashOut" [class.money-out]="cashOut > cashIn">{{
+              (cashIn - cashOut) / 100 | currency: 'KES' : 'code'
+            }}</strong>
           </article>
           <article>
             <p>Categories with activity</p>
@@ -480,7 +485,12 @@
         </div>
         <div class="ws-grid">
           <article class="ws-card">
-            <h2>Spending by category</h2>
+            <h2>
+              <span aria-hidden="true"
+                ><span class="analytics-light">📉</span><span class="analytics-dark">📈</span></span
+              >
+              Spending by category
+            </h2>
             @if (composition.length) {
               <app-category-chart [points]="composition" />
             }
@@ -515,7 +525,7 @@
             } @empty {
               <p>No balance, budget, or maturity alerts match your preferences.</p>
             }
-            <h3>Forecast coverage</h3>
+            <h3><span aria-hidden="true">🔮</span> Forecast coverage</h3>
             <p class="ws-muted">
               A reliable forecast requires recurring obligations and complete transaction history.
               No forecast or health score is inferred from partial sample records.
@@ -535,8 +545,14 @@
               (click)="exportCsv()"
               [disabled]="!reportRows.length || !validRange"
             >
-              Export CSV
-            </button><button class="button secondary" (click)="exportPdf()" [disabled]="!reportRows.length || !validRange">Export PDF</button>
+              Export CSV</button
+            ><button
+              class="button secondary"
+              (click)="exportPdf()"
+              [disabled]="!reportRows.length || !validRange"
+            >
+              Export PDF
+            </button>
           </div>
           <label class="ws-report-type"
             >Report type<select [(ngModel)]="report">
@@ -614,7 +630,7 @@
         <article class="ws-card">
           <div class="ws-section-title">
             <div>
-              <h2>Appearance</h2>
+              <h2><span aria-hidden="true">⚙️</span> Appearance</h2>
               <p>Choose a light or dark Azure palette.</p>
             </div>
             <div class="appearance-toggle" role="group" aria-label="Appearance">
@@ -629,7 +645,7 @@
         </article>
         <article class="ws-card">
           <div class="ws-section-title">
-            <h2>Profile & reporting preferences</h2>
+            <h2><span aria-hidden="true">👤</span> Profile & reporting preferences</h2>
             <button class="button" (click)="open('profile')">Edit preferences</button>
           </div>
           <dl class="ws-profile">
@@ -676,5 +692,3 @@
     }
   }
 </section>
-
-

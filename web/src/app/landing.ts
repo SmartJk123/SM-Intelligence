@@ -68,7 +68,13 @@ import { BankLogo } from './bank-logo';
       <div class="feature-grid">
         @for (feature of features; track feature.title) {
           <article class="feature">
-            <span class="feature-icon" aria-hidden="true">{{ feature.icon }}</span>
+            <span class="feature-icon" aria-hidden="true">
+              @if (feature.title === 'Visual analytics') {
+                <span class="analytics-light">📉</span><span class="analytics-dark">📈</span>
+              } @else {
+                {{ feature.icon }}
+              }
+            </span>
             <h3>{{ feature.title }}</h3>
             <p>{{ feature.text }}</p>
           </article>
@@ -144,7 +150,7 @@ import { BankLogo } from './bank-logo';
 export class Landing {
   features = [
     {
-      icon: '🗃️',
+      icon: '🗂️',
       title: 'Account consolidation',
       text: 'Keep manual deposit and credit snapshots from your bank accounts in one place.',
     },
@@ -154,7 +160,7 @@ export class Landing {
       text: 'See money coming in and going out, organized by period, account, and category.',
     },
     {
-      icon: '🩺',
+      icon: '💎',
       title: 'Business health score',
       text: 'Planned: meaningful indicators based on an approved methodology and sufficient data.',
     },
@@ -164,7 +170,7 @@ export class Landing {
       text: 'Planned: understand what may be ahead as forecasting becomes available.',
     },
     {
-      icon: '📈',
+      icon: '📊',
       title: 'Budget monitoring',
       text: 'Bring category budgets and spending into the same view.',
     },

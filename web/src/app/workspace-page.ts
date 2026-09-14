@@ -279,35 +279,95 @@ export class WorkspacePage implements OnInit, OnDestroy {
     return Object.keys(this.reportRows[0] ?? {});
   }
   exportPdf() {
-    const rows=this.reportRows;
-    if(!rows.length||!this.validRange)return;
-    const reportWindow=window.open('', '_blank');
-    if(!reportWindow){this.error.set('Allow pop-ups for this site, then select Export PDF again.');return;}
-    reportWindow.opener=null;
-    const doc=reportWindow.document;
-    const title=({transactions:'Transaction ledger',accounts:'Account balances',cashflow:'Cash-flow summary'} as Record<string,string>)[this.report] ?? 'Financial report';
-    doc.title='SM-Intelligence — '+title;
-    doc.documentElement.lang='en';
-    const style=doc.createElement('style');
-    style.textContent=`@page{size:A4 landscape;margin:16mm}*{box-sizing:border-box}body{font:11px Arial,sans-serif;color:#18334f;margin:24px}h1{font-size:25px;margin:10px 0}h2{font-size:13px;color:#2563eb;letter-spacing:1px}p{line-height:1.6}table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:22px}th,td{padding:9px 7px;border-bottom:1px solid #dce6f1;text-align:left;overflow-wrap:anywhere;vertical-align:top}th{background:#eaf2fe;color:#18334f;font-size:10px}td.amount{text-align:right;font-variant-numeric:tabular-nums}thead{display:table-header-group}tr{break-inside:avoid}.note{color:#52667c}.toolbar{padding:16px;background:#f1f5f9;display:flex;gap:16px;align-items:center}button{padding:10px 18px;border:0;border-radius:8px;background:#2563eb;color:white;cursor:pointer}@media print{body{margin:0}.toolbar{display:none}th{print-color-adjust:exact;-webkit-print-color-adjust:exact}}`;
+    const rows = this.reportRows;
+    if (!rows.length || !this.validRange) return;
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) {
+      this.error.set('Allow pop-ups for this site, then select Export PDF again.');
+      return;
+    }
+    reportWindow.opener = null;
+    const doc = reportWindow.document;
+    const title =
+      (
+        {
+          transactions: 'Transaction ledger',
+          accounts: 'Account balances',
+          cashflow: 'Cash-flow summary',
+        } as Record<string, string>
+      )[this.report] ?? 'Financial report';
+    doc.title = 'SM-Intelligence — ' + title;
+    doc.documentElement.lang = 'en';
+    const style = doc.createElement('style');
+    style.textContent = `@page{size:A4 landscape;margin:16mm}*{box-sizing:border-box}body{font:11px Arial,sans-serif;color:#18334f;margin:24px}h1{font-size:25px;margin:10px 0}h2{font-size:13px;color:#2563eb;letter-spacing:1px}p{line-height:1.6}table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:22px}th,td{padding:9px 7px;border-bottom:1px solid #dce6f1;text-align:left;overflow-wrap:anywhere;vertical-align:top}th{background:#eaf2fe;color:#18334f;font-size:10px}td.amount{text-align:right;font-variant-numeric:tabular-nums}thead{display:table-header-group}tr{break-inside:avoid}.note{color:#52667c}.toolbar{padding:16px;background:#f1f5f9;display:flex;gap:16px;align-items:center}button{padding:10px 18px;border:0;border-radius:8px;background:#2563eb;color:white;cursor:pointer}@media print{body{margin:0}.toolbar{display:none}th{print-color-adjust:exact;-webkit-print-color-adjust:exact}}`;
     doc.head.append(style);
-    const add=(tag:string,text:string,parent:HTMLElement=doc.body)=>{const el=doc.createElement(tag);el.textContent=text;parent.append(el);return el;};
-    const toolbar=add('div','');toolbar.className='toolbar';
-    const print=add('button','Print / Save as PDF',toolbar);print.addEventListener('click',()=>reportWindow.print());
-    add('span','Choose “Save as PDF” as your destination in the print dialog.',toolbar);
-    add('h2','SMARTMONEY · SM-INTELLIGENCE');add('h1',title);
-    add('p',(this.data()?.profile.name??'')+' · '+(this.account?this.accountName(this.account):'All accounts'));
-    add('p',this.report==='accounts'?'Current account balance snapshots · KES':this.start+' to '+this.end+' · KES');
-    add('p','Generated '+new Date().toLocaleString('en-KE')+' · '+rows.length+' records');
-    if(this.data()?.source==='sample')add('p','Sample data — local development. No live bank connection.').className='note';
-    const table=add('table','');const head=add('thead','',table);const header=add('tr','',head);
-    const columns=Object.keys(rows[0]);for(const column of columns){const th=add('th',column,header);th.setAttribute('scope','col');}
-    const body=add('tbody','',table);
-    for(const row of rows){const tr=add('tr','',body);for(const column of columns){const value=row[column];const td=add('td',typeof value==='number'?new Intl.NumberFormat('en-KE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(value):String(value??''),tr);if(typeof value==='number')td.className='amount';}}
-    add('p',this.report==='accounts'?'Balances are snapshots; the date filter does not change their values.':this.report==='cashflow'?'Cash flow includes posted deposit-account activity only.':'Transaction status and direction are included; non-posted records do not contribute to cash-flow totals.').className='note';
+    const add = (tag: string, text: string, parent: HTMLElement = doc.body) => {
+      const el = doc.createElement(tag);
+      el.textContent = text;
+      parent.append(el);
+      return el;
+    };
+    const toolbar = add('div', '');
+    toolbar.className = 'toolbar';
+    const print = add('button', 'Print / Save as PDF', toolbar);
+    print.addEventListener('click', () => reportWindow.print());
+    add('span', 'Choose “Save as PDF” as your destination in the print dialog.', toolbar);
+    add('h2', 'SMARTMONEY · SM-INTELLIGENCE');
+    add('h1', title);
+    add(
+      'p',
+      (this.data()?.profile.name ?? '') +
+        ' · ' +
+        (this.account ? this.accountName(this.account) : 'All accounts'),
+    );
+    add(
+      'p',
+      this.report === 'accounts'
+        ? 'Current account balance snapshots · KES'
+        : this.start + ' to ' + this.end + ' · KES',
+    );
+    add('p', 'Generated ' + new Date().toLocaleString('en-KE') + ' · ' + rows.length + ' records');
+    if (this.data()?.source === 'sample')
+      add('p', 'Sample data — local development. No live bank connection.').className = 'note';
+    const table = add('table', '');
+    const head = add('thead', '', table);
+    const header = add('tr', '', head);
+    const columns = Object.keys(rows[0]);
+    for (const column of columns) {
+      const th = add('th', column, header);
+      th.setAttribute('scope', 'col');
+    }
+    const body = add('tbody', '', table);
+    for (const row of rows) {
+      const tr = add('tr', '', body);
+      for (const column of columns) {
+        const value = row[column];
+        const td = add(
+          'td',
+          typeof value === 'number'
+            ? new Intl.NumberFormat('en-KE', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }).format(value)
+            : String(value ?? ''),
+          tr,
+        );
+        if (typeof value === 'number') td.className = 'amount';
+      }
+    }
+    add(
+      'p',
+      this.report === 'accounts'
+        ? 'Balances are snapshots; the date filter does not change their values.'
+        : this.report === 'cashflow'
+          ? 'Cash flow includes posted deposit-account activity only.'
+          : 'Transaction status and direction are included; non-posted records do not contribute to cash-flow totals.',
+    ).className = 'note';
     this.message.set('PDF report opened. Choose Save as PDF in the print dialog.');
     reportWindow.focus();
-    setTimeout(()=>{if(!reportWindow.closed)reportWindow.print();},250);
+    setTimeout(() => {
+      if (!reportWindow.closed) reportWindow.print();
+    }, 250);
   }
   exportCsv() {
     const rows = this.reportRows;
@@ -546,4 +606,3 @@ export class WorkspacePage implements OnInit, OnDestroy {
     }
   }
 }
-

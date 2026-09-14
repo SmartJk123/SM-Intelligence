@@ -48,7 +48,7 @@ interface DashboardData {
       <header class="dashboard-heading">
         <div>
           <p class="eyebrow">YOUR FINANCIAL PICTURE</p>
-          <h1>Overview</h1>
+          <h1>Financial Overview</h1>
           <p class="muted">
             {{
               data() ? 'Welcome back, ' + data()!.user.name + '.' : 'Your money, in one clear view.'
@@ -83,7 +83,7 @@ interface DashboardData {
         </div>
       } @else if (error()) {
         <div class="dashboard-empty" role="alert">
-          <h2>We couldn’t load your dashboard</h2>
+          <h2>We could not load your dashboard</h2>
           <p>{{ error() }}</p>
           <button class="button" (click)="load()">Try again</button>
         </div>
@@ -93,28 +93,28 @@ interface DashboardData {
         }
         <div class="dashboard-metrics">
           <article>
-            <p>Available cash</p>
+            <p><span aria-hidden="true">🗂️</span> Available cash</p>
             <strong>{{
               d.summary.availableCashMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Deposit accounts only</small>
           </article>
           <article>
-            <p>Credit outstanding</p>
+            <p><span aria-hidden="true">💳</span> Credit outstanding</p>
             <strong>{{
               d.summary.creditOutstandingMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Amount owed · excluded from cash</small>
           </article>
           <article>
-            <p>Money in</p>
+            <p><span aria-hidden="true">🔄</span> Money in</p>
             <strong class="positive">{{
               d.summary.moneyInMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Posted deposit-account credits</small>
           </article>
           <article>
-            <p>Money out</p>
+            <p><span aria-hidden="true">🔄</span> Money out</p>
             <strong>{{ d.summary.moneyOutMinor / 100 | currency: 'KES' : 'code' : '1.2-2' }}</strong
             ><small>Posted deposit-account debits</small>
           </article>
@@ -123,7 +123,7 @@ interface DashboardData {
           <article class="dashboard-panel">
             <div class="panel-heading">
               <div>
-                <h2>Cash flow</h2>
+                <h2><span aria-hidden="true">🔄</span> Cash flow</h2>
                 <p>
                   {{ d.period.from | date: 'd MMM' : 'UTC' }} –
                   {{ d.period.to | date: 'd MMM y' : 'UTC' }}
@@ -171,7 +171,7 @@ interface DashboardData {
           <article class="dashboard-panel">
             <div class="panel-heading">
               <div>
-                <h2>Your accounts</h2>
+                <h2><span aria-hidden="true">🗂️</span> Your accounts</h2>
                 <p>{{ d.accounts.length }} accounts · KES</p>
               </div>
             </div>

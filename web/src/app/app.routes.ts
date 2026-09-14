@@ -32,7 +32,7 @@ export const routes: Routes = [
     children: [
       {
         path: 'dashboard',
-        title: 'Overview | SM-Intelligence',
+        title: 'Financial Overview | SM-Intelligence',
         loadComponent: () => import('./dashboard').then((m) => m.Dashboard),
       },
       { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
@@ -42,10 +42,10 @@ export const routes: Routes = [
         { page: 'cashflow', title: 'Cash Flow' },
         { page: 'budgets', title: 'Budgets' },
         { page: 'investments', title: 'Investments' },
-        { page: 'analysis', title: 'Analysis' },
+        { page: 'analysis', title: 'Analytics' },
         { page: 'reports', title: 'Reports' },
         { page: 'notifications', title: 'Notifications' },
-        { page: 'settings', title: 'Profile & Settings' },
+        { page: 'settings', title: 'Profile and Settings' },
       ].map(({ page, title }) => ({
         path: page,
         title: title + ' | SM-Intelligence',
@@ -56,3 +56,5 @@ export const routes: Routes = [
   },
   { path: '**', redirectTo: '' },
 ];
+
+

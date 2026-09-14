@@ -1176,5 +1176,45 @@ app-category-chart {
     transition: none;
   }
 }
-.workspace-shell .dashboard-page td.amount-cell:not(.positive) { color: var(--finance-out); }
-.workspace-shell .ws-page input, .workspace-shell .ws-page select { background-color: var(--ws-bg); color: var(--ws-ink); }
+.workspace-shell .dashboard-page td.amount-cell:not(.positive) {
+  color: var(--finance-out);
+}
+.workspace-shell .ws-page input,
+.workspace-shell .ws-page select {
+  background-color: var(--ws-bg);
+  color: var(--ws-ink);
+}
+/* Soft blue light appearance; dark palette keeps its existing contrast. */
+html:not([data-theme='dark']) {
+  --ws-bg: #e8f2ff;
+  --ws-card: #f0f7ff;
+  --ws-soft: #dcecff;
+  --ws-line: #bfd5ef;
+}
+.ws-sidebar nav a > span,
+.ws-bottom a > span {
+  font-family: 'Segoe UI Symbol', 'Cambria Math', sans-serif;
+  font-style: normal;
+  line-height: 1.2;
+}
+/* Native full-color symbols retain readable text labels. */
+.ws-sidebar nav a > span,
+.ws-bottom a > span,
+.feature-icon {
+  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+}
+.analytics-dark {
+  display: none;
+}
+html[data-theme='dark'] .analytics-light {
+  display: none;
+}
+html[data-theme='dark'] .analytics-dark {
+  display: inline;
+}
+.ws-sidebar nav a {
+  min-width: 0;
+}
+.ws-sidebar nav a > span {
+  flex-shrink: 0;
+}
