@@ -1102,18 +1102,7 @@ app-bank-logo {
   height: 100%;
   object-fit: contain;
 }
-.bank-logo-art[data-bank='kcb'] {
-  background: #8cc63f;
-}
-.bank-logo-art[data-bank='ncba'] {
-  background: #382f2b;
-}
-.bank-logo-art[data-bank='equity'] {
-  background: #363636;
-}
-.bank-logo-art[data-bank='stanbic'] {
-  background: #000;
-}
+
 .bank-logo-fallback {
   font-size: 13px;
   color: inherit;
@@ -1189,30 +1178,11 @@ html.dark footer {
   color: #c9dbea;
 }
 /* Extra breathing room for the wider supplied bank artwork. */
-.bank-logo-art[data-bank='kcb'] {
-  width: 180px;
-  height: 86px;
-  padding: 14px;
-}
-.bank-logo-art[data-bank='stanbic'] {
-  width: 220px;
-  height: 86px;
-  padding: 14px;
-}
+
 .bank-logo-art {
   max-width: 100%;
 }
 @media (max-width: 600px) {
-  .bank-logo-art[data-bank='kcb'] {
-    width: 152px;
-    height: 80px;
-    padding: 12px;
-  }
-  .bank-logo-art[data-bank='stanbic'] {
-    width: 190px;
-    height: 80px;
-    padding: 12px;
-  }
 }
 .review app-bank-logo .bank-logo-art {
   max-width: 100%;
@@ -1390,4 +1360,38 @@ html.dark footer {
     gap: 12px;
     font-size: 11px;
   }
+}
+/* Keep linked logos centered at their native proportions on a neutral canvas. */
+.bank-logo-art {
+  background: #fff;
+}
+.bank-logo-art img {
+  object-position: center;
+}
+.bank-logo-fallback {
+  color: #18334f;
+  font-weight: 600;
+  font-size: 11px;
+  text-align: center;
+}
+.account-setup-card .bank-logo-frame {
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.account-setup-card .bank-logo-art {
+  border-radius: 6px;
+}
+/* Landing logos sit directly on the page without card frames. */
+.bank-strip .bank-logo-frame {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.bank-strip .bank-logo-art {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
 }
