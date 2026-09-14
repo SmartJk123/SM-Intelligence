@@ -3,6 +3,7 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   {
     path: '',
+    pathMatch: 'full',
     title: 'SM-Intelligence | Financial clarity',
     loadComponent: () => import('./landing').then((m) => m.Landing),
   },
@@ -25,10 +26,33 @@ export const routes: Routes = [
     loadComponent: () => import('./setup').then((m) => m.Setup),
   },
   {
-    path: 'dashboard',
-    title: 'Dashboard | SM-Intelligence',
-    canActivate: [dashboardGuard],
-    loadComponent: () => import('./dashboard').then((m) => m.Dashboard),
+    path: '',
+    canActivateChild: [dashboardGuard],
+    loadComponent: () => import('./workspace-shell').then((m) => m.WorkspaceShell),
+    children: [
+      {
+        path: 'dashboard',
+        title: 'Overview | SM-Intelligence',
+        loadComponent: () => import('./dashboard').then((m) => m.Dashboard),
+      },
+      { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
+      ...[
+        { page: 'accounts', title: 'Accounts' },
+        { page: 'transactions', title: 'Transactions' },
+        { page: 'cashflow', title: 'Cash Flow' },
+        { page: 'budgets', title: 'Budgets' },
+        { page: 'investments', title: 'Investments' },
+        { page: 'analysis', title: 'Analysis' },
+        { page: 'reports', title: 'Reports' },
+        { page: 'notifications', title: 'Notifications' },
+        { page: 'settings', title: 'Profile & Settings' },
+      ].map(({ page, title }) => ({
+        path: page,
+        title: title + ' | SM-Intelligence',
+        data: { page },
+        loadComponent: () => import('./workspace-page').then((m) => m.WorkspacePage),
+      })),
+    ],
   },
   { path: '**', redirectTo: '' },
 ];

@@ -1,0 +1,680 @@
+<section class="ws-page" [attr.data-page]="page">
+  <header class="ws-heading">
+    <div>
+      <p class="eyebrow">YOUR FINANCIAL WORKSPACE</p>
+      <h1>{{ title }}</h1>
+      <p>{{ description }}</p>
+    </div>
+    <button class="button secondary" (click)="load()" [disabled]="loading() || pending()">
+      Refresh
+    </button>
+  </header>
+  @if (message()) {
+    <p class="ws-notice" role="status">{{ message() }}</p>
+  }
+  @if (error()) {
+    <div class="ws-alert" role="alert">
+      {{ error() }}
+      @if (!data()) {
+        <button class="button" (click)="load()">Try again</button>
+      }
+    </div>
+  }
+  @if (loading()) {
+    <div class="ws-empty" role="status">Loading your workspace…</div>
+  } @else if (data(); as d) {
+    @if (d.source === 'sample') {
+      <p class="sample-label">
+        Sample data · Local development · Changes reset when the mock API restarts
+      </p>
+    }
+    @if (!['settings', 'notifications', 'investments'].includes(page)) {
+      <div class="ws-scope">
+        <label
+          >Account<select [(ngModel)]="account">
+            <option value="">All accounts</option>
+            @for (a of d.accounts; track a.id) {
+              <option [value]="a.id">{{ a.accountName }}</option>
+            }
+          </select></label
+        ><label>From<input type="date" [(ngModel)]="start" /></label
+        ><label>To<input type="date" [(ngModel)]="end" /></label
+        ><span class="ws-currency">KES</span>
+      </div>
+      @if (!validRange) {
+        <p class="ws-alert" role="alert">Choose a valid start and end date.</p>
+      }
+    }
+    @if (editing) {
+      <article class="ws-card ws-editor">
+        <h2 id="editor-heading" tabindex="-1">
+          {{ form['id'] ? 'Edit' : 'Add' }}
+          {{
+            editing === 'profile'
+              ? 'profile & preferences'
+              : editing === 'accounts'
+                ? 'bank account'
+                : editing === 'transactions'
+                  ? 'transaction'
+                  : editing === 'budgets'
+                    ? 'budget'
+                    : 'investment'
+          }}
+        </h2>
+        <form #editor="ngForm" (ngSubmit)="save(editor)">
+          <div class="ws-form-grid">
+            @for (field of fields; track field.key) {
+              <label [for]="'field-' + field.key"
+                >{{ field.label }}
+                @if (!field.required) {
+                  <small>(optional)</small>
+                }
+                @if (field.type === 'select') {
+                  <select
+                    [id]="'field-' + field.key"
+                    [name]="field.key"
+                    [(ngModel)]="form[field.key]"
+                    [required]="!!field.required"
+                  >
+                    @for (o of field.options; track o.value) {
+                      <option [value]="o.value">{{ o.label }}</option>
+                    }
+                  </select>
+                } @else {
+                  <input
+                    [id]="'field-' + field.key"
+                    [name]="field.key"
+                    [type]="field.type || 'text'"
+                    [(ngModel)]="form[field.key]"
+                    [required]="!!field.required"
+                    [attr.min]="field.min"
+                    [attr.max]="field.max"
+                    [attr.step]="field.step"
+                    [attr.maxlength]="field.type === 'text' ? 200 : null"
+                  />
+                }
+              </label>
+            }
+          </div>
+          @if (editing === 'profile') {
+            <div class="ws-checks">
+              <label
+                ><input
+                  type="checkbox"
+                  name="budgetAlerts"
+                  [(ngModel)]="form['budgetAlerts']"
+                />Budget alerts</label
+              ><label
+                ><input
+                  type="checkbox"
+                  name="balanceAlerts"
+                  [(ngModel)]="form['balanceAlerts']"
+                />Low-balance alerts</label
+              ><label
+                ><input
+                  type="checkbox"
+                  name="maturityAlerts"
+                  [(ngModel)]="form['maturityAlerts']"
+                />Maturity reminders</label
+              >
+            </div>
+          }
+          @if (editing === 'accounts') {
+            <p class="ws-muted">
+              Only the last four digits are retained by the mock API. Enter fictional account
+              details.
+            </p>
+          }
+          @if (editing === 'transactions') {
+            <p class="ws-muted">
+              Manual records do not update account balance snapshots. Cash flow uses posted
+              deposit-account records.
+            </p>
+          }
+          <div class="ws-actions">
+            <button class="button" [disabled]="editor.invalid || pending()">
+              {{ pending() ? 'Saving…' : 'Save changes' }}</button
+            ><button
+              class="button secondary"
+              type="button"
+              (click)="editing = ''"
+              [disabled]="pending()"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </article>
+    }
+    @if (deleteTarget) {
+      <div class="ws-alert" role="alert">
+        <p>Delete this record? This will update the related totals.</p>
+        <button class="button" (click)="remove()" [disabled]="pending()">Confirm delete</button
+        ><button class="button secondary" (click)="deleteTarget = null" [disabled]="pending()">
+          Cancel
+        </button>
+      </div>
+    }
+    @switch (page) {
+      @case ('accounts') {
+        <div class="ws-metrics">
+          <article>
+            <p>Available cash</p>
+            <strong>{{ cash / 100 | currency: 'KES' : 'code' }}</strong
+            ><small>Deposit accounts</small>
+          </article>
+          <article>
+            <p>Credit outstanding</p>
+            <strong>{{ debt / 100 | currency: 'KES' : 'code' }}</strong
+            ><small>Owed, separate from cash</small>
+          </article>
+          <article>
+            <p>Your accounts</p>
+            <strong>{{ accounts.length }}</strong
+            ><small>Manual records</small>
+          </article>
+        </div>
+        <div class="ws-section-title">
+          <h2>Bank accounts</h2>
+          <button class="button" (click)="open('accounts')">+ Add account</button>
+        </div>
+        <div class="ws-grid">
+          @for (a of accounts; track a.id) {
+            <article class="ws-card">
+              <div class="ws-account-title">
+                <app-bank-logo [bank]="a.bank" />
+                <div>
+                  <h2>{{ a.accountName }}</h2>
+                  <p>{{ a.bank }} · {{ a.maskedIdentifier }}</p>
+                </div>
+              </div>
+              <p class="ws-tag">
+                {{ a.accountType === 'CREDIT' ? 'Credit account' : 'Deposit account' }}
+              </p>
+              <strong class="ws-amount">{{
+                (a.accountType === 'CREDIT' ? a.creditOutstandingMinor : a.availableBalanceMinor) /
+                  100 | currency: 'KES' : 'code'
+              }}</strong>
+              <p class="ws-muted">
+                {{
+                  a.accountType === 'CREDIT' ? 'Current amount owed' : 'Recorded available balance'
+                }}
+              </p>
+              <a class="ws-link" routerLink="/transactions" [queryParams]="{ account: a.id }"
+                >View transactions →</a
+              >
+            </article>
+          } @empty {
+            <div class="ws-empty">
+              No accounts yet. Add an account to start organizing your finances.
+            </div>
+          }
+        </div>
+        <p class="ws-muted">
+          Balance snapshots are independent of the date filter. No live bank connection is
+          established.
+        </p>
+      }
+      @case ('transactions') {
+        <div class="ws-section-title">
+          <h2>Transaction ledger</h2>
+          <button class="button" (click)="open('transactions')" [disabled]="!d.accounts.length">
+            + Add transaction
+          </button>
+        </div>
+        <div class="ws-scope">
+          <label
+            >Search<input
+              type="search"
+              [(ngModel)]="search"
+              placeholder="Description or category" /></label
+          ><label
+            >Status<select [(ngModel)]="status">
+              <option value="">All statuses</option>
+              <option>POSTED</option>
+              <option>PENDING</option>
+              <option>FAILED</option>
+              <option>REVERSED</option>
+              <option>CANCELLED</option>
+            </select></label
+          ><label
+            >Category<select [(ngModel)]="category">
+              <option value="">All categories</option>
+              @for (c of categories; track c) {
+                <option>{{ c }}</option>
+              }
+            </select></label
+          >
+        </div>
+        <article class="ws-card">
+          <p>{{ rows.length }} matching records</p>
+          <div class="ws-table-wrap" tabindex="0" aria-label="Transaction ledger">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Account</th>
+                  <th>Status</th>
+                  <th>Amount (KES)</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of rows; track t.id) {
+                  <tr>
+                    <td>{{ t.date | date: 'd MMM y' : 'UTC' }}</td>
+                    <td>
+                      <strong>{{ t.description }}</strong
+                      ><small>{{ t.category }}</small>
+                    </td>
+                    <td>{{ accountName(t.accountId) }}</td>
+                    <td>
+                      <span class="ws-tag" [attr.data-status]="t.status">{{ t.status }}</span>
+                    </td>
+                    <td class="ws-numeric" [class.ws-positive]="t.direction === 'CREDIT'">
+                      {{ t.direction === 'CREDIT' ? '+' : '−'
+                      }}{{ t.amountMinor / 100 | currency: 'KES' : '' }}
+                    </td>
+                    <td>
+                      <button
+                        class="ws-link"
+                        (click)="open('transactions', t)"
+                        [attr.aria-label]="'Edit ' + t.description"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="6">
+                      No matching transactions. Try a wider date range or add a record.
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </article>
+      }
+      @case ('cashflow') {
+        <div class="ws-metrics">
+          <article>
+            <p>Money in</p>
+            <strong>{{ cashIn / 100 | currency: 'KES' : 'code' }}</strong>
+          </article>
+          <article>
+            <p>Money out</p>
+            <strong>{{ cashOut / 100 | currency: 'KES' : 'code' }}</strong>
+          </article>
+          <article>
+            <p>Net cash flow</p>
+            <strong [class.money-in]="cashIn>cashOut" [class.money-out]="cashOut>cashIn">{{ (cashIn - cashOut) / 100 | currency: 'KES' : 'code' }}</strong>
+          </article>
+        </div>
+        <article class="ws-card">
+          <div class="ws-section-title">
+            <h2>Posted cash movements</h2>
+            <span class="ws-muted">Green: money in · Red: money out</span>
+          </div>
+          @if (cashIn || cashOut) {
+            <app-finance-chart [points]="bins" />
+          } @else {
+            <div class="ws-empty">No posted cash movements in this period.</div>
+          }
+          <div class="ws-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>In (KES)</th>
+                  <th>Out (KES)</th>
+                  <th>Net (KES)</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (b of bins; track b.from) {
+                  <tr>
+                    <td>{{ b.from }} – {{ b.to }}</td>
+                    <td>{{ b.in / 100 | currency: 'KES' : '' }}</td>
+                    <td>{{ b.out / 100 | currency: 'KES' : '' }}</td>
+                    <td>{{ (b.in - b.out) / 100 | currency: 'KES' : '' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </article>
+        <article class="ws-card">
+          <h2>Balance coverage</h2>
+          <p>
+            Only posted deposit-account movements contribute to cash flow. Credit purchases and
+            non-posted records are excluded. Historical opening and closing balances require dated
+            snapshots; current balances cannot establish reconciliation.
+          </p>
+        </article>
+      }
+      @case ('budgets') {
+        <div class="ws-section-title">
+          <h2>Category allocations</h2>
+          <button class="button" (click)="open('budgets')">+ Add budget</button>
+        </div>
+        <p class="ws-muted">
+          Each budget uses its own full period. Actuals include posted debits, including
+          credit-account purchases.
+        </p>
+        <div class="ws-grid">
+          @for (b of budgets; track b.id) {
+            <article class="ws-card">
+              <div class="ws-section-title">
+                <h2>{{ b.category }}</h2>
+                <span class="ws-tag" [attr.data-budget]="budgetStatus(b)">{{
+                  budgetStatus(b)
+                }}</span>
+              </div>
+              <p>{{ b.start }} – {{ b.end }} · {{ accountName(b.accountId) }}</p>
+              <strong class="ws-amount">{{ spent(b) / 100 | currency: 'KES' : 'code' }}</strong>
+              <p>of {{ b.allocatedMinor / 100 | currency: 'KES' : 'code' }} allocated</p>
+              <progress
+                [attr.data-budget]="budgetStatus(b)" [value]="spent(b)"
+                [max]="b.allocatedMinor || 1"
+                [attr.aria-label]="b.category + ' budget usage'"
+              ></progress>
+              <p>
+                {{ (b.allocatedMinor - spent(b)) / 100 | currency: 'KES' : 'code' }} remaining ·
+                warning at {{ b.threshold }}%
+              </p>
+              <div class="ws-actions">
+                <button class="ws-link" (click)="open('budgets', b)">Edit budget</button
+                ><button
+                  class="ws-link"
+                  (click)="deleteTarget = { collection: 'budgets', id: b.id }"
+                >
+                  Delete</button
+                ><a class="ws-link" routerLink="/transactions">Inspect activity →</a>
+              </div>
+            </article>
+          } @empty {
+            <div class="ws-empty">
+              No budgets in this period. Create an allocation to track your spending.
+            </div>
+          }
+        </div>
+      }
+      @case ('investments') {
+        <div class="ws-metrics">
+          <article>
+            <p>Principal</p>
+            <strong>{{ principal / 100 | currency: 'KES' : 'code' }}</strong>
+          </article>
+          <article>
+            <p>Recorded portfolio value</p>
+            <strong>{{
+              portfolio === null ? 'Unavailable' : (portfolio / 100 | currency: 'KES' : 'code')
+            }}</strong>
+          </article>
+          <article>
+            <p>Unrealized change</p>
+            <strong>{{
+              portfolio === null
+                ? 'Unavailable'
+                : ((portfolio - principal) / 100 | currency: 'KES' : 'code')
+            }}</strong>
+          </article>
+        </div>
+        <div class="ws-section-title">
+          <h2>Investment records</h2>
+          <button class="button" (click)="open('investments')">+ Add investment</button>
+        </div>
+        <div class="ws-grid">
+          @for (i of d.investments; track i.id) {
+            <article class="ws-card">
+              <p class="ws-tag">{{ i.type }}</p>
+              <h2>{{ i.name }}</h2>
+              <strong class="ws-amount">{{
+                i.currentValueMinor === null
+                  ? 'Valuation unavailable'
+                  : (i.currentValueMinor / 100 | currency: 'KES' : 'code')
+              }}</strong>
+              <p>Principal: {{ i.principalMinor / 100 | currency: 'KES' : 'code' }}</p>
+              <p>
+                Valued {{ i.valuationDate }}<br />Maturity: {{ i.maturityDate || 'Not specified' }}
+              </p>
+              <div class="ws-actions">
+                <button class="ws-link" (click)="open('investments', i)">Edit record</button
+                ><button
+                  class="ws-link"
+                  (click)="deleteTarget = { collection: 'investments', id: i.id }"
+                >
+                  Delete
+                </button>
+              </div>
+            </article>
+          } @empty {
+            <div class="ws-empty">
+              No investments recorded. Add a monitoring record to get started.
+            </div>
+          }
+        </div>
+        <p class="ws-muted">
+          Recorded valuations are separate from available cash. This page does not execute
+          investments or calculate guaranteed returns.
+        </p>
+      }
+      @case ('analysis') {
+        <div class="ws-metrics">
+          <article>
+            <p>Posted debits</p>
+            <strong>{{ totalSpending / 100 | currency: 'KES' : 'code' }}</strong
+            ><small>All selected accounts</small>
+          </article>
+          <article>
+            <p>Net deposit flow</p>
+            <strong [class.money-in]="cashIn>cashOut" [class.money-out]="cashOut>cashIn">{{ (cashIn - cashOut) / 100 | currency: 'KES' : 'code' }}</strong>
+          </article>
+          <article>
+            <p>Categories with activity</p>
+            <strong>{{ composition.length }}</strong>
+          </article>
+        </div>
+        <div class="ws-grid">
+          <article class="ws-card">
+            <h2>Spending by category</h2>
+            @if (composition.length) {
+              <app-category-chart [points]="composition" />
+            }
+            @for (c of composition; track c.category) {
+              <div class="ws-composition">
+                <div>
+                  <strong>{{ c.category }}</strong
+                  ><span>{{ c.value / 100 | currency: 'KES' : 'code' }}</span>
+                </div>
+                <progress
+                  [value]="c.value"
+                  [max]="totalSpending || 1"
+                  [attr.aria-label]="c.category + ' share of posted debits'"
+                ></progress>
+              </div>
+            } @empty {
+              <div class="ws-empty">No posted debits in this period.</div>
+            }
+            <p class="ws-muted">
+              Includes credit-account purchases. Refund and transfer reconciliation requires richer
+              transaction classifications.
+            </p>
+          </article>
+          <article class="ws-card">
+            <h2>What needs attention</h2>
+            @for (a of alerts; track a.id) {
+              <a class="ws-insight" [routerLink]="'/' + a.target"
+                ><strong>{{ a.title }}</strong>
+                <p>{{ a.message }}</p>
+                <span>Review →</span></a
+              >
+            } @empty {
+              <p>No balance, budget, or maturity alerts match your preferences.</p>
+            }
+            <h3>Forecast coverage</h3>
+            <p class="ws-muted">
+              A reliable forecast requires recurring obligations and complete transaction history.
+              No forecast or health score is inferred from partial sample records.
+            </p>
+          </article>
+        </div>
+      }
+      @case ('reports') {
+        <article class="ws-card">
+          <div class="ws-section-title">
+            <div>
+              <h2>Build a report</h2>
+              <p>Export the records in your selected scope.</p>
+            </div>
+            <button
+              class="button"
+              (click)="exportCsv()"
+              [disabled]="!reportRows.length || !validRange"
+            >
+              Export CSV
+            </button><button class="button secondary" (click)="exportPdf()" [disabled]="!reportRows.length || !validRange">Export PDF</button>
+          </div>
+          <label class="ws-report-type"
+            >Report type<select [(ngModel)]="report">
+              <option value="transactions">Transaction ledger</option>
+              <option value="accounts">Account balances</option>
+              <option value="cashflow">Cash-flow summary</option>
+            </select></label
+          >
+          <p class="ws-muted">
+            {{
+              report === 'accounts'
+                ? 'Account balances are current snapshots; dates do not change their values.'
+                : 'Dates and account filters apply to this export.'
+            }}
+            Amounts are in KES.
+          </p>
+        </article>
+        <article class="ws-card">
+          <h2>Report preview</h2>
+          <p>{{ reportRows.length }} rows</p>
+          <div class="ws-table-wrap" tabindex="0" aria-label="Report preview">
+            <table>
+              <thead>
+                <tr>
+                  @for (c of reportColumns; track c) {
+                    <th>{{ c }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of reportRows; track $index) {
+                  <tr>
+                    @for (c of reportColumns; track c) {
+                      <td>{{ row[c] }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (!reportRows.length) {
+              <p class="ws-empty">No records to export in this scope.</p>
+            }
+          </div>
+        </article>
+      }
+      @case ('notifications') {
+        <div class="ws-section-title">
+          <label class="ws-inline-check"
+            ><input type="checkbox" [(ngModel)]="unreadOnly" />Unread only</label
+          >
+        </div>
+        @for (a of visibleAlerts; track a.id) {
+          <article class="ws-card ws-notification" [class.read]="a.read">
+            <div>
+              <p class="ws-tag">{{ a.read ? 'Read' : 'Unread' }}</p>
+              <h2>{{ a.title }}</h2>
+              <p>{{ a.message }}</p>
+            </div>
+            <div class="ws-actions">
+              <a class="ws-link" [routerLink]="'/' + a.target">Review →</a>
+              @if (!a.read) {
+                <button class="button secondary" (click)="markRead([a.id])">Mark as read</button>
+              }
+            </div>
+          </article>
+        } @empty {
+          <div class="ws-empty">
+            <h2>You’re all caught up</h2>
+            <p>No {{ unreadOnly ? 'unread ' : '' }}alerts match your preferences.</p>
+            <a class="ws-link" routerLink="/settings">Manage notification preferences →</a>
+          </div>
+        }
+      }
+      @case ('settings') {
+        <article class="ws-card">
+          <div class="ws-section-title">
+            <div>
+              <h2>Appearance</h2>
+              <p>Choose a light or dark Azure palette.</p>
+            </div>
+            <div class="appearance-toggle" role="group" aria-label="Appearance">
+              <button [attr.aria-pressed]="!dark()" (click)="setTheme(false)">
+                <span aria-hidden="true">☀</span> Light</button
+              ><button [attr.aria-pressed]="dark()" (click)="setTheme(true)">
+                <span aria-hidden="true">☾</span> Dark
+              </button>
+            </div>
+          </div>
+          <p class="ws-muted">Your appearance preference is saved on this device.</p>
+        </article>
+        <article class="ws-card">
+          <div class="ws-section-title">
+            <h2>Profile & reporting preferences</h2>
+            <button class="button" (click)="open('profile')">Edit preferences</button>
+          </div>
+          <dl class="ws-profile">
+            <div>
+              <dt>Name</dt>
+              <dd>{{ d.profile.name }}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{{ d.profile.email }}</dd>
+            </div>
+            <div>
+              <dt>Workspace</dt>
+              <dd>{{ d.profile.kind === 'organization' ? 'Organization' : 'Individual' }}</dd>
+            </div>
+            <div>
+              <dt>Organization</dt>
+              <dd>{{ d.profile.organization || 'Not specified' }}</dd>
+            </div>
+            <div>
+              <dt>Currency</dt>
+              <dd>KES</dd>
+            </div>
+            <div>
+              <dt>Low-balance threshold</dt>
+              <dd>{{ d.profile.lowBalanceMinor / 100 | currency: 'KES' : 'code' }}</dd>
+            </div>
+          </dl>
+          <p class="ws-muted">
+            Preferences control in-app alerts. Identity, password changes and email/SMS delivery
+            require backend integration.
+          </p>
+        </article>
+        <article class="ws-card">
+          <h2>Change history</h2>
+          @for (a of d.audit; track $index) {
+            <p>{{ a.at | date: 'd MMM y, HH:mm' }} · {{ a.action }}</p>
+          } @empty {
+            <p>No saved changes yet.</p>
+          }
+          <p class="ws-muted">Development activity history; not a production audit log.</p>
+        </article>
+      }
+    }
+  }
+</section>
+
+

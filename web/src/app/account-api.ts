@@ -73,4 +73,9 @@ export class AccountApi {
       throw new Error('The account service did not confirm the save. Please try again.');
     this.setupCompleted.set(true);
   }
+  async logout() {
+    await firstValueFrom(this.http.post('/api/auth/logout', {}).pipe(timeout(15000)));
+    this.authenticated.set(false);
+    this.setupCompleted.set(false);
+  }
 }
