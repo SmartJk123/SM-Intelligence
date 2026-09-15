@@ -1,4 +1,5 @@
-import { FinanceChart } from './finance-chart';
+import { WorkspaceIcon } from './workspace-icon';
+import { CategoryChart, FinanceChart } from './finance-chart';
 import { Component, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -42,7 +43,7 @@ interface DashboardData {
   transactionCount: number;
 }
 @Component({
-  imports: [CurrencyPipe, DatePipe, BankLogo, FinanceChart],
+  imports: [CurrencyPipe, DatePipe, BankLogo, FinanceChart, CategoryChart, WorkspaceIcon],
   template: `
     <section class="dashboard-page">
       <header class="dashboard-heading">
@@ -93,37 +94,37 @@ interface DashboardData {
         }
         <div class="dashboard-metrics">
           <article>
-            <p><span aria-hidden="true">🗂️</span> Available cash</p>
+            <p><app-workspace-icon name="wallet" /> Available cash</p>
             <strong>{{
               d.summary.availableCashMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Deposit accounts only</small>
           </article>
           <article>
-            <p><span aria-hidden="true">💳</span> Credit outstanding</p>
+            <p><app-workspace-icon name="accounts" /> Credit outstanding</p>
             <strong>{{
               d.summary.creditOutstandingMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Amount owed · excluded from cash</small>
           </article>
           <article>
-            <p><span aria-hidden="true">🔄</span> Money in</p>
+            <p><app-workspace-icon name="income" /> Money in</p>
             <strong class="positive">{{
               d.summary.moneyInMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Posted deposit-account credits</small>
           </article>
           <article>
-            <p><span aria-hidden="true">🔄</span> Money out</p>
+            <p><app-workspace-icon name="expense" /> Money out</p>
             <strong>{{ d.summary.moneyOutMinor / 100 | currency: 'KES' : 'code' : '1.2-2' }}</strong
             ><small>Posted deposit-account debits</small>
           </article>
         </div>
-        <div class="dashboard-columns">
-          <article class="dashboard-panel">
+        <div class="dashboard-hybrid">
+          <article class="dashboard-panel hybrid-flow">
             <div class="panel-heading">
               <div>
-                <h2><span aria-hidden="true">🔄</span> Cash flow</h2>
+                <h2><app-workspace-icon name="cashflow" /> Cash flow</h2>
                 <p>
                   {{ d.period.from | date: 'd MMM' : 'UTC' }} –
                   {{ d.period.to | date: 'd MMM y' : 'UTC' }}
@@ -136,7 +137,7 @@ interface DashboardData {
             @if (d.summary.moneyInMinor === 0 && d.summary.moneyOutMinor === 0) {
               <div class="chart-empty">No posted cash movements in this period.</div>
             } @else {
-              <app-finance-chart [points]="chartPoints" />
+              <app-finance-chart [points]="chartPoints" mode="line" />
             }
             <div class="net-flow">
               <span>Net cash flow</span
@@ -168,10 +169,16 @@ interface DashboardData {
               </div>
             </details>
           </article>
-          <article class="dashboard-panel">
+          <article class="dashboard-panel hybrid-spending">
+            <div class="panel-heading"><div><h2><app-workspace-icon name="analysis" /> Spending breakdown</h2><p>Recent posted deposit-account debits</p></div></div>
+            @if (spendingPoints.length) { <app-category-chart [points]="spendingPoints" /> }
+            @else { <div class="chart-empty">No posted spending in the recent transactions.</div> }
+            <p class="dashboard-footnote">Based on the recent transactions shown below, which may be a subset of this period.</p>
+          </article>
+        <article class="dashboard-panel hybrid-accounts">
             <div class="panel-heading">
               <div>
-                <h2><span aria-hidden="true">🗂️</span> Your accounts</h2>
+                <h2><app-workspace-icon name="wallet" /> Your accounts</h2>
                 <p>{{ d.accounts.length }} accounts · KES</p>
               </div>
             </div>
@@ -198,11 +205,10 @@ interface DashboardData {
               </div>
             }
           </article>
-        </div>
-        <article class="dashboard-panel">
+        <article class="dashboard-panel hybrid-transactions">
           <div class="panel-heading">
             <div>
-              <h2>Recent transactions</h2>
+              <h2><app-workspace-icon name="transactions" /> Recent transactions</h2>
               <p>{{ d.transactionCount }} records in this period · showing up to 12</p>
             </div>
           </div>
@@ -255,6 +261,7 @@ interface DashboardData {
             credit-account entries are excluded. Account balances are current snapshots.
           </p>
         </article>
+          </div>
       }
     </section>
   `,
@@ -295,6 +302,15 @@ export class Dashboard {
     if (this.loading() || days === this.days()) return;
     this.days.set(days);
     void this.load();
+  }
+  get spendingPoints() {
+    const d = this.data();
+    const totals = new Map<string, number>();
+    for (const tx of d?.transactions ?? []) {
+      if (tx.status !== 'POSTED' || tx.direction !== 'DEBIT' || !d?.accounts.some(a => a.id === tx.accountId && a.accountType === 'DEPOSIT')) continue;
+      totals.set(tx.category, (totals.get(tx.category) ?? 0) + tx.amountMinor);
+    }
+    return [...totals].map(([category, value]) => ({ category, value })).sort((a,b) => b.value-a.value);
   }
   get chartPoints() {
     return (

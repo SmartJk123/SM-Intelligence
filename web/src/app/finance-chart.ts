@@ -1,3 +1,4 @@
+import { smoothChartPath } from './smooth-chart';
 import { Component, input, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 @Component({
@@ -12,6 +13,26 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
       </button>
     </div>
     <p class="viz-hint">Select a period to explore its values · KES</p>
+    @if (mode() === 'line') {
+      <div class="hybrid-line-chart">
+        <div class="hybrid-scale"><span>0 KES</span><span>Scale: {{ maximum() / 100 | currency: 'KES' : 'code' : '1.0-0' }}</span></div>
+        <svg viewBox="0 0 600 200" role="img" aria-label="Cash flow trend. Use the period buttons below for exact values.">
+          <path d="M10 10H590 M10 95H590 M10 180H590" class="hybrid-grid" />
+          @if (series() !== 'out') { <path [attr.d]="linePath('in') + ' L590,180 L10,180 Z'" class="hybrid-area" /><path [attr.d]="linePath('in')" class="hybrid-income" /> }
+          @if (series() !== 'in') { <path [attr.d]="linePath('out')" class="hybrid-outflow" /> }
+          @if (points()[selected()]) {
+            <line [attr.x1]="pointX(selected())" [attr.x2]="pointX(selected())" y1="10" y2="180" class="hybrid-guide" />
+            @if (series() !== 'out') { <circle [attr.cx]="pointX(selected())" [attr.cy]="pointY(selected(), 'in')" r="4" class="hybrid-income-dot" /> }
+            @if (series() !== 'in') { <circle [attr.cx]="pointX(selected())" [attr.cy]="pointY(selected(), 'out')" r="4" class="hybrid-outflow-dot" /> }
+          }
+        </svg>
+        <div class="hybrid-periods">
+          @for (p of points(); track p.from; let i = $index) {
+            <button (click)="selected.set(i)" [attr.aria-pressed]="selected() === i">{{ p.from | date: 'd MMM' : 'UTC' }}</button>
+          }
+        </div>
+      </div>
+    } @else {
     <div class="viz-plot">
       <div class="viz-axis">
         <span>{{ maximum() / 100 | currency: 'KES' : '' : '1.0-0' }}</span
@@ -39,6 +60,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
         }
       </div>
     </div>
+    }
     @if (points()[selected()]; as p) {
       <div class="viz-detail" aria-live="polite">
         <strong>{{ p.from | date: 'd MMM' : 'UTC' }} – {{ p.to | date: 'd MMM' : 'UTC' }}</strong
@@ -50,6 +72,12 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
   `,
 })
 export class FinanceChart {
+  readonly mode = input('bar');
+  linePath(key: 'in' | 'out') {
+    return smoothChartPath(this.points().map(p => p[key]), this.maximum());
+  }
+  pointX(index: number) { return 10 + index * 580 / Math.max(1, this.points().length - 1); }
+  pointY(index: number, key: 'in' | 'out') { return 180 - this.points()[index][key] / this.maximum() * 170; }
   readonly points = input.required<{ from: string; to: string; in: number; out: number }[]>();
   readonly selected = signal(0);
   readonly series = signal('both');
