@@ -1,27 +1,153 @@
 services:
-  postgres:
+
+  # ============================================================
+  # DATABASES — one PostgreSQL instance per service
+  # ============================================================
+  postgres-identity:
     image: postgres:15-alpine
-    container_name: smartmoney-postgres
+    container_name: smi-postgres-identity
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: secretpassword
-      POSTGRES_DB: smartmoney_db
+      POSTGRES_DB: smi_identity
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata-identity:/var/lib/postgresql/data
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: smartmoney-rabbitmq
+  postgres-accounts:
+    image: postgres:15-alpine
+    container_name: smi-postgres-accounts
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: smi_accounts
     ports:
-      - "5672:5672"   # Core message queue port
-      - "15672:15672" # Web management UI port
+      - "5433:5432"
+    volumes:
+      - pgdata-accounts:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-transactions:
+    image: postgres:15-alpine
+    container_name: smi-postgres-transactions
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: smi_transactions
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata-transactions:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-categories:
+    image: postgres:15-alpine
+    container_name: smi-postgres-categories
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: smi_categories
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata-categories:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-budgets:
+    image: postgres:15-alpine
+    container_name: smi-postgres-budgets
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: smi_budgets
+    ports:
+      - "5436:5432"
+    volumes:
+      - pgdata-budgets:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-investments:
+    image: postgres:15-alpine
+    container_name: smi-postgres-investments
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: smi_investments
+    ports:
+      - "5437:5432"
+    volumes:
+      - pgdata-investments:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-forecasts:
+    image: postgres:15-alpine
+    container_name: smi-postgres-forecasts
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: smi_forecasts
+    ports:
+      - "5438:5432"
+    volumes:
+      - pgdata-forecasts:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-notifications:
+    image: postgres:15-alpine
+    container_name: smi-postgres-notifications
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: smi_notifications
+    ports:
+      - "5439:5432"
+    volumes:
+      - pgdata-notifications:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postgres-audit:
+    image: postgres:15-alpine
+    container_name: smi-postgres-audit
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: smi_audit
+    ports:
+      - "5440:5432"
+    volumes:
+      - pgdata-audit:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ============================================================
+  # MESSAGING — Kafka for async inter-service communication
+  # ============================================================
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: smi-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
     restart: unless-stopped
 
 volumes:
-  pgdata:
+  pgdata-identity:
+  pgdata-accounts:
+  pgdata-transactions:
+  pgdata-categories:
+  pgdata-budgets:
+  pgdata-investments:
+  pgdata-forecasts:
+  pgdata-notifications:
+  pgdata-audit:
