@@ -94,28 +94,28 @@ interface DashboardData {
         }
         <div class="dashboard-metrics">
           <article>
-            <p><app-workspace-icon name="wallet" /> Available cash</p>
+            <p><app-workspace-icon name="content-cash" /> Available cash</p>
             <strong>{{
               d.summary.availableCashMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Deposit accounts only</small>
           </article>
           <article>
-            <p><app-workspace-icon name="accounts" /> Credit outstanding</p>
+            <p><app-workspace-icon name="content-credit" /> Credit outstanding</p>
             <strong>{{
               d.summary.creditOutstandingMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Amount owed · excluded from cash</small>
           </article>
           <article>
-            <p><app-workspace-icon name="income" /> Money in</p>
+            <p><app-workspace-icon name="content-income" /> Money in</p>
             <strong class="positive">{{
               d.summary.moneyInMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
             }}</strong
             ><small>Posted deposit-account credits</small>
           </article>
           <article>
-            <p><app-workspace-icon name="expense" /> Money out</p>
+            <p><app-workspace-icon name="content-expense" /> Money out</p>
             <strong>{{ d.summary.moneyOutMinor / 100 | currency: 'KES' : 'code' : '1.2-2' }}</strong
             ><small>Posted deposit-account debits</small>
           </article>
@@ -124,7 +124,7 @@ interface DashboardData {
           <article class="dashboard-panel hybrid-flow">
             <div class="panel-heading">
               <div>
-                <h2><app-workspace-icon name="cashflow" /> Cash flow</h2>
+                <h2><app-workspace-icon name="content-flow" /> Cash flow</h2>
                 <p>
                   {{ d.period.from | date: 'd MMM' : 'UTC' }} –
                   {{ d.period.to | date: 'd MMM y' : 'UTC' }}
@@ -170,7 +170,7 @@ interface DashboardData {
             </details>
           </article>
           <article class="dashboard-panel hybrid-spending">
-            <div class="panel-heading"><div><h2><app-workspace-icon name="analysis" /> Spending breakdown</h2><p>Recent posted deposit-account debits</p></div></div>
+            <div class="panel-heading"><div><h2><app-workspace-icon name="content-spending" /> Spending breakdown</h2><p>Recent posted deposit-account debits</p></div></div>
             @if (spendingPoints.length) { <app-category-chart [points]="spendingPoints" /> }
             @else { <div class="chart-empty">No posted spending in the recent transactions.</div> }
             <p class="dashboard-footnote">Based on the recent transactions shown below, which may be a subset of this period.</p>
@@ -178,7 +178,7 @@ interface DashboardData {
         <article class="dashboard-panel hybrid-accounts">
             <div class="panel-heading">
               <div>
-                <h2><app-workspace-icon name="wallet" /> Your accounts</h2>
+                <h2><app-workspace-icon name="content-accounts" /> Your accounts</h2>
                 <p>{{ d.accounts.length }} accounts · KES</p>
               </div>
             </div>
@@ -208,7 +208,7 @@ interface DashboardData {
         <article class="dashboard-panel hybrid-transactions">
           <div class="panel-heading">
             <div>
-              <h2><app-workspace-icon name="transactions" /> Recent transactions</h2>
+              <h2><app-workspace-icon name="content-ledger" /> Recent transactions</h2>
               <p>{{ d.transactionCount }} records in this period · showing up to 12</p>
             </div>
           </div>

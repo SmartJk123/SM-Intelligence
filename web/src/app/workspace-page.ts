@@ -1,3 +1,4 @@
+import { WorkspaceIcon } from './workspace-icon';
 import { FinanceChart, CategoryChart } from './finance-chart';
 import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
@@ -19,7 +20,7 @@ type EditField = {
   options?: { value: string; label: string }[];
 };
 @Component({
-  imports: [CurrencyPipe, DatePipe, FormsModule, RouterLink, BankLogo, FinanceChart, CategoryChart],
+  imports: [CurrencyPipe, DatePipe, FormsModule, RouterLink, BankLogo, FinanceChart, CategoryChart, WorkspaceIcon],
   templateUrl: './workspace-page.html',
 })
 export class WorkspacePage implements OnInit, OnDestroy {

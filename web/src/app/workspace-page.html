@@ -359,7 +359,7 @@
       }
       @case ('budgets') {
         <div class="ws-section-title">
-          <h2><span aria-hidden="true">📊</span> Category allocations</h2>
+          <h2><app-workspace-icon name="content-budget" /> Category allocations</h2>
           <button class="button" (click)="open('budgets')">+ Add budget</button>
         </div>
         <p class="ws-muted">
@@ -370,7 +370,7 @@
           @for (b of budgets; track b.id) {
             <article class="ws-card">
               <div class="ws-section-title">
-                <h2>{{ b.category }}</h2>
+                <h2><app-workspace-icon name="content-budget" /> {{ b.category }}</h2>
                 <span class="ws-tag" [attr.data-budget]="budgetStatus(b)">{{
                   budgetStatus(b)
                 }}</span>
@@ -468,27 +468,25 @@
       @case ('analysis') {
         <div class="ws-metrics">
           <article>
-            <p>Posted debits</p>
+            <p><app-workspace-icon name="content-expense" /> Posted debits</p>
             <strong>{{ totalSpending / 100 | currency: 'KES' : 'code' }}</strong
             ><small>All selected accounts</small>
           </article>
           <article>
-            <p>Net deposit flow</p>
+            <p><app-workspace-icon name="content-flow" /> Net deposit flow</p>
             <strong [class.money-in]="cashIn > cashOut" [class.money-out]="cashOut > cashIn">{{
               (cashIn - cashOut) / 100 | currency: 'KES' : 'code'
             }}</strong>
           </article>
           <article>
-            <p>Categories with activity</p>
+            <p><app-workspace-icon name="content-spending" /> Categories with activity</p>
             <strong>{{ composition.length }}</strong>
           </article>
         </div>
         <div class="ws-grid">
           <article class="ws-card">
             <h2>
-              <span aria-hidden="true"
-                ><span class="analytics-light">📉</span><span class="analytics-dark">📈</span></span
-              >
+              <app-workspace-icon name="content-spending" />
               Spending by category
             </h2>
             @if (composition.length) {
@@ -515,7 +513,7 @@
             </p>
           </article>
           <article class="ws-card">
-            <h2>What needs attention</h2>
+            <h2><app-workspace-icon name="content-attention" /> What needs attention</h2>
             @for (a of alerts; track a.id) {
               <a class="ws-insight" [routerLink]="'/' + a.target"
                 ><strong>{{ a.title }}</strong>
@@ -525,7 +523,7 @@
             } @empty {
               <p>No balance, budget, or maturity alerts match your preferences.</p>
             }
-            <h3><span aria-hidden="true">🔮</span> Forecast coverage</h3>
+            <h3><app-workspace-icon name="content-forecast" /> Forecast coverage</h3>
             <p class="ws-muted">
               A reliable forecast requires recurring obligations and complete transaction history.
               No forecast or health score is inferred from partial sample records.
