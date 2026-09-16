@@ -597,6 +597,16 @@
         </article>
       }
       @case ('notifications') {
+        <div class="notification-filters ws-scope" aria-label="Notification filters">
+          <label>Timeline<select [(ngModel)]="notificationTimeline"><option value="">All time</option><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="week">This week</option><option value="month">This month</option><option value="30">Last 30 days</option></select></label>
+          <label>Transaction type<select [(ngModel)]="notificationCategory"><option value="">All types</option>@for (c of ['Income','Interest','Rent','Shopping','Transport','Utilities']; track c) {<option [value]="c">{{ c }}</option>}</select></label>
+          <label>Status<select [(ngModel)]="notificationTransaction"><option value="">All statuses</option><option value="sent">Sent</option><option value="received">Received</option><option value="pending">Pending</option><option value="cancelled">Cancelled</option><option value="failed">Failed</option></select></label>
+          <label>Important<select [(ngModel)]="notificationImportant"><option value="">All notifications</option><option value="budget">Budget warnings</option><option value="funds">Low funds</option><option value="maturity">Maturity deadlines</option></select></label>
+          <label>Bank<select [(ngModel)]="notificationBank"><option value="">All banks</option>@for (b of notificationBanks; track b) {<option [value]="b">{{ b }}</option>}</select></label>
+          <button class="button secondary" (click)="resetNotificationFilters()">Clear filters</button>
+        </div>
+        <p class="ws-muted">Filters combine. Weeks start Monday; dates use Nairobi time. Active warnings have no recorded event date and appear under All time. Bank filters exclude workspace-wide budgets and investments without a bank assignment.</p>
+        <p role="status">{{ visibleAlerts.length }} matching notifications</p>
         <div class="ws-section-title">
           <label class="ws-inline-check"
             ><input type="checkbox" [(ngModel)]="unreadOnly" />Unread only</label
@@ -606,7 +616,7 @@
           <article class="ws-card ws-notification" [class.read]="a.read">
             <div>
               <p class="ws-tag">{{ a.read ? 'Read' : 'Unread' }}</p>
-              <h2>{{ a.title }}</h2>
+              <p class="ws-muted">{{ a.date ? (a.date | date: 'd MMM y' : 'UTC') : 'Current warning · event date unavailable' }} · {{ a.bank || 'Workspace-wide / bank unassigned' }}</p><h2>{{ a.title }}</h2>
               <p>{{ a.message }}</p>
             </div>
             <div class="ws-actions">
@@ -618,8 +628,8 @@
           </article>
         } @empty {
           <div class="ws-empty">
-            <h2>You’re all caught up</h2>
-            <p>No {{ unreadOnly ? 'unread ' : '' }}alerts match your preferences.</p>
+            <h2>No matching notifications</h2>
+            <p>Try clearing filters or selecting a wider timeline.</p>
             <a class="ws-link" routerLink="/settings">Manage notification preferences →</a>
           </div>
         }

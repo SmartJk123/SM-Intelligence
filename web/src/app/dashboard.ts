@@ -26,6 +26,7 @@ interface Transaction {
   date: string;
 }
 interface DashboardData {
+  bank?: string;
   source: 'sample' | 'live';
   currency: 'KES';
   user: { name: string; kind: string };
@@ -62,6 +63,12 @@ interface DashboardData {
         <span>{{
           data()?.user?.kind === 'organization' ? 'Organization overview' : 'Personal overview'
         }}</span>
+        <label class="overview-bank">Bank
+          <select [value]="bank()" (change)="changeBank($any($event.target).value)" [disabled]="loading()">
+            <option value="">All banks</option>
+            @for (name of banks; track name) { <option [value]="name">{{ name }}</option> }
+          </select>
+        </label>
         <div role="group" aria-label="Reporting period">
           <button
             [attr.aria-pressed]="days() === 30"
@@ -272,6 +279,13 @@ export class Dashboard {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly days = signal(30);
+  readonly bank = signal('');
+  readonly banks = ['KCB', 'Equity', 'Stanbic', 'NCBA'];
+  changeBank(bank: string) {
+    if (this.loading() || bank === this.bank()) return;
+    this.bank.set(bank);
+    void this.load();
+  }
   constructor() {
     void this.load();
   }
@@ -280,20 +294,20 @@ export class Dashboard {
     this.error.set('');
     try {
       const d = await firstValueFrom(
-        this.http.get<DashboardData>('/api/dashboard?days=' + this.days()).pipe(timeout(15000)),
+        this.http.get<DashboardData>('/api/dashboard?days=' + this.days() + '&bank=' + encodeURIComponent(this.bank())).pipe(timeout(15000)),
       );
       if (
         d?.currency !== 'KES' ||
         !d.summary ||
         !Array.isArray(d.accounts) ||
         !Array.isArray(d.transactions) ||
-        !Array.isArray(d.cashFlow)
+        !Array.isArray(d.cashFlow) || (this.bank() && d.bank !== this.bank())
       )
         throw new Error('Invalid response');
       this.data.set(d);
     } catch {
       this.data.set(null);
-      this.error.set('Please try again. Your account details have not been changed.');
+      this.error.set(this.bank() ? 'Unable to load this bank overview. The account service must support bank-filtered totals. Please try again or select All banks.' : 'Please try again. Your account details have not been changed.');
     } finally {
       this.loading.set(false);
     }

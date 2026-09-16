@@ -1385,3 +1385,11 @@ html[data-theme='dark'] .workspace-shell .dashboard-metrics article { padding:18
 /* Content illustrations share the financial outline style. */
 .ws-page h2:has(app-workspace-icon),.ws-page h3:has(app-workspace-icon),.ws-metrics p:has(app-workspace-icon) { display:flex; align-items:center; gap:9px; }
 .ws-page h2 app-workspace-icon,.ws-page h3 app-workspace-icon,.ws-metrics app-workspace-icon { color:var(--ws-accent); }
+
+.overview-bank { display:flex; align-items:center; gap:10px; margin-left:auto; color:var(--ws-muted); font-size:13px; }
+.overview-bank select,.notification-filters select { background:var(--ws-card); color:var(--ws-ink); border:1px solid var(--ws-line); border-radius:10px; padding:10px 12px; }
+.dashboard-toolbar { flex-wrap:wrap; gap:14px; }
+.notification-filters { display:flex; flex-wrap:wrap; align-items:end; gap:14px; }
+.notification-filters label { flex:1 1 160px; display:grid; gap:7px; min-width:0; }
+.notification-filters select { width:100%; }
+@media(max-width:600px) { .overview-bank { margin-left:0; } .notification-filters label { flex-basis:100%; } }

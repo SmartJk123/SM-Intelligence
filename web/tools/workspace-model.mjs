@@ -11,12 +11,13 @@ export function createWorkspaceStore(accounts, transactions) {
   const states = new Map();
   const state = (user) => {
     if (!states.has(user.id)) {
-      const populated = ['seed-returning', 'seed-business', 'seed-slow', 'seed-error'].includes(
+      const populated = user.id.startsWith('realistic-') || ['seed-returning', 'seed-business', 'seed-slow', 'seed-error'].includes(
         user.id,
       );
       const factor = user.kind === 'organization' ? 8 : 1;
       const end = today(),
         start = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+      const realistic = user.id.startsWith('realistic-');
       states.set(user.id, {
         budgets: populated
           ? [
@@ -26,7 +27,7 @@ export function createWorkspaceStore(accounts, transactions) {
                 allocatedMinor: 1000000 * factor,
                 start,
                 end,
-                accountId: '',
+                accountId: realistic ? user.id+'-bank-0' : '',
                 threshold: 85,
               },
               {
@@ -58,7 +59,7 @@ export function createWorkspaceStore(accounts, transactions) {
                 principalMinor: 5000000 * factor,
                 currentValueMinor: 5150000 * factor,
                 valuationDate: end,
-                maturityDate: new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10),
+                maturityDate: new Date(Date.now() + (realistic ? 3 : 45) * 86400000).toISOString().slice(0, 10),
               },
             ]
           : [],
@@ -69,7 +70,7 @@ export function createWorkspaceStore(accounts, transactions) {
           balanceAlerts: true,
           maturityAlerts: true,
         },
-        read: [],
+        read: realistic ? ['transaction:'+user.id+'-activity-0'] : [],
         audit: [],
       });
     }

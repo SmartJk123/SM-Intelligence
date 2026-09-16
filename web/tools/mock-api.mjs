@@ -52,6 +52,10 @@ export function startMockServer(port = 4301, webPort = 4200) {
       kind: 'individual',
       setupCompleted: true,
     });
+  for (const [email,id,name,kind] of [
+    ['realistic@example.com','realistic-personal','Nia Kamau','individual'],
+    ['retail@example.com','realistic-retail','Acacia Retail Demo','organization'],
+  ]) users.set(email,{id,name,email,kind,password:'SamplePass123!',setupCompleted:true});
   const records = [...users.values()].map((user) => sampleRecords(user));
   const accounts = records.flatMap((r) => r.accounts);
   const transactions = records.flatMap((r) => r.transactions);
@@ -104,7 +108,9 @@ export function startMockServer(port = 4301, webPort = 4200) {
       if (user.id === 'seed-slow') await new Promise((resolve) => setTimeout(resolve, 3000));
       const days = Number(new URL(req.url, 'http://localhost').searchParams.get('days') ?? 30);
       if (![30, 90].includes(days)) return send(400, { error: 'Unsupported period' });
-      return send(200, dashboardData(user, accounts, transactions, days));
+      const bank = new URL(req.url, 'http://localhost').searchParams.get('bank') || '';
+      if (bank && !['KCB','Equity','Stanbic','NCBA'].includes(bank)) return send(400, {error:'Invalid bank'});
+      return send(200, dashboardData(user, accounts, transactions, days, new Date(), bank));
     }
     if (req.method === 'POST' && path === '/api/auth/logout') {
       sessions.delete(cookie);

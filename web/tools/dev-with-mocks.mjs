@@ -32,7 +32,7 @@ server.on('error', (e) => {
 });
 server.once('listening', () => {
   console.log(
-    `Mock dashboard: http://localhost:${port}/login\nSample users: individual@example.com, business@example.com, new@example.com, empty@example.com\nPassword: SamplePass123!\nRecords reset on restart. Use fictional details only.`,
+    `Mock dashboard: http://localhost:${port}/login\nSample users: individual@example.com, business@example.com, new@example.com, empty@example.com, realistic@example.com, retail@example.com\nPassword: SamplePass123!\nRecords reset on restart. Use fictional details only.`,
   );
   const app = spawn(
     process.execPath,

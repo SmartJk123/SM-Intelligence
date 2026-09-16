@@ -1,3 +1,4 @@
+import { matchesNotification, NotificationItem } from './notification-filter';
 import { WorkspaceIcon } from './workspace-icon';
 import { FinanceChart, CategoryChart } from './finance-chart';
 import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
@@ -245,8 +246,46 @@ export class WorkspacePage implements OnInit, OnDestroy {
           );
     return alerts;
   }
+  notificationTimeline = '';
+  notificationCategory = '';
+  notificationTransaction = '';
+  notificationImportant = '';
+  notificationBank = '';
+  readonly notificationBanks = ['KCB', 'Equity', 'Stanbic', 'NCBA'];
+  resetNotificationFilters() {
+    this.notificationTimeline = this.notificationCategory = this.notificationTransaction = this.notificationImportant = this.notificationBank = '';
+    this.unreadOnly = false;
+  }
+  get notificationItems(): NotificationItem[] {
+    const d = this.data();
+    if (!d) return [];
+    const bankFor = (id: string) => d.accounts.find(a => a.id === id)?.bank ?? '';
+    const warnings = this.alerts.map(a => {
+      const id = a.id.slice(a.id.indexOf(':')+1);
+      const budget = a.id.startsWith('budget:') ? d.budgets.find(b => b.id === id) : undefined;
+      // Active warnings have no persisted event timestamp; do not invent one.
+      return {...a, date:'', category:budget?.category ?? '', transaction:'',
+        important:a.id.startsWith('balance:') ? 'funds' : budget ? 'budget' : 'maturity',
+        bank:a.id.startsWith('balance:') ? bankFor(id) : budget ? bankFor(budget.accountId) : ''};
+    });
+    const transactions = d.transactions.map(t => ({
+      id:'transaction:' + t.id, title:t.description,
+      message:(t.direction === 'CREDIT' ? 'Received' : 'Sent') + ' · KES ' + (t.amountMinor/100).toLocaleString('en-KE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' · ' + t.category + ' · ' + t.status,
+      target:'transactions', read:d.read.includes('transaction:' + t.id), date:t.date.slice(0,10), category:t.category,
+      transaction:t.status === 'PENDING' ? 'pending' : t.status === 'POSTED' ? (t.direction === 'CREDIT' ? 'received' : 'sent') : t.status.toLowerCase(), important:'', bank:bankFor(t.accountId)
+    }));
+    for (let i=0;i<transactions.length;i++) {
+      const t = d.transactions[i];
+      if(t.status !== 'POSTED') transactions[i].message = t.status + ' · KES ' + (t.amountMinor/100).toLocaleString('en-KE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' · ' + t.category;
+    }
+    return [...warnings, ...transactions.sort((a,b)=>b.date.localeCompare(a.date))];
+  }
   get visibleAlerts() {
-    return this.alerts.filter((a) => !this.unreadOnly || !a.read);
+    const today = new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Nairobi',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    return this.notificationItems.filter(a => matchesNotification(a, {
+      timeline:this.notificationTimeline,category:this.notificationCategory,transaction:this.notificationTransaction,
+      important:this.notificationImportant,bank:this.notificationBank,unread:this.unreadOnly
+    }, today));
   }
   get reportRows(): Record<string, unknown>[] {
     if (this.report === 'accounts')
