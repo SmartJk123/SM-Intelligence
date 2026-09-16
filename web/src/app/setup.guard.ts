@@ -1,6 +1,9 @@
+// Route guards for login, setup and dashboard access.
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AccountApi } from './account-api';
+
+// Update carefully when authentication flow changes.
 export const setupGuard: CanActivateFn = async () => {
   const api = inject(AccountApi);
   const router = inject(Router);

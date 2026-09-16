@@ -1,3 +1,4 @@
+// Reusable controller for Accounts, Transactions, Cash Flow, Budgets, Investments, Analytics, Reports, Notifications and Settings pages.
 import { matchesNotification, NotificationItem } from './notification-filter';
 import { WorkspaceIcon } from './workspace-icon';
 import { FinanceChart, CategoryChart } from './finance-chart';
@@ -10,6 +11,8 @@ import { WorkspaceApi, WorkspaceData, Budget, Investment, Entry } from './worksp
 import { BankLogo } from './bank-logo';
 import { AccountApi } from './account-api';
 import { workspaceLinks } from './workspace-shell';
+
+// Reuse this component across routes by reacting to each route's data.page value.
 type EditField = {
   key: string;
   label: string;
@@ -20,10 +23,13 @@ type EditField = {
   step?: string;
   options?: { value: string; label: string }[];
 };
+
 @Component({
   imports: [CurrencyPipe, DatePipe, FormsModule, RouterLink, BankLogo, FinanceChart, CategoryChart, WorkspaceIcon],
   templateUrl: './workspace-page.html',
 })
+
+// Navigation metadata supplies the visible page title to avoid duplicating labels.
 export class WorkspacePage implements OnInit, OnDestroy {
   private api = inject(WorkspaceApi);
   private accountsApi = inject(AccountApi);

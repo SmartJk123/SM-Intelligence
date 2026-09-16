@@ -1,5 +1,7 @@
+// Reusable bank-logo component.
 import { Component, input, signal } from '@angular/core';
 
+// Maps known bank names to display assets/initials without coupling pages to branding logic.
 const BANK_LOGOS: Record<string, { src: string; name: string; key: string }> = {
   KCB: {
     src: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS7qMLGNZqCiHTP5c2vowvuGbboQQXVXo4ZSWR-ih8qoA&s',
@@ -50,6 +52,7 @@ const BANK_LOGOS: Record<string, { src: string; name: string; key: string }> = {
     }
   `,
 })
+
 export class BankLogo {
   readonly bank = input.required<string>();
   readonly failedUrl = signal('');

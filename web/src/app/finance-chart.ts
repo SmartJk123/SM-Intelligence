@@ -1,6 +1,8 @@
+// Reusable SVG/chart components for financial trends and category breakdowns.
 import { smoothChartPath } from './smooth-chart';
 import { Component, input, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+
 @Component({
   selector: 'app-finance-chart',
   imports: [CurrencyPipe, DatePipe],
@@ -71,6 +73,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
     }
   `,
 })
+
 export class FinanceChart {
   readonly mode = input('bar');
   linePath(key: 'in' | 'out') {
@@ -90,6 +93,7 @@ export class FinanceChart {
     );
   }
 }
+
 @Component({
   selector: 'app-category-chart',
   imports: [CurrencyPipe],
@@ -128,6 +132,7 @@ export class FinanceChart {
     </p>
   `,
 })
+
 export class CategoryChart {
   readonly points = input.required<{ category: string; value: number }[]>();
   readonly selected = signal('');

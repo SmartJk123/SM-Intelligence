@@ -1,3 +1,4 @@
+// Small chart helper used to create smooth SVG paths from numeric data points.
 /** Cubic segments stay within each pair of values; no fabricated extrema. */
 export function smoothChartPath(values: number[], maximum: number): string {
   if (!values.length) return '';

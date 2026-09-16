@@ -1,6 +1,9 @@
+// Public landing page for SM-Intelligence.
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { BankLogo } from './bank-logo';
+
+// Keep this page informational and separate from the authenticated workspace.
 @Component({
   imports: [RouterLink, BankLogo],
   template: `
@@ -144,6 +147,7 @@ import { BankLogo } from './bank-logo';
     </section>
   `,
 })
+
 export class Landing {
   features = [
     {

@@ -1,5 +1,9 @@
+// Central route map.
+// Guards protect authentication/setup flows; workspace pages are lazy-loaded.
 import { setupGuard, dashboardGuard, entryGuard } from './setup.guard';
 import { Routes } from '@angular/router';
+
+// Add authenticated customer-facing routes here so they inherit dashboardGuard and WorkspaceShell.
 export const routes: Routes = [
   {
     path: '',

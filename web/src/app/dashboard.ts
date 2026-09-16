@@ -1,3 +1,4 @@
+// Customer financial overview.
 import { WorkspaceIcon } from './workspace-icon';
 import { CategoryChart, FinanceChart } from './finance-chart';
 import { Component, inject, signal } from '@angular/core';
@@ -43,6 +44,8 @@ interface DashboardData {
   transactions: Transaction[];
   transactionCount: number;
 }
+
+// Converts workspace API data into summary metrics and dashboard visualizations.
 @Component({
   imports: [CurrencyPipe, DatePipe, BankLogo, FinanceChart, CategoryChart, WorkspaceIcon],
   template: `
@@ -273,6 +276,7 @@ interface DashboardData {
     </section>
   `,
 })
+
 export class Dashboard {
   private http = inject(HttpClient);
   readonly data = signal<DashboardData | null>(null);

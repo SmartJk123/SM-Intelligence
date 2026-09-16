@@ -1,3 +1,4 @@
+// Account-journey tests covering validation, authentication, setup and API behavior.
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
@@ -7,6 +8,7 @@ import { Auth } from './auth';
 import { Setup } from './setup';
 import { AccountApi } from './account-api';
 import { setupGuard } from './setup.guard';
+
 describe('Account journey', () => {
   const api = {
     authenticated: signal(false),
@@ -101,6 +103,7 @@ describe('Account journey', () => {
     expect(s.form.controls.accountName.value).toBe('Savings');
   });
 });
+
 describe('Account API contract', () => {
   beforeEach(() =>
     TestBed.configureTestingModule({

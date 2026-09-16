@@ -1,7 +1,10 @@
+// Authenticated workspace layout and navigation shared by all customer-facing finance pages.
 import { WorkspaceIcon } from './workspace-icon';
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AccountApi } from './account-api';
+
+// Single source of truth for authenticated navigation labels and routes.
 export const workspaceLinks = [
   { path: 'dashboard', label: 'Financial Overview', group: '', icon: '🌌' },
   { path: 'accounts', label: 'Accounts', group: 'FINANCES', icon: '💳' },
@@ -14,6 +17,7 @@ export const workspaceLinks = [
   { path: 'notifications', label: 'Notifications', group: 'ACCOUNT', icon: '🔔' },
   { path: 'settings', label: 'Profile and Settings', group: '', icon: '👤' },
 ];
+
 @Component({
   imports: [RouterLink, RouterLinkActive, RouterOutlet, WorkspaceIcon],
   template: ` <div class="workspace-shell" (keydown.escape)="closeMenu()">
@@ -105,6 +109,7 @@ export const workspaceLinks = [
     </nav>
   </div>`,
 })
+
 export class WorkspaceShell {
   readonly links = workspaceLinks;
   readonly api = inject(AccountApi);

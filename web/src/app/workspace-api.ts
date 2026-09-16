@@ -1,7 +1,9 @@
+// Shared workspace data service for loading, creating and deleting customer-facing financial records.
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 
+// Workspace pages intentionally share one aggregate endpoint to keep their data model consistent and reduce round trips.
 export interface BankAccount {
   id: string;
   bank: string;
@@ -59,6 +61,8 @@ export interface WorkspaceData {
   read: string[];
   audit: { at: string; action: string }[];
 }
+
+// Collection must match a backend-supported workspace resource. See API-CONTRACT.md.
 @Injectable({ providedIn: 'root' })
 export class WorkspaceApi {
   private http = inject(HttpClient);

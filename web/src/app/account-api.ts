@@ -1,6 +1,9 @@
+// Authentication and initial account-setup API service.
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
+
+// Keep endpoints aligned with API-CONTRACT.md. Update carefully when authentication flow changes.
 export type AccountKind = 'individual' | 'organization';
 export interface Registration {
   name: string;

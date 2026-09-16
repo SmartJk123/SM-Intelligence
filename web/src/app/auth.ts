@@ -1,7 +1,9 @@
+// Login and registration component.
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AccountApi, AccountKind } from './account-api';
+
 @Component({
   imports: [ReactiveFormsModule, RouterLink],
   template: `
@@ -137,6 +139,8 @@ import { AccountApi, AccountKind } from './account-api';
     </section>
   `,
 })
+
+// Owns form validation, submission state and navigation after authentication.
 export class Auth {
   private router = inject(Router);
   private api = inject(AccountApi);

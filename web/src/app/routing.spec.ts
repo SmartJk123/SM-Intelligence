@@ -1,9 +1,11 @@
+// Routing tests. Protects expected route/guard behavior from accidental navigation regressions.
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { AccountApi } from './account-api';
 import { setupGuard, dashboardGuard, entryGuard } from './setup.guard';
 import { Auth } from './auth';
+
 describe('Setup-aware destinations',()=>{
  const api={authenticated:signal(false),setupCompleted:signal(false),restoreSession:vi.fn(),login:vi.fn(),register:vi.fn()};
  beforeEach(()=>{vi.resetAllMocks();api.authenticated.set(false);api.setupCompleted.set(false);TestBed.configureTestingModule({providers:[provideRouter([]),{provide:AccountApi,useValue:api}]});});

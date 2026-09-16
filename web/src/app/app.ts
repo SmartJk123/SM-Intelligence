@@ -1,3 +1,4 @@
+// Root application shell.
 import { AccountApi } from './account-api';
 import { Component, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
@@ -40,6 +41,8 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
     }
   `,
 })
+
+// Controls public navigation, workspace detection and global sign-out behavior.
 export class App {
   readonly api = inject(AccountApi);
   private router = inject(Router);

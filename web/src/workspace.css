@@ -1,4 +1,5 @@
-/* Customer workspace: Azure surfaces shared by all routed pages. */
+/* Authenticated workspace styles.
+Shared by dashboard and finance pages; preserve responsive behavior when editing */
 :root {
   --ws-bg: #f4f8fd;
   --ws-card: #fff;

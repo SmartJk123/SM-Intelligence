@@ -1,4 +1,6 @@
+// Central SVG icon registry for workspace navigation and financial content icons.
 import { Component, input } from '@angular/core';
+
 const paths: Record<string,string> = {
   'content-budget': 'M3 9h18v12H3z M7 9V5h10v4 M9 5V2h6v3 M3 14h18 M9 17h6 M12 11v6',
   'content-attention': 'M12 3l10 18H2z M12 9v5 M12 17h.1',
@@ -25,6 +27,7 @@ const paths: Record<string,string> = {
   income: 'M5 16l6-6 4 4 6-9 M15 5h6v6',
   expense: 'M5 8l6 6 4-4 6 9 M15 19h6v-6',
 };
+
 @Component({selector:'app-workspace-icon',template:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path [attr.d]="path()" /></svg>`})
 export class WorkspaceIcon {
   readonly name = input('dashboard');

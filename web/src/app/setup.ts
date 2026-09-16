@@ -1,8 +1,10 @@
+// First-time account setup component.
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { BankLogo } from './bank-logo';
 import { AccountApi, AccountDetails } from './account-api';
+
 @Component({
   imports: [ReactiveFormsModule, RouterLink, BankLogo],
   template: `
@@ -141,6 +143,8 @@ import { AccountApi, AccountDetails } from './account-api';
     </section>
   `,
 })
+
+// Validates bank/account details before sending them to AccountApi.
 export class Setup {
   private fb = inject(FormBuilder);
   private api = inject(AccountApi);

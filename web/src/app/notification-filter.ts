@@ -1,3 +1,5 @@
+// Pure notification filtering helpers.
+// Keep these functions side-effect free so they remain easy to test.
 export interface NotificationFilters { timeline: string; category: string; transaction: string; important: string; bank: string; unread: boolean; }
 export interface NotificationItem { id: string; title: string; message: string; target: string; read: boolean; date: string; category: string; transaction: string; important: string; bank: string; }
 export function matchesNotification(item: NotificationItem, f: NotificationFilters, today: string): boolean {
