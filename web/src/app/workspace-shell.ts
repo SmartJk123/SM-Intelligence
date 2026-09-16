@@ -87,13 +87,13 @@ export const workspaceLinks = [
       <router-outlet />
     </div>
     <nav class="ws-bottom" aria-label="Mobile navigation">
-      <a routerLink="/dashboard" routerLinkActive="active"
+      <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page"
         ><app-workspace-icon name="dashboard" /><small>Overview</small></a
-      ><a routerLink="/accounts" routerLinkActive="active"
+      ><a routerLink="/accounts" routerLinkActive="active" ariaCurrentWhenActive="page"
         ><app-workspace-icon name="accounts" /><small>Accounts</small></a
-      ><a routerLink="/transactions" routerLinkActive="active"
+      ><a routerLink="/transactions" routerLinkActive="active" ariaCurrentWhenActive="page"
         ><app-workspace-icon name="transactions" /><small>Activity</small></a
-      ><a routerLink="/reports" routerLinkActive="active"
+      ><a routerLink="/reports" routerLinkActive="active" ariaCurrentWhenActive="page"
         ><app-workspace-icon name="reports" /><small>Reports</small></a
       ><button
         (click)="menu.set(!menu())"
