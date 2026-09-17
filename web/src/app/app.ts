@@ -48,6 +48,17 @@ export class App {
   private router = inject(Router);
   readonly inWorkspace = signal(false);
   constructor() {
+    // One-time, scoped reset requested for the fresh workspace rollout.
+    try {
+      if (localStorage.getItem('sm-fresh-workspace-v1') !== 'done') {
+        localStorage.removeItem('sm-intelligence-workspace-v1');
+        localStorage.removeItem('sm-intelligence-appearance');
+        sessionStorage.removeItem('sm-auth-session-v1');
+        sessionStorage.removeItem('sm-sample-auth-v1');
+        localStorage.setItem('sm-fresh-workspace-v1', 'done');
+      }
+    } catch {}
+
     const update = () =>
       this.inWorkspace.set(
         [

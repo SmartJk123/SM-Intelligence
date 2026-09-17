@@ -1,10 +1,11 @@
 // Central route map.
 // Guards protect authentication/setup flows; workspace pages are lazy-loaded.
-import { setupGuard, dashboardGuard, entryGuard } from './setup.guard';
+import { setupGuard, dashboardGuard, entryGuard, sampleGuard } from './setup.guard';
 import { Routes } from '@angular/router';
 
 // Add authenticated customer-facing routes here so they inherit dashboardGuard and WorkspaceShell.
 export const routes: Routes = [
+  { path: 'auth-check', canActivate: [sampleGuard], title: 'Authentication test | SM-Intelligence', loadComponent: () => import('./auth-check').then(m => m.AuthCheck) },
   {
     path: '',
     pathMatch: 'full',

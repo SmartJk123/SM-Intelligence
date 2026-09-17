@@ -26,6 +26,7 @@ Sections render conditionally from WorkspacePage.page.
   @if (loading()) {
     <div class="ws-empty" role="status">Loading your workspace…</div>
   } @else if (data(); as d) {
+    @if (d.source === 'local') { <p class="sample-label">Local workspace · Financial records reset when the development server restarts.</p> }
     @if (d.source === 'sample') {
       <p class="sample-label">
         Sample data · Local development · Changes reset when the mock API restarts

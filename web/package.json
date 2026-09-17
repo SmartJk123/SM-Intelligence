@@ -3,12 +3,14 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "node tools/dev-with-mocks.mjs --hosted-auth",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "start:mock": "node tools/dev-with-mocks.mjs",
-    "test:mock": "node --test tools/dashboard-model.test.mjs tools/workspace-model.test.mjs"
+    "test:mock": "node --test tools/dashboard-model.test.mjs tools/workspace-model.test.mjs",
+    "start:sample": "node tools/dev-with-mocks.mjs --hosted-auth",
+    "test:workflow": "node --test tools/hosted-workflow.test.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.1",

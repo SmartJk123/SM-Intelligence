@@ -40,7 +40,7 @@ describe('Account journey', () => {
     expect(api.register).not.toHaveBeenCalled();
     expect(a.mismatch()).toBe(true);
   });
-  it('navigates to setup only after successful login', async () => {
+  it('navigates to dashboard only after successful login', async () => {
     const router = TestBed.inject(Router);
     const nav = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const a = TestBed.createComponent(Auth).componentInstance;
@@ -50,7 +50,7 @@ describe('Account journey', () => {
     expect(nav).not.toHaveBeenCalled();
     api.login.mockResolvedValueOnce(undefined);
     await a.submit();
-    expect(nav).toHaveBeenCalledWith(['/setup']);
+    expect(nav).toHaveBeenCalledWith(['/dashboard']);
   });
   it('protects direct setup access without a restored session', async () => {
     api.restoreSession.mockResolvedValue(false);
@@ -134,5 +134,24 @@ describe('Account API contract', () => {
     const assertion = expect(pending).rejects.toThrow('did not confirm');
     TestBed.inject(HttpTestingController).expectOne('/api/accounts').flush({});
     await assertion;
+  });
+});
+
+describe('Hosted registration handoff', () => {
+  it('shows sign-in confirmation without trying to accept a user session', async () => {
+    TestBed.configureTestingModule({providers:[provideHttpClient(),provideHttpClientTesting(),provideRouter([])]});
+    const router=TestBed.inject(Router);
+    vi.spyOn(router,'url','get').mockReturnValue('/register');
+    const nav=vi.spyOn(router,'navigate').mockResolvedValue(true);
+    const auth=TestBed.createComponent(Auth).componentInstance;
+    auth.form.patchValue({name:'Fresh User',email:'fresh@example.invalid',password:'TestPassword123!',confirm:'TestPassword123!'});
+    const pending=auth.submit();
+    TestBed.inject(HttpTestingController).expectOne('/api/auth/register').flush({registered:true});
+    await pending;
+    expect(auth.created()).toBe(true);
+    expect(auth.error()).toBe('');
+    expect(nav).not.toHaveBeenCalled();
+    expect(auth.form.controls.password.value).toBe('');
+    TestBed.inject(HttpTestingController).verify();
   });
 });

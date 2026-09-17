@@ -52,7 +52,7 @@ export interface Profile {
   maturityAlerts: boolean;
 }
 export interface WorkspaceData {
-  source: 'sample' | 'live';
+  source: 'sample' | 'live' | 'local';
   accounts: BankAccount[];
   transactions: Entry[];
   budgets: Budget[];

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { startMockServer } from './mock-api.mjs';
+const hosted = process.argv.includes('--hosted-auth');
 const port = Number(process.env.MOCK_WEB_PORT || 4200);
 const apiPort = Number(process.env.MOCK_API_PORT || 4301);
 async function check(port, host) {
@@ -25,20 +26,20 @@ try {
   );
   process.exit(1);
 }
-const server = startMockServer(apiPort, port);
+const server = startMockServer(apiPort, port, { hostedAuth: hosted });
 server.on('error', (e) => {
   console.error('Mock API could not start:', e.message);
   process.exitCode = 1;
 });
 server.once('listening', () => {
-  console.log(
-    `Mock dashboard: http://localhost:${port}/login\nSample users: individual@example.com, business@example.com, new@example.com, empty@example.com, realistic@example.com, retail@example.com\nPassword: SamplePass123!\nRecords reset on restart. Use fictional details only.`,
-  );
+  console.log(`Workspace: http://localhost:${port}/login\nAuthentication: ${hosted ? 'hosted backend' : 'local development'}. No seeded records. Financial data resets on restart.`);
   const app = spawn(
     process.execPath,
     [
       'node_modules/@angular/cli/bin/ng.js',
       'serve',
+      '--configuration',
+      'development',
       '--host',
       'localhost',
       '--port',

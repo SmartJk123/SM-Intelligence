@@ -3,7 +3,10 @@ import { dashboardData, sampleRecords } from './dashboard-model.mjs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
-export function startMockServer(port = 4301, webPort = 4200) {
+export function startMockServer(port = 4301, webPort = 4200, options = {}) {
+  const hosted = options.hostedAuth === true;
+  const fetchAuth = options.fetchAuth || fetch;
+  const cookieName = hosted ? "sm_dev_session" : "sm_mock_session";
   const users = new Map([
     [
       'new@example.com',
@@ -56,18 +59,21 @@ export function startMockServer(port = 4301, webPort = 4200) {
     ['realistic@example.com','realistic-personal','Nia Kamau','individual'],
     ['retail@example.com','realistic-retail','Acacia Retail Demo','organization'],
   ]) users.set(email,{id,name,email,kind,password:'SamplePass123!',setupCompleted:true});
+  if (options.seed !== true || hosted) users.clear();
   const records = [...users.values()].map((user) => sampleRecords(user));
   const accounts = records.flatMap((r) => r.accounts);
   const transactions = records.flatMap((r) => r.transactions);
   const workspace = createWorkspaceStore(accounts, transactions);
   const failedOnce = new Set();
   const sessions = new Map();
+  const expiries = new Map();
   const publicUser = ({ id, name, kind, setupCompleted }) => ({ id, name, kind, setupCompleted });
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json');
     const send = (status, data) => {
       res.writeHead(status);
+      if (hosted && data?.source === "sample") data = { ...data, source: "local" };
       res.end(JSON.stringify(data));
     };
     // Development only. Never listen on a public interface or enable CORS.
@@ -79,8 +85,9 @@ export function startMockServer(port = 4301, webPort = 4200) {
     const cookie = req.headers.cookie
       ?.split(';')
       .map((v) => v.trim())
-      .find((v) => v.startsWith('sm_mock_session='))
-      ?.slice('sm_mock_session='.length);
+      .find((v) => v.startsWith(cookieName + '='))
+      ?.slice(cookieName.length + 1);
+    if (hosted && (expiries.get(cookie) || 0) <= Date.now()) { sessions.delete(cookie); expiries.delete(cookie); }
     const email = sessions.get(cookie);
     const user = email && users.get(email);
     const path = req.url?.split('?')[0];
@@ -114,7 +121,8 @@ export function startMockServer(port = 4301, webPort = 4200) {
     }
     if (req.method === 'POST' && path === '/api/auth/logout') {
       sessions.delete(cookie);
-      res.setHeader('Set-Cookie', 'sm_mock_session=; HttpOnly; SameSite=Lax; Path=/api; Max-Age=0');
+      expiries.delete(cookie);
+      res.setHeader('Set-Cookie', cookieName + '=; HttpOnly; SameSite=Lax; Path=/api; Max-Age=0');
       return send(200, {});
     }
     if (req.method === 'GET' && path === '/api/accounts')
@@ -141,6 +149,45 @@ export function startMockServer(port = 4301, webPort = 4200) {
         } catch (e) {
           return send(e.status || 400, { error: e.message });
         }
+      }
+      if (hosted && (path === '/api/auth/login' || path === '/api/auth/register')) {
+        const email = typeof body.email === 'string' ? body.email.trim() : '';
+        if (!email || typeof body.password !== 'string' || !body.password) return send(400, {error:'Email and password are required'});
+        const registering = path.endsWith('/register');
+        if (registering && (!body.name?.trim() || !['individual','organization'].includes(body.kind) || body.password.length < 12))
+          return send(400, {error:'Invalid registration'});
+        let response;
+        try {
+          response = await fetchAuth('https://sm-backend-dev.onrender.com' + path, {
+            method:'POST', headers:{'Content-Type':'application/json'}, signal:AbortSignal.timeout(90000),
+            body:JSON.stringify(registering ? {name:body.name.trim(),email,password:body.password,phoneNumber:body.phone?.trim() || ''} : {email,password:body.password}),
+          });
+        } catch { return send(503, {error:'Authentication service is unavailable. Please retry.'}); }
+        if (!response.ok) return send(response.status, {error:'Authentication request failed'});
+        // Never forward registration entities: the hosted sample includes password hashes.
+        if (registering) {
+          await response.arrayBuffer();
+          users.set(email,{id:randomUUID(),name:body.name.trim(),email,kind:body.kind,setupCompleted:false});
+          return send(201,{registered:true});
+        }
+        let claims;
+        try {
+          const result=await response.json();
+          const token=result.accessToken ?? result.token;
+          claims=JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString('utf8'));
+          if (claims.sub !== email || !Number.isFinite(claims.exp) || claims.exp*1000 <= Date.now()) throw new Error();
+        } catch { return send(502,{error:'Invalid session from authentication service'}); }
+        // Trust only a token received directly from successful HTTPS credential verification.
+        // The browser never supplies a token to this adapter.
+        let target=users.get(email);
+        if (!target) {
+          target={id:randomUUID(),name:email.split('@')[0],email,kind:'individual',setupCompleted:false};
+          users.set(email,target);
+        }
+        const session=randomUUID();
+        sessions.set(session,email);expiries.set(session,claims.exp*1000);
+        res.setHeader('Set-Cookie', cookieName+'='+session+'; HttpOnly; SameSite=Lax; Path=/api');
+        return send(200,{user:publicUser(target)});
       }
       if (path === '/api/auth/login' || path === '/api/auth/register') {
         const normalized = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';

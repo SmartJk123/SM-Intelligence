@@ -28,7 +28,7 @@ interface Transaction {
 }
 interface DashboardData {
   bank?: string;
-  source: 'sample' | 'live';
+  source: 'sample' | 'live' | 'local';
   currency: 'KES';
   user: { name: string; kind: string };
   period: { from: string; to: string; days: number };
@@ -99,6 +99,7 @@ interface DashboardData {
           <button class="button" (click)="load()">Try again</button>
         </div>
       } @else if (data(); as d) {
+        @if (d.source === 'local') { <p class="sample-label">Local workspace · Financial records reset when the development server restarts.</p> }
         @if (d.source === 'sample') {
           <p class="sample-label">Sample data · Local development</p>
         }
