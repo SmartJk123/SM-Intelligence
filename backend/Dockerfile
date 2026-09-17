@@ -37,4 +37,11 @@ COPY --from=builder /workspace/${SERVICE}/target/*.jar app.jar
 # Run as non-root user
 USER 1001:1001
 
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+ENTRYPOINT ["java", \
+  "-Xms128m", \
+  "-Xmx256m", \
+  "-Xss256k", \
+  "-XX:MaxMetaspaceSize=128m", \
+  "-XX:TieredStopAtLevel=1", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-jar", "app.jar"]
