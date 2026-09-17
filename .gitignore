@@ -1,0 +1,66 @@
+# ============================================================
+# Maven & Java build outputs
+# ============================================================
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+*.log.*
+logs/
+**/logs/
+
+# ============================================================
+# IDEs and Editors
+# ============================================================
+.idea/
+*.iml
+*.iws
+*.ipr
+.settings/
+.project
+.classpath
+.factorypath
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+*.sublime-workspace
+*.sublime-project
+
+# ============================================================
+# OS & Environment
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+.env
+.env.local
+
+# ============================================================
+# Node / Frontend dependencies (if built at root)
+# ============================================================
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.angular/
