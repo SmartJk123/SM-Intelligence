@@ -49,7 +49,7 @@ export const workspaceLinks = [
         }
       </nav>
       <div class="ws-sidebar-foot">
-        <span class="ws-avatar">SM</span>
+        <span class="ws-avatar">{{ api.initials() }}</span>
         <div>
           <strong>{{
             api.kind() === 'organization' ? 'Organization workspace' : 'Personal workspace'
@@ -82,7 +82,7 @@ export const workspaceLinks = [
           <span class="ws-currency">KES</span
           ><a routerLink="/notifications" aria-label="Open notifications"
             >Notifications <app-workspace-icon name="notifications" /></a
-          ><a class="ws-avatar" routerLink="/settings" aria-label="Open profile and settings">SM</a>
+          ><a class="ws-avatar" routerLink="/settings" [attr.title]="api.displayName() || 'Profile and settings'" aria-label="Open profile and settings">{{ api.initials() }}</a>
         </div>
       </header>
       @if (error()) {

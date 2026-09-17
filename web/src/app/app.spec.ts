@@ -137,8 +137,9 @@ describe('Account API contract', () => {
   });
 });
 
-describe('Hosted registration handoff', () => {
-  it('shows sign-in confirmation without trying to accept a user session', async () => {
+
+describe('Automatic sign-in after registration', () => {
+  it.each([true, false])('handles automatic sign-in success=%s without registering twice', async (success) => {
     TestBed.configureTestingModule({providers:[provideHttpClient(),provideHttpClientTesting(),provideRouter([])]});
     const router=TestBed.inject(Router);
     vi.spyOn(router,'url','get').mockReturnValue('/register');
@@ -146,12 +147,21 @@ describe('Hosted registration handoff', () => {
     const auth=TestBed.createComponent(Auth).componentInstance;
     auth.form.patchValue({name:'Fresh User',email:'fresh@example.invalid',password:'TestPassword123!',confirm:'TestPassword123!'});
     const pending=auth.submit();
-    TestBed.inject(HttpTestingController).expectOne('/api/auth/register').flush({registered:true});
+    const http=TestBed.inject(HttpTestingController);
+    http.expectOne('/api/auth/register').flush({registered:true});
+    await vi.waitFor(() => {
+      const request=http.expectOne('/api/auth/login');
+      expect(request.request.body).toEqual({email:'fresh@example.invalid',password:'TestPassword123!'});
+      if(success) request.flush({user:{id:'fresh',kind:'individual',setupCompleted:false}});
+      else request.flush({}, {status:503,statusText:'Unavailable'});
+    });
     await pending;
-    expect(auth.created()).toBe(true);
+    expect(auth.created()).toBe(!success);
     expect(auth.error()).toBe('');
-    expect(nav).not.toHaveBeenCalled();
+    if(success) expect(nav).toHaveBeenCalledWith(['/dashboard']);
+    else expect(nav).not.toHaveBeenCalled();
     expect(auth.form.controls.password.value).toBe('');
-    TestBed.inject(HttpTestingController).verify();
+    expect(auth.form.controls.confirm.value).toBe('');
+    http.verify();
   });
 });

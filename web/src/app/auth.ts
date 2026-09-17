@@ -33,7 +33,7 @@ import { AccountApi, AccountKind } from './account-api';
           <p class="muted">Sample backend: registration and login only. Use test credentials.</p>
         }
         @if (created()) {
-          <p role="status">Account created successfully. Sign in with your new credentials.</p>
+          <p role="status">Your account was created, but automatic sign-in could not complete. Please sign in to continue.</p>
           <a class="button" routerLink="/login">Continue to sign in</a>
         } @else {
         <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -202,7 +202,17 @@ export class Auth {
           password: value.password,
           kind: value.kind,
         });
-        if (result === 'sign-in') { this.form.controls.password.reset(); this.form.controls.confirm.reset(); this.created.set(true); return; }
+        if (result === 'sign-in') {
+          try {
+            await this.api.login({ email: value.email.trim(), password: value.password });
+          } catch {
+            // Registration already succeeded: never submit it again on a login failure.
+            this.form.controls.password.reset();
+            this.form.controls.confirm.reset();
+            this.created.set(true);
+            return;
+          }
+        }
       }
       else await this.api.login({ email: value.email.trim(), password: value.password });
       if (this.api.sampleMode) {
@@ -212,9 +222,9 @@ export class Auth {
         else await this.router.navigate(['/auth-check']);
         return;
       }
-      await this.router.navigate([
-        this.register ? '/setup' : '/dashboard',
-      ]);
+      this.form.controls.password.reset();
+      this.form.controls.confirm.reset();
+      await this.router.navigate(['/dashboard']);
     } catch (e) {
       this.error.set(
         'Unable to ' +

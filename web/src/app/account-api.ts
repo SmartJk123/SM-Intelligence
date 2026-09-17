@@ -1,5 +1,5 @@
 // Authentication and initial account-setup API service.
-import { Injectable, InjectionToken, inject, signal } from '@angular/core';
+import { Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 
@@ -25,7 +25,7 @@ export interface AccountDetails {
   currency: 'KES';
 }
 interface Session {
-  user: { id: string; kind: AccountKind; setupCompleted: boolean };
+  user: { name?: string; email?: string; id: string; kind: AccountKind; setupCompleted: boolean };
 }
 // Same-origin, cookie-based API contract. See API-CONTRACT.md before backend integration.
 @Injectable({ providedIn: 'root' })
@@ -33,6 +33,15 @@ export class AccountApi {
   private http = inject(HttpClient);
   readonly sampleMode = inject(SAMPLE_AUTH_MODE);
   readonly email = signal('');
+  readonly displayName = signal('');
+  readonly initials = computed(() => {
+    const name = this.displayName().trim() || this.email().split('@')[0];
+    const words = name.match(/[\p{L}\p{N}]+/gu) || [];
+    if (!words.length) return '?';
+    const first = Array.from(words[0] || '')[0] || '';
+    const last = words.length > 1 ? Array.from(words[words.length - 1] || '')[0] || '' : '';
+    return (first + last).toLocaleUpperCase();
+  });
   private expiryTimer?: ReturnType<typeof setTimeout>;
   private readonly sessionKey = 'sm-sample-auth-v1';
   private acceptToken(token: string, email: string) {
@@ -60,6 +69,8 @@ export class AccountApi {
         'The account service returned an invalid session. Please try signing in again.',
       );
     this.authenticated.set(true);
+    this.displayName.set(session.user.name?.trim() || '');
+    this.email.set(session.user.email || '');
     this.kind.set(session.user.kind);
     this.setupCompleted.set(session.user.setupCompleted);
   }
@@ -104,6 +115,7 @@ export class AccountApi {
       );
       return true;
     } catch {
+      this.displayName.set('');
       this.authenticated.set(false);
       this.setupCompleted.set(false);
       return false;

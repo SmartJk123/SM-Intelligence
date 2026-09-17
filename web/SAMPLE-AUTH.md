@@ -1,7 +1,7 @@
 # Normal workflow with hosted authentication
 In VS Code, stop the previous server with Ctrl+C and run npm start from web.
 npm run start:sample is an alias for the same workflow.
-Register → sign in → dashboard. Add accounts from the workspace when ready.
+Register → automatic sign-in → dashboard. Returning users: sign in → dashboard. Add accounts from the workspace when ready.
 Existing registered users can sign in. Backend identities are not deleted.
 
 Authentication is checked by the hosted Render backend over HTTPS.

@@ -1,7 +1,8 @@
+import { AccountApi } from './account-api';
 // Shared workspace data service for loading, creating and deleting customer-facing financial records.
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom, timeout } from 'rxjs';
+import { firstValueFrom, timeout, tap } from 'rxjs';
 
 // Workspace pages intentionally share one aggregate endpoint to keep their data model consistent and reduce round trips.
 export interface BankAccount {
@@ -66,12 +67,16 @@ export interface WorkspaceData {
 @Injectable({ providedIn: 'root' })
 export class WorkspaceApi {
   private http = inject(HttpClient);
+  private account = inject(AccountApi);
   load() {
-    return firstValueFrom(this.http.get<WorkspaceData>('/api/workspace').pipe(timeout(15000)));
+    return firstValueFrom(this.http.get<WorkspaceData>('/api/workspace').pipe(timeout(15000), tap(data => this.account.displayName.set(data.profile.name))));
   }
   save(collection: string, body: unknown) {
     return firstValueFrom(
-      this.http.post('/api/workspace/' + collection, body).pipe(timeout(15000)),
+      this.http.post('/api/workspace/' + collection, body).pipe(timeout(15000), tap(() => {
+        if (collection === 'profile' && body && typeof body === 'object' && 'name' in body && typeof body.name === 'string')
+          this.account.displayName.set(body.name.trim());
+      })),
     );
   }
   remove(collection: string, id: string) {
