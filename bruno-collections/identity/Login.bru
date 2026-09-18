@@ -1,0 +1,22 @@
+meta {
+  name: Login User
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "emailAddress": "frankie@example.com",
+    "password": "password123"
+  }
+}
+
+vars:post-response {
+  token: res.body.token
+}
