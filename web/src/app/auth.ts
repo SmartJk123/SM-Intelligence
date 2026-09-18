@@ -1,7 +1,9 @@
+// Login and registration component.
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AccountApi, AccountKind } from './account-api';
+
 @Component({
   imports: [ReactiveFormsModule, RouterLink],
   template: `
@@ -27,6 +29,13 @@ import { AccountApi, AccountKind } from './account-api';
               : 'Sign in to your SM-Intelligence account.'
           }}
         </p>
+        @if (api.sampleMode) {
+          <p class="muted">Sample backend: registration and login only. Use test credentials.</p>
+        }
+        @if (created()) {
+          <p role="status">Your account was created, but automatic sign-in could not complete. Please sign in to continue.</p>
+          <a class="button" routerLink="/login">Continue to sign in</a>
+        } @else {
         <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
           @if (register) {
             <fieldset class="kind">
@@ -126,7 +135,9 @@ import { AccountApi, AccountKind } from './account-api';
           <button class="button full" type="submit" [disabled]="pending()">
             {{ pending() ? 'Please wait…' : register ? 'Create account →' : 'Sign in →' }}
           </button>
+          @if (pending() && api.sampleMode) { <p role="status">Connecting… the sample server may take a minute to wake up.</p> }
         </form>
+        }
         <p class="auth-switch">
           {{ register ? 'Already have an account?' : 'New to SM-Intelligence?' }}
           <a [routerLink]="register ? '/login' : '/register'">{{
@@ -137,9 +148,12 @@ import { AccountApi, AccountKind } from './account-api';
     </section>
   `,
 })
+
+// Owns form validation, submission state and navigation after authentication.
 export class Auth {
   private router = inject(Router);
-  private api = inject(AccountApi);
+  readonly api = inject(AccountApi);
+  readonly created = signal(false);
   private fb = inject(FormBuilder);
   readonly register = this.router.url.startsWith('/register');
   readonly form = this.fb.nonNullable.group({
@@ -177,18 +191,40 @@ export class Auth {
     this.pending.set(true);
     try {
       const value = this.form.getRawValue();
-      if (this.register)
-        await this.api.register({
+      if (this.register && new TextEncoder().encode(value.password).length > 72) {
+        this.error.set('Password must be at most 72 UTF-8 bytes.'); return;
+      }
+      if (this.register) {
+        const result = await this.api.register({
           name: value.name.trim(),
           email: value.email.trim(),
           phone: value.phone,
           password: value.password,
           kind: value.kind,
         });
+        if (result === 'sign-in') {
+          try {
+            await this.api.login({ email: value.email.trim(), password: value.password });
+          } catch {
+            // Registration already succeeded: never submit it again on a login failure.
+            this.form.controls.password.reset();
+            this.form.controls.confirm.reset();
+            this.created.set(true);
+            return;
+          }
+        }
+      }
       else await this.api.login({ email: value.email.trim(), password: value.password });
-      await this.router.navigate([
-        this.register || !this.api.setupCompleted() ? '/setup' : '/dashboard',
-      ]);
+      if (this.api.sampleMode) {
+        this.form.controls.password.reset();
+        this.form.controls.confirm.reset();
+        if (this.register) this.created.set(true);
+        else await this.router.navigate(['/auth-check']);
+        return;
+      }
+      this.form.controls.password.reset();
+      this.form.controls.confirm.reset();
+      await this.router.navigate(['/dashboard']);
     } catch (e) {
       this.error.set(
         'Unable to ' +

@@ -1,3 +1,4 @@
+// Account-journey tests covering validation, authentication, setup and API behavior.
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
@@ -7,6 +8,7 @@ import { Auth } from './auth';
 import { Setup } from './setup';
 import { AccountApi } from './account-api';
 import { setupGuard } from './setup.guard';
+
 describe('Account journey', () => {
   const api = {
     authenticated: signal(false),
@@ -38,7 +40,7 @@ describe('Account journey', () => {
     expect(api.register).not.toHaveBeenCalled();
     expect(a.mismatch()).toBe(true);
   });
-  it('navigates to setup only after successful login', async () => {
+  it('navigates to dashboard only after successful login', async () => {
     const router = TestBed.inject(Router);
     const nav = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const a = TestBed.createComponent(Auth).componentInstance;
@@ -48,7 +50,7 @@ describe('Account journey', () => {
     expect(nav).not.toHaveBeenCalled();
     api.login.mockResolvedValueOnce(undefined);
     await a.submit();
-    expect(nav).toHaveBeenCalledWith(['/setup']);
+    expect(nav).toHaveBeenCalledWith(['/dashboard']);
   });
   it('protects direct setup access without a restored session', async () => {
     api.restoreSession.mockResolvedValue(false);
@@ -101,6 +103,7 @@ describe('Account journey', () => {
     expect(s.form.controls.accountName.value).toBe('Savings');
   });
 });
+
 describe('Account API contract', () => {
   beforeEach(() =>
     TestBed.configureTestingModule({
@@ -131,5 +134,34 @@ describe('Account API contract', () => {
     const assertion = expect(pending).rejects.toThrow('did not confirm');
     TestBed.inject(HttpTestingController).expectOne('/api/accounts').flush({});
     await assertion;
+  });
+});
+
+
+describe('Automatic sign-in after registration', () => {
+  it.each([true, false])('handles automatic sign-in success=%s without registering twice', async (success) => {
+    TestBed.configureTestingModule({providers:[provideHttpClient(),provideHttpClientTesting(),provideRouter([])]});
+    const router=TestBed.inject(Router);
+    vi.spyOn(router,'url','get').mockReturnValue('/register');
+    const nav=vi.spyOn(router,'navigate').mockResolvedValue(true);
+    const auth=TestBed.createComponent(Auth).componentInstance;
+    auth.form.patchValue({name:'Fresh User',email:'fresh@example.invalid',password:'TestPassword123!',confirm:'TestPassword123!'});
+    const pending=auth.submit();
+    const http=TestBed.inject(HttpTestingController);
+    http.expectOne('/api/auth/register').flush({registered:true});
+    await vi.waitFor(() => {
+      const request=http.expectOne('/api/auth/login');
+      expect(request.request.body).toEqual({email:'fresh@example.invalid',password:'TestPassword123!'});
+      if(success) request.flush({user:{id:'fresh',kind:'individual',setupCompleted:false}});
+      else request.flush({}, {status:503,statusText:'Unavailable'});
+    });
+    await pending;
+    expect(auth.created()).toBe(!success);
+    expect(auth.error()).toBe('');
+    if(success) expect(nav).toHaveBeenCalledWith(['/dashboard']);
+    else expect(nav).not.toHaveBeenCalled();
+    expect(auth.form.controls.password.value).toBe('');
+    expect(auth.form.controls.confirm.value).toBe('');
+    http.verify();
   });
 });
