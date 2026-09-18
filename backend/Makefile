@@ -1,4 +1,4 @@
-.PHONY: up down logs build validate
+.PHONY: up down logs build validate test
 
 # Start all infrastructure (databases + Kafka) in the background
 up:

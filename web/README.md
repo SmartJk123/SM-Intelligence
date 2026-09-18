@@ -1,10 +1,10 @@
 # SM-Intelligence customer frontend
 
-Angular customer frontend using the Azure design. Main flow: Landing -> Registration -> Account setup -> Dashboard. Login returns unfinished users to setup and completed users to the dashboard, using the server-provided setupCompleted flag. Light mode is the default; appearance controls belong in customer Settings.
+Angular customer frontend using the Azure design. Main flow: Landing -> Registration -> automatic sign-in -> Dashboard. Returning users sign in to the Dashboard; accounts can be added from the workspace. The setup route remains available for onboarding. Light mode is the default; appearance controls belong in customer Settings.
 
 ## Development
 
-Use Node 24.15+ and npm 11+ (see `.mise.toml`).
+Use Node matching the package engines (`^24.15.0 || >=26.0.0`) and npm 11+ (see `.mise.toml` for the pinned version).
 
 ```sh
 npm ci
@@ -13,35 +13,23 @@ npm run build
 npm test -- --watch=false
 ```
 
-Public routes: `/`, `/login`, `/register`, `/setup`. The signed-in Dashboard contains Overview (`/dashboard`, also `/overview`), Accounts, Transactions, Cash Flow, Budgets, Investments, Analysis, Reports, Notifications, and Profile & Settings. Each page has a direct route protected by session and setup guards. Hosting must serve `index.html` for frontend routes and route `/api/*` to the backend.
+Public routes: `/`, `/login`, `/register`. The `/setup` route requires a session and unfinished setup. The signed-in Dashboard contains Overview (`/dashboard`, also `/overview`), Accounts, Transactions, Cash Flow, Budgets, Investments, Analysis, Reports, Notifications, and Profile & Settings. Workspace routes require a session and remain accessible before account setup is completed. Hosting must serve `index.html` for frontend routes and route `/api/*` to the backend.
 
 Setup includes bank logo choices, account name and number, debit/credit selection, opening balance or credit outstanding, and an effective date. KES is fixed. Confirmation masks the number and the form clears it after a successful save. Frontend state is in memory; server sessions are restored through the API on reload.
 
 ## Backend integration
 
-Read [API-CONTRACT.md](API-CONTRACT.md). The frontend calls a proposed same-origin cookie-session API; the production HTTP implementation is not yet available in the backend starter. Successful registration/login and saving require that implementation. Failed requests display errors, never fabricated success. Tests mock API responses to verify the flow. No demo bypass is exposed in customer navigation.
+Read [API-CONTRACT.md](API-CONTRACT.md). The frontend calls a proposed same-origin cookie-session API; the production HTTP implementation is not yet available in the backend starter. For development, `npm start` uses hosted authentication and a local financial API adapter; see [SAMPLE-AUTH.md](SAMPLE-AUTH.md). Production registration/login and saving require the HTTP implementation. Failed requests display errors, never fabricated success. Tests mock API responses to verify the flow. No demo bypass is exposed in customer navigation.
 
 The React project in Downloads remains the separate design reference.
 
-## Optional dashboard development with sample data
+## Local development without hosted authentication
 
-Run `npm run start:mock` from `web` (stop any other server using port 4200 first), then open http://localhost:4200. This starts Angular with a proxy and an in-memory API on loopback port 4301. Normal `npm start` still expects the real backend. Mock code is under `tools/` and is not imported into the production app.
+Run `npm run start:mock` from `web` (stop any other server using port 4200 first), then open http://localhost:4200. This starts Angular with a proxy and an in-memory API on loopback port 4301. Register a fictional user to start; no sample users or financial records are seeded by the launcher. Users, sessions, and financial records reset when this process restarts.
 
-All sample users use password `SamplePass123!`:
+Normal `npm start` uses hosted authentication with local in-memory financial records. Mock code lives under `tools/` and is not imported into the production app. See [MOCK-USERS.md](MOCK-USERS.md) for explicit test fixtures.
 
-| Email | Scenario |
-| --- | --- |
-| individual@example.com | Personal dashboard with three accounts |
-| business@example.com | Organization dashboard |
-| new@example.com | First login goes to account setup |
-| empty@example.com | Completed setup with empty dashboard |
-| slow@example.com | Three-second dashboard loading state |
-| error@example.com | First dashboard request fails; retry succeeds |
-
-You can also register a fictional user, save a bank account, and view its opening balance on the dashboard. No bank connection is established. All registrations, sessions and records reset when the mock process restarts. Passwords are plain text in this development-only process: use fictional details, never real credentials. Stop both servers with Ctrl+C.
-
-`npm run test:mock` checks ownership filtering, balances, date ranges, and transaction status calculations. Dashboard features include KES cash/debt totals, 30/90-day cash flow, account summaries, recent transactions, retry/loading/empty states and responsive layout.
-
+`npm run test:mock` checks financial calculations and isolation. `npm run test:workflow` checks the hosted-auth adapter with stubbed authentication responses. Neither command verifies a live hosted backend.
 
 ## Dashboard pages
 

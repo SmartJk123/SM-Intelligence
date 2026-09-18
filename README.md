@@ -6,7 +6,7 @@ Financial intelligence platform for individual and business users.
 
 The Angular application lives in `web/`. The Figma/React prototype is maintained separately as a design reference.
 
-Requirements: Node.js 22.19 or a compatible Angular 21 runtime, and npm.
+Requirements: Node.js matching `web/package.json` (`^24.15.0 || >=26.0.0`) and npm 11+. The application uses Angular 22; `web/.mise.toml` pins the development Node version.
 
 ```powershell
 cd web
@@ -23,16 +23,20 @@ npm test -- --watch=false
 
 ## Scope
 
-This checkout starts with the Angular web scaffold. Product screens and backend integration are not implemented yet.
+The Angular frontend includes public pages, registration, onboarding, and the customer workspace. `npm start` uses hosted authentication through a local development adapter; financial records remain in memory and reset when that adapter restarts. See [web/README.md](web/README.md) and [web/SAMPLE-AUTH.md](web/SAMPLE-AUTH.md).
 
-The brief calls for a public information website and a separate authenticated application experience, supporting Individual and Business profiles. Planned modules include Dashboard, Accounts, Transactions, Cash Flow, Budgets, Investments, Analysis, Reports, Notifications, and Profile & Settings.
+Workspace pages include Overview, Accounts, Transactions, Cash Flow, Budgets, Investments, Analysis, Reports, Notifications, and Profile & Settings, with Individual and Business profiles.
 
-SM-Intelligence monitors financial activity; it does not execute payments, transfers, or investment purchases. Backend technology and API contracts are to be agreed with the team.
+SM-Intelligence monitors financial activity; it does not execute payments, transfers, or investment purchases. The Spring Boot backend contains an API gateway and nine service modules, with identity domain logic and service-owned Flyway migrations. It does not yet implement the frontend's [HTTP API contract](web/API-CONTRACT.md), so the development adapter is still required.
 
 ## Layout
 
 - `web/src/app/`: Angular components and routes.
-- `web/src/styles.scss`: global styles.
+- `web/src/styles.css`: global styles.
 - `web/public/`: static assets.
+- `backend/`: Maven multi-module backend; requires JDK 25 and Maven. Run `mvn test` from this directory. `docker compose up -d` starts PostgreSQL instances and Kafka, not the Java services.
+- `backend/*-service/src/main/resources/db/migration/`: migrations loaded by each service.
+- `database_schema/README.md`: points to the authoritative service migrations; redundant SQL copies have been removed.
+- [erd.md](erd.md): current service ownership and relationships.
 
 Use the repository's existing branch conventions when contributing. Dependencies and build output are ignored by Git; commit source and the npm lockfile.
