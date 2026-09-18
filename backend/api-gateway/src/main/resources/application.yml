@@ -4,3 +4,17 @@ server:
 spring:
   application:
     name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+        - id: identity-service
+          uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/auth/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
