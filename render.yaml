@@ -1,0 +1,172 @@
+databases:
+  - name: smi-postgres
+    databaseName: smi_identity
+    user: admin
+    plan: starter
+
+services:
+  - type: web
+    name: api-gateway
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: api-gateway
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8080"
+
+  - type: web
+    name: identity-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: identity-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8081"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
+
+  - type: web
+    name: accounts-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: accounts-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8082"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
+
+  - type: web
+    name: transactions-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: transactions-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8083"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
+
+  - type: web
+    name: categories-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: categories-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8084"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
+
+  - type: web
+    name: budgets-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: budgets-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8085"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
+
+  - type: web
+    name: investments-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: investments-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8086"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
+
+  - type: web
+    name: forecasts-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: forecasts-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8087"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
+
+  - type: web
+    name: notifications-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: notifications-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8088"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
+
+  - type: web
+    name: audit-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: audit-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8089"
+      - key: DB_URL
+        fromDatabase:
+          name: smi-postgres
+          property: connectionString
