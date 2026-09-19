@@ -1,42 +1,23 @@
 # SM-Intelligence
 
-Financial intelligence platform for individual and business users.
+Angular customer frontend and Spring Boot services for financial monitoring.
 
-## Web development
+The current connected workflow is registration, login, session restoration, profile display and logout. Financial service integration is the next team milestone. No sample users, temporary accounts or financial records are created by the frontend.
 
-The Angular application lives in `web/`. The Figma/React prototype is maintained separately as a design reference.
+## Run locally
 
-Requirements: Node.js matching `web/package.json` (`^24.15.0 || >=26.0.0`) and npm 11+. The application uses Angular 22; `web/.mise.toml` pins the development Node version.
+1. Start PostgreSQL for identity: `docker compose -f backend/docker-compose.yml up -d postgres-identity`.
+2. In a PowerShell terminal, set `JWT_SECRET` to a private random value of at least 32 bytes, then run `./backend/mvn.ps1 -pl identity-service spring-boot:run`.
+3. In another terminal, run `./backend/mvn.ps1 -pl api-gateway spring-boot:run`.
+4. In `web/`, run `npm ci` and `npm start`, then open http://localhost:4200.
 
-```powershell
-cd web
-npm ci
-npm start
-```
+See [backend setup](backend/README.md) for Java/Maven requirements and [frontend setup](web/README.md) for API configuration. Environment variables must be set in the terminal running each service; the root `.env.example` is a reference, not an automatically loaded file.
 
-Open http://localhost:4200. Stop the server with Ctrl+C.
+## Project layout
 
-```powershell
-npm run build
-npm test -- --watch=false
-```
+- `web/src/app/`: Angular UI. Finance page designs remain available for the next integration step, but active finance routes show a not-connected state.
+- `web/tools/auth-server.mjs`: loopback development adapter for the identity API. It keeps JWTs server-side and issues an HttpOnly session cookie.
+- `backend/`: Maven reactor with gateway and nine domain services. Runtime schemas are in each service's Flyway migration directory; see [schema map](erd.md).
+- `bruno-collections/`: direct backend API examples.
 
-## Scope
-
-The Angular frontend includes public pages, registration, onboarding, and the customer workspace. `npm start` uses hosted authentication through a local development adapter; financial records remain in memory and reset when that adapter restarts. See [web/README.md](web/README.md) and [web/SAMPLE-AUTH.md](web/SAMPLE-AUTH.md).
-
-Workspace pages include Overview, Accounts, Transactions, Cash Flow, Budgets, Investments, Analysis, Reports, Notifications, and Profile & Settings, with Individual and Business profiles.
-
-SM-Intelligence monitors financial activity; it does not execute payments, transfers, or investment purchases. The Spring Boot backend contains an API gateway and nine service modules, with identity domain logic and service-owned Flyway migrations. It does not yet implement the frontend's [HTTP API contract](web/API-CONTRACT.md), so the development adapter is still required.
-
-## Layout
-
-- `web/src/app/`: Angular components and routes.
-- `web/src/styles.css`: global styles.
-- `web/public/`: static assets.
-- `backend/`: Maven multi-module backend; requires JDK 25 and Maven. Run `mvn test` from this directory. `docker compose up -d` starts PostgreSQL instances and Kafka, not the Java services.
-- `backend/*-service/src/main/resources/db/migration/`: migrations loaded by each service.
-- `database_schema/README.md`: points to the authoritative service migrations; redundant SQL copies have been removed.
-- [erd.md](erd.md): current service ownership and relationships.
-
-Use the repository's existing branch conventions when contributing. Dependencies and build output are ignored by Git; commit source and the npm lockfile.
+The account and transaction endpoints are not exposed through the gateway or frontend in this milestone. They still need authenticated ownership enforcement before customer use. Other domain services remain future integration work. Financial monitoring does not execute bank payments or purchases.

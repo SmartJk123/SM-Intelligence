@@ -1,11 +1,10 @@
 // Central route map.
 // Guards protect authentication/setup flows; workspace pages are lazy-loaded.
-import { setupGuard, dashboardGuard, entryGuard, sampleGuard } from './setup.guard';
+import { setupGuard, dashboardGuard, entryGuard } from './setup.guard';
 import { Routes } from '@angular/router';
 
 // Add authenticated customer-facing routes here so they inherit dashboardGuard and WorkspaceShell.
 export const routes: Routes = [
-  { path: 'auth-check', canActivate: [sampleGuard], title: 'Authentication test | SM-Intelligence', loadComponent: () => import('./auth-check').then(m => m.AuthCheck) },
   {
     path: '',
     pathMatch: 'full',
@@ -28,7 +27,7 @@ export const routes: Routes = [
     path: 'setup',
     canActivate: [setupGuard],
     title: 'Set up your workspace | SM-Intelligence',
-    loadComponent: () => import('./setup').then((m) => m.Setup),
+    loadComponent: () => import('./connection-pending').then((m) => m.ConnectionPending),
   },
   {
     path: '',
@@ -38,7 +37,7 @@ export const routes: Routes = [
       {
         path: 'dashboard',
         title: 'Financial Overview | SM-Intelligence',
-        loadComponent: () => import('./dashboard').then((m) => m.Dashboard),
+        loadComponent: () => import('./connection-pending').then((m) => m.ConnectionPending),
       },
       { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
       ...[
@@ -55,7 +54,7 @@ export const routes: Routes = [
         path: page,
         title: title + ' | SM-Intelligence',
         data: { page },
-        loadComponent: () => import('./workspace-page').then((m) => m.WorkspacePage),
+        loadComponent: () => import('./connection-pending').then((m) => m.ConnectionPending),
       })),
     ],
   },

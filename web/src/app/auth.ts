@@ -29,9 +29,6 @@ import { AccountApi, AccountKind } from './account-api';
               : 'Sign in to your SM-Intelligence account.'
           }}
         </p>
-        @if (api.sampleMode) {
-          <p class="muted">Sample backend: registration and login only. Use test credentials.</p>
-        }
         @if (created()) {
           <p role="status">Your account was created, but automatic sign-in could not complete. Please sign in to continue.</p>
           <a class="button" routerLink="/login">Continue to sign in</a>
@@ -135,7 +132,6 @@ import { AccountApi, AccountKind } from './account-api';
           <button class="button full" type="submit" [disabled]="pending()">
             {{ pending() ? 'Please wait…' : register ? 'Create account →' : 'Sign in →' }}
           </button>
-          @if (pending() && api.sampleMode) { <p role="status">Connecting… the sample server may take a minute to wake up.</p> }
         </form>
         }
         <p class="auth-switch">
@@ -215,13 +211,6 @@ export class Auth {
         }
       }
       else await this.api.login({ email: value.email.trim(), password: value.password });
-      if (this.api.sampleMode) {
-        this.form.controls.password.reset();
-        this.form.controls.confirm.reset();
-        if (this.register) this.created.set(true);
-        else await this.router.navigate(['/auth-check']);
-        return;
-      }
       this.form.controls.password.reset();
       this.form.controls.confirm.reset();
       await this.router.navigate(['/dashboard']);

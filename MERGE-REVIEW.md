@@ -1,3 +1,5 @@
+> Historical review of merge 0e5deeb. Later identity/accounts/transactions additions and the authentication integration supersede some findings below. See the current README files.
+
 # Merge review: Customer-facing-interface
 
 Reviewed merge `0e5deeb` (first parent `7a444db`, merged main `eb81ff0`). The merge brings in the Maven multi-module backend, nine service-owned database migrations, identity domain/service logic, Docker infrastructure, and Render configuration. It makes no changes under `web/`.

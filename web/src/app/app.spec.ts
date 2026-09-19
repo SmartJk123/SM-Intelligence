@@ -121,7 +121,7 @@ describe('Account API contract', () => {
     await pending;
     expect(api.authenticated()).toBe(true);
   });
-  it('rejects an unconfirmed save response', async () => {
+  it('does not send financial data before account integration', async () => {
     const pending = TestBed.inject(AccountApi).saveSetup({
       bank: 'KCB',
       accountName: 'Savings',
@@ -131,8 +131,8 @@ describe('Account API contract', () => {
       balanceDate: '2026-09-09',
       currency: 'KES',
     });
-    const assertion = expect(pending).rejects.toThrow('did not confirm');
-    TestBed.inject(HttpTestingController).expectOne('/api/accounts').flush({});
+    const assertion = expect(pending).rejects.toThrow('not connected yet');
+    TestBed.inject(HttpTestingController).expectNone('/api/accounts');
     await assertion;
   });
 });

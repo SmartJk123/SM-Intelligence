@@ -14,12 +14,12 @@ logs:
 
 # Validate the Maven POM structure
 validate:
-	mvn clean validate
+	sh ./mvnw clean validate
 
 # Build the entire backend locally
 build:
-	mvn clean install -DskipTests
+	sh ./mvnw clean install -DskipTests
 
 # Run all tests
 test:
-	mvn clean test
+	sh ./mvnw clean test
