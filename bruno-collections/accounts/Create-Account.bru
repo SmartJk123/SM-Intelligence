@@ -10,10 +10,14 @@ post {
   auth: none
 }
 
+vars:pre-request {
+  providerAccountId: ACC-KCB-{{$randomInt}}
+}
+
 body:json {
   {
     "userId": "00000000-0000-0000-0000-000000000001",
-    "providerAccountId": "ACC-KCB-987654",
+    "providerAccountId": "{{providerAccountId}}",
     "accountName": "KCB Main Current Account",
     "institution": "KCB Bank",
     "accountType": "DEPOSIT",
@@ -23,4 +27,8 @@ body:json {
     "creditLimit": 0.00,
     "dataSource": "MANUAL"
   }
+}
+
+vars:post-response {
+  accountId: res.body.id
 }

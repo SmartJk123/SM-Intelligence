@@ -45,7 +45,7 @@ public class Account {
     @Column(name = "masked_identifier", nullable = false)
     private String maskedIdentifier;
 
-    @Column(name = "currency", nullable = false, length = 3)
+    @Column(name = "currency", nullable = false, columnDefinition = "bpchar")
     private String currency = "KES";
 
     @Column(name = "ledger_balance", nullable = false, precision = 19, scale = 4)
