@@ -1,0 +1,32 @@
+meta {
+  name: Record Transaction
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{transactionsBaseUrl}}/api/transactions
+  body: json
+  auth: none
+}
+
+vars:pre-request {
+  providerReference: MPESA-{{$randomInt}}
+}
+
+body:json {
+  {
+    "accountId": "00000000-0000-0000-0000-000000000001",
+    "amount": 4500.00,
+    "currency": "KES",
+    "transactionType": "DEBIT",
+    "counterparty": "Naivas Supermarket Westlands",
+    "paymentMethod": "M-PESA",
+    "providerReference": "{{providerReference}}",
+    "description": "Weekly grocery restocking"
+  }
+}
+
+vars:post-response {
+  transactionId: res.body.id
+}
