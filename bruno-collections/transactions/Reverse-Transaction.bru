@@ -1,0 +1,17 @@
+meta {
+  name: Reverse Transaction
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{transactionsBaseUrl}}/api/transactions/{{transactionId}}/reverse
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "reason": "Customer requested full refund"
+  }
+}

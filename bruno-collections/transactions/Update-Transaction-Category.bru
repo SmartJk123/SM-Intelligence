@@ -1,0 +1,17 @@
+meta {
+  name: Update Transaction Category
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{transactionsBaseUrl}}/api/transactions/{{transactionId}}/category
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "categoryId": "00000000-0000-0000-0000-000000000005"
+  }
+}

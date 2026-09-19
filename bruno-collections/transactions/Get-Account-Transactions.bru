@@ -1,0 +1,14 @@
+meta {
+  name: Get Account Transactions
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{transactionsBaseUrl}}/api/transactions?accountId=00000000-0000-0000-0000-000000000001
+  auth: none
+}
+
+params:query {
+  accountId: 00000000-0000-0000-0000-000000000001
+}
