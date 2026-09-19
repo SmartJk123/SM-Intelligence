@@ -1,0 +1,14 @@
+meta {
+  name: Close Account
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{accountsBaseUrl}}/api/accounts/{{accountId}}
+  auth: none
+}
+
+vars:pre-request {
+  accountId: 00000000-0000-0000-0000-000000000001
+}

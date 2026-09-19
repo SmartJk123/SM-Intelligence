@@ -1,0 +1,23 @@
+meta {
+  name: Update Account Balance
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{accountsBaseUrl}}/api/accounts/{{accountId}}/balance
+  body: json
+  auth: none
+}
+
+vars:pre-request {
+  accountId: 00000000-0000-0000-0000-000000000001
+}
+
+body:json {
+  {
+    "availableBalance": 300000.00,
+    "ledgerBalance": 300000.00,
+    "creditOutstanding": 0.00
+  }
+}
