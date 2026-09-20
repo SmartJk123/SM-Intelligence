@@ -1,0 +1,11 @@
+meta {
+  name: Test Connection Probe
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{bankIntegrationBaseUrl}}/api/v1/admin/bank-integrations/kcb/test
+  body: none
+  auth: none
+}

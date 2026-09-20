@@ -3,12 +3,14 @@ package io.smartmoney.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.smartmoney.api.bankintegration.DemoTransactionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
 
@@ -23,11 +25,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * about money moving without ever being mistaken for a bank delivery.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 class DemoTransactionTests {
 
     @Autowired
+    private WebApplicationContext context;
+
     private MockMvc mvc;
+
+    @BeforeEach
+    void setUp() {
+        mvc = MockMvcBuilders.webAppContextSetup(context).build();
+    }
 
     @Autowired
     private ObjectMapper mapper;

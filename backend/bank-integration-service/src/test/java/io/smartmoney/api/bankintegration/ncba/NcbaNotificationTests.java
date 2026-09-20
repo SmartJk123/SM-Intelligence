@@ -3,12 +3,14 @@ package io.smartmoney.api.bankintegration.ncba;
 import io.smartmoney.api.bankintegration.NormalizedTransactionEntity;
 import io.smartmoney.api.bankintegration.NormalizedTransactionRepository;
 import io.smartmoney.api.bankintegration.WebhookEventRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Map;
 import java.util.UUID;
@@ -37,8 +39,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "smartmoney.ncba.account-number=1234567890",
         "smartmoney.ncba.signature-verification=true"
 })
-@AutoConfigureMockMvc
 class NcbaNotificationTests {
+
+    @Autowired
+    private WebApplicationContext context;
+
+    private MockMvc mvc;
+
+    @BeforeEach
+    void setUp() {
+        mvc = MockMvcBuilders.webAppContextSetup(context).build();
+    }
 
     private static final String SECRET_KEY = "z#YUNq5b";
     private static final String USERNAME = "smartmoney-test";
@@ -48,8 +59,6 @@ class NcbaNotificationTests {
     private static final String DOCUMENTED_HASH =
             "ZTczOGJhYWMzMGVlNDM1Yjk0MGQyMmIzZDIwNzcyOWMxY2NjNWE3Njc1Zjg3NTAxZmQ1ZGE5ODBmOThlY2EzOA==";
 
-    @Autowired
-    private MockMvc mvc;
 
     @Autowired
     private WebhookEventRepository webhookEvents;

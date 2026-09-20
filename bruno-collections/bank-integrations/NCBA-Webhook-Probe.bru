@@ -1,0 +1,11 @@
+meta {
+  name: NCBA Webhook Probe
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{bankIntegrationBaseUrl}}/api/v1/webhooks/ncba
+  body: none
+  auth: none
+}

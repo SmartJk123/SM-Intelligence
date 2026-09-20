@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8090}
 
 # Keep the console readable. A DEBUG environment variable on the machine would
 # otherwise switch Spring into full debug logging and bury the useful lines.
@@ -12,7 +12,7 @@ logging:
 
 spring:
   application:
-    name: smartmoney-api
+    name: bank-integration-service
   datasource:
     url: jdbc:h2:file:./data/smartmoney;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
@@ -22,10 +22,6 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
-  jackson:
-    default-property-inclusion: always
-    serialization:
-      write-dates-as-timestamps: false
 
 management:
   endpoints:
