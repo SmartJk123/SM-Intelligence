@@ -1,0 +1,56 @@
+meta {
+  name: Stanbic notification
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/webhooks/stanbic
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+}
+
+body:json {
+  {
+    "eventId": "{{$guid}}",
+    "bankAccountNumber": "0100013306316",
+    "transactionReference": "SM-TRIAL-{{$guid}}",
+    "amount": 1500.00,
+    "currency": "KES",
+    "creditDebitIndicator": "Credit",
+    "narration": "Bruno trial notification",
+    "bookingDate": "2026-09-17T09:15:00Z"
+  }
+}
+
+docs {
+  Posts the shape of notification Stanbic sends for a credit alert.
+
+  Two outcomes are expected. A 200 with signatureVerified false means the event
+  was stored without a signature check. A 401 means signature verification is
+  switched on but no header and secret are configured, so the endpoint fails
+  closed. Set STANBIC_SIGNATURE_HEADER and STANBIC_SIGNATURE_SECRET to turn the
+  check on, or switch signature verification off in the bank settings while the
+  scheme is still being confirmed with the bank.
+
+  Each run uses a fresh event id, so a repeat run stores a new event. Posting
+  the same event id twice stores one event, which is the idempotency rule.
+}
+
+tests {
+  test("the notification is stored or rejected, never a server error", function() {
+    expect([200, 401]).to.include(res.getStatus());
+  });
+
+  test("a stored notification is acknowledged with its event id", function() {
+    if (res.getStatus() === 200) {
+      const body = res.getBody();
+      expect(body).to.have.property("eventId");
+      expect(body.status).to.equal("received");
+    }
+  });
+}

@@ -1,0 +1,288 @@
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex flex-wrap items-center gap-3">
+    <app-bank-logo [src]="bank().logo" [name]="bank().name" size="md" />
+    <div class="flex-1 min-w-0">
+      <p class="text-[15px] font-bold font-display" style="color: var(--text-1)">{{ bank().full }}</p>
+      <p class="text-[12px] mt-0.5" style="color: var(--text-3)">
+        {{ health().environment }} environment · Integration configuration
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <app-badge [status]="health().apiStatus" />
+      <app-badge [status]="health().webhookStatus" />
+    </div>
+  </div>
+
+  <!-- Credentials, held server side -->
+  <div class="rounded-xl border p-4" style="border-color: var(--border); background: var(--surface-2)">
+    <div class="flex items-start gap-3">
+      <span
+        class="w-8 h-8 rounded-lg flex items-center justify-center text-[13px] flex-shrink-0"
+        style="background: var(--surface-3); color: var(--text-2)"
+      >🔑</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ labels().heading }}</p>
+        <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--text-2)">
+          {{ labels().description }}
+        </p>
+
+        <div class="flex flex-wrap items-center gap-2 mt-3">
+          <span
+            class="pill"
+            [style.background]="credentials()?.tokenReady ? 'var(--green-soft)' : 'var(--surface-3)'"
+            [style.color]="credentials()?.tokenReady ? 'var(--green-ink)' : 'var(--text-2)'"
+          >
+            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              [style.background]="credentials()?.tokenReady ? 'var(--green)' : 'var(--text-3)'"></span>
+            {{ labels().firstPill }} {{ credentials()?.tokenReady ? 'ready' : 'not ready' }}
+          </span>
+          <span
+            class="pill"
+            [style.background]="credentials()?.registrationReady ? 'var(--green-soft)' : 'var(--surface-3)'"
+            [style.color]="credentials()?.registrationReady ? 'var(--green-ink)' : 'var(--text-2)'"
+          >
+            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              [style.background]="credentials()?.registrationReady ? 'var(--green)' : 'var(--text-3)'"></span>
+            {{ labels().secondPill }} {{ credentials()?.registrationReady ? 'ready' : 'not ready' }}
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">{{ labels().key }}</p>
+            <p class="text-[13px] font-mono mt-0.5"
+              [style.color]="credentials()?.clientKeyConfigured ? 'var(--text-1)' : 'var(--red-ink)'">
+              {{ credentials()?.clientKeyConfigured ? credentials()!.clientKeyHint : 'Not configured' }}
+            </p>
+          </div>
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">{{ labels().secret }}</p>
+            <p class="text-[13px] font-mono mt-0.5"
+              [style.color]="credentials()?.clientSecretConfigured ? 'var(--text-1)' : 'var(--red-ink)'">
+              {{ credentials()?.clientSecretConfigured ? '••••••••••••' : 'Not configured' }}
+            </p>
+          </div>
+          <!-- KCB answers "not applicable" for this field, so the column is dropped rather than shown red. -->
+          @if (credentials()?.apiKeySource !== 'not applicable') {
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">{{ labels().third }}</p>
+              <p class="text-[13px] font-mono mt-0.5"
+                [style.color]="credentials()?.apiKeyConfigured ? 'var(--text-1)' : 'var(--red-ink)'">
+                {{ credentials()?.apiKeyHint || 'Not configured' }}
+              </p>
+              <p class="text-[11px] mt-0.5" style="color: var(--text-3)">{{ credentials()?.apiKeySource }}</p>
+            </div>
+          }
+        </div>
+
+        @if (credentials(); as creds) {
+          <div class="mt-3 pt-3 border-t space-y-1" style="border-color: var(--border)">
+            <!-- Rows that do not apply to a bank are dropped, so NCBA does not read "not set" three times. -->
+            @if (creds.tokenUrl) {
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
+                <span style="color: var(--text-3)">Token URL</span>
+                <span class="font-mono break-all" style="color: var(--text-2)">{{ creds.tokenUrl }}</span>
+              </div>
+            }
+            @if (creds.registrationUrl) {
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
+                <span style="color: var(--text-3)">Registration</span>
+                <span class="font-mono break-all" style="color: var(--text-2)">{{ creds.registrationUrl }}</span>
+              </div>
+            }
+            @if (creds.oauthScope || creds.accountNumber) {
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
+                @if (creds.oauthScope) {
+                  <span style="color: var(--text-3)">Scope</span>
+                  <span class="font-mono" style="color: var(--text-2)">{{ creds.oauthScope }}</span>
+                }
+                @if (creds.oauthScope && creds.accountNumber) {
+                  <span class="mx-1 opacity-40">•</span>
+                }
+                @if (creds.accountNumber) {
+                  <span style="color: var(--text-3)">Account</span>
+                  <span class="font-mono" style="color: var(--text-2)">{{ creds.accountNumber }}</span>
+                }
+              </div>
+            }
+            <p class="text-[11.5px] pt-1" style="color: var(--text-3)">{{ creds.note }}</p>
+            @if (creds.apiKeyAdvice) {
+              <p class="text-[11.5px] pt-1" style="color: var(--text-2)">{{ creds.apiKeyAdvice }}</p>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection settings -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div>
+      <label class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">
+        Environment
+      </label>
+      <select
+        [value]="settings().environment"
+        (change)="setEnvironment($any($event.target).value)"
+        class="w-full px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+        style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+      >
+        @for (environment of environments; track environment) {
+          <option [value]="environment">{{ environment }}</option>
+        }
+      </select>
+    </div>
+
+    <div>
+      <label class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">
+        API timeout, seconds
+      </label>
+      <input
+        type="number"
+        min="5"
+        [value]="settings().apiTimeoutSeconds"
+        (change)="setNumber('apiTimeoutSeconds', $any($event.target).value)"
+        class="w-full px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+        style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+      />
+    </div>
+
+    <div>
+      <label class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">
+        Retry attempts
+      </label>
+      <input
+        type="number"
+        min="0"
+        [value]="settings().retryAttempts"
+        (change)="setNumber('retryAttempts', $any($event.target).value)"
+        class="w-full px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+        style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+      />
+    </div>
+
+    <div>
+      <label class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">
+        Retry delay, seconds
+      </label>
+      <input
+        type="number"
+        min="1"
+        [value]="settings().retryDelaySeconds"
+        (change)="setNumber('retryDelaySeconds', $any($event.target).value)"
+        class="w-full px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+        style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+      />
+    </div>
+  </div>
+
+  <!-- Webhook -->
+  <div class="pt-1">
+    <label class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">
+      Webhook endpoint URL
+    </label>
+    <div class="flex flex-col sm:flex-row gap-2">
+      <input
+        type="text"
+        readonly
+        [value]="webhookUrl()"
+        class="flex-1 px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none font-mono"
+        style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+      />
+      <app-copy-button [value]="webhookUrl()" label="Copy URL" />
+    </div>
+    <p class="text-[12px] mt-2" style="color: var(--text-3)">
+      Register this address with {{ bank().name }}. The backend accepts payment notifications here and
+      verifies the caller before processing.
+    </p>
+  </div>
+
+  <!-- Webhook and token facts -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="rounded-xl border p-3" style="border-color: var(--border); background: var(--surface-2)">
+      <p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">Last webhook</p>
+      <p class="text-[13px] font-semibold mt-1" style="color: var(--text-1)">
+        {{ health().lastWebhookReceived ?? 'None yet' }}
+      </p>
+    </div>
+    <div class="rounded-xl border p-3" style="border-color: var(--border); background: var(--surface-2)">
+      <p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">Token status</p>
+      <p class="text-[13px] font-semibold mt-1" style="color: var(--text-1)">{{ health().tokenStatus }}</p>
+    </div>
+    <div class="rounded-xl border p-3" style="border-color: var(--border); background: var(--surface-2)">
+      <p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">Expires in</p>
+      <p class="text-[13px] font-semibold mt-1" style="color: var(--text-1)">
+        {{ health().tokenExpiresInMinutes !== null ? health().tokenExpiresInMinutes + ' minutes' : 'Unknown' }}
+      </p>
+    </div>
+    <div class="rounded-xl border p-3" style="border-color: var(--border); background: var(--surface-2)">
+      <p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">Response time</p>
+      <p class="text-[13px] font-semibold mt-1" style="color: var(--text-1)">
+        {{ health().latencyMs !== null ? health().latencyMs + ' ms' : 'Unknown' }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Signature verification -->
+  <div class="rounded-xl border px-4" style="border-color: var(--border)">
+    <app-toggle
+      label="Verify the signature on incoming notifications"
+      [defaultChecked]="settings().signatureVerification"
+      (checked)="setSignatureVerification($event)"
+    />
+    <app-toggle
+      label="Retry automatically when a notification cannot be processed"
+      [defaultChecked]="settings().automaticRetry"
+      (checked)="setAutomaticRetry($event)"
+    />
+  </div>
+
+  <!-- Actions -->
+  <div class="flex flex-wrap items-center gap-2">
+    <button
+      type="button"
+      (click)="testConnection()"
+      [disabled]="testing() || saving()"
+      class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-60"
+      style="background: var(--primary)"
+    >
+      @if (testing()) {
+        <span class="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+        Testing connection
+      } @else {
+        Test connection
+      }
+    </button>
+    <button
+      type="button"
+      (click)="save()"
+      [disabled]="saving() || testing()"
+      class="px-4 py-2.5 rounded-xl text-[13px] font-semibold border transition-all hover:opacity-80"
+      style="border-color: var(--border-strong); color: var(--text-2); background: var(--surface)"
+    >
+      {{ saving() ? 'Saving settings' : saved() ? 'Settings saved' : 'Save settings' }}
+    </button>
+    @if (result()) {
+      <button
+        type="button"
+        (click)="clearResult()"
+        class="px-3 py-2.5 rounded-xl text-[12px] font-semibold transition-all hover:opacity-80"
+        style="color: var(--text-3)"
+      >
+        Clear result
+      </button>
+    }
+  </div>
+
+  @if (error()) {
+    <p class="text-[12.5px] rounded-xl border px-3 py-2" style="border-color: var(--red); color: var(--red-ink); background: var(--red-soft)">
+      {{ error() }}
+    </p>
+  }
+
+  <!-- Test result -->
+  @if (result(); as test) {
+    <app-connection-steps [result]="test" />
+  }
+</div>

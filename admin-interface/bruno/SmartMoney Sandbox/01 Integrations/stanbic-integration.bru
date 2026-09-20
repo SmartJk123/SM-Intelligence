@@ -1,0 +1,26 @@
+meta {
+  name: Stanbic integration detail
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/stanbic
+  body: none
+  auth: none
+}
+
+docs {
+  One bank only. A bank that has never sent a notification reports zero rather
+  than a guess, and an unmeasured value is null.
+}
+
+tests {
+  test("Stanbic detail returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the response belongs to Stanbic", function() {
+    expect(res.getBody().bankId).to.equal("stanbic");
+  });
+}

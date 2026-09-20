@@ -1,0 +1,32 @@
+meta {
+  name: List bank integrations
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations
+  body: none
+  auth: none
+}
+
+docs {
+  Health of every implemented bank. This is the call the Bank Integrations
+  page makes when it loads.
+}
+
+tests {
+  test("integrations return with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("each entry carries a bank id and an environment", function() {
+    const list = res.getBody();
+    expect(list).to.be.an("array");
+    expect(list.length).to.be.above(0);
+    list.forEach(function(entry) {
+      expect(entry).to.have.property("bankId");
+      expect(entry).to.have.property("environment");
+    });
+  });
+}

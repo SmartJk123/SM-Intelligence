@@ -1,0 +1,30 @@
+meta {
+  name: KCB settings
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/kcb/settings
+  body: none
+  auth: none
+}
+
+docs {
+  The settings the admin interface edits. Credentials are deliberately absent,
+  they never travel to the browser.
+}
+
+tests {
+  test("settings return with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("timeout, retry and signature fields are present", function() {
+    const body = res.getBody();
+    expect(body.bankId).to.equal("kcb");
+    expect(body).to.have.property("apiTimeoutSeconds");
+    expect(body).to.have.property("retryAttempts");
+    expect(body).to.have.property("signatureVerification");
+  });
+}

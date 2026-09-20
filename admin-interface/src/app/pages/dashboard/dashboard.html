@@ -1,0 +1,284 @@
+<div class="flex-1 overflow-auto p-4 lg:p-5 space-y-4">
+
+  @if (!backendConnected()) {
+    <div
+      class="rounded-2xl border px-4 py-3 flex flex-wrap items-center gap-3"
+      style="border-color: var(--border); background: var(--surface-2)"
+    >
+      <span class="pill" style="background: var(--gold-soft); color: var(--gold-ink)">
+        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background: var(--gold)"></span>
+        Not connected
+      </span>
+      <p class="text-[12.5px] flex-1 min-w-[220px]" style="color: var(--text-2)">
+        The dashboard is not reading from the backend, so there are no live figures.
+        Start the Spring Boot service on port 8080, then reload this page.
+      </p>
+    </div>
+  }
+
+  <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
+
+    <!-- ══════════════ Main column ══════════════ -->
+    <div class="min-w-0 space-y-4">
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <app-kpi-card
+          label="Notifications received"
+          [value]="total()"
+          sub="from the connected banks"
+          color="blue"
+          delay="delay-50"
+        />
+        <app-kpi-card
+          label="Last 24 hours"
+          [value]="today()"
+          [sub]="'last at ' + lastReceived()"
+          color="green"
+          delay="delay-100"
+        />
+        <app-kpi-card
+          label="Failed"
+          [value]="failed()"
+          sub="need attention"
+          color="red"
+          delay="delay-150"
+        />
+      </div>
+
+      <!-- Notification volume -->
+      <app-surface-card class="p-4 lg:p-5" animDelay="delay-200">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-[16px] font-bold font-display" style="color: var(--text-1)">Notification volume</h2>
+            <p class="text-[12.5px] mt-0.5" style="color: var(--text-3)">
+              Bank notifications received each day, last 14 days
+            </p>
+          </div>
+          <button
+            type="button"
+            (click)="refresh()"
+            class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
+            style="border-color: var(--border); color: var(--text-2)"
+          >
+            <span>↻</span> Refresh
+          </button>
+        </div>
+
+        @if (hasData()) {
+          <app-grouped-bar-chart
+            [labels]="volumeLabels()"
+            [series]="volumeSeries()"
+            [labelEvery]="2"
+            [height]="190"
+            ariaLabel="Bank notifications received each day"
+          />
+          <div class="flex flex-wrap items-center justify-center gap-6 mt-4">
+            @for (item of volumeSeries(); track item.name) {
+              <span class="flex items-center gap-2 text-[12.5px]" style="color: var(--text-2)">
+                <span class="w-2.5 h-2.5 rounded-full" [style.background]="item.color"></span>
+                {{ item.name }}
+              </span>
+            }
+          </div>
+        } @else {
+          <div class="py-12 text-center">
+            <p class="text-[14px] font-semibold" style="color: var(--text-1)">No notifications received yet</p>
+            <p class="text-[12.5px] mt-1" style="color: var(--text-3)">
+              Register the callback URL with your bank, then make a small transaction.
+            </p>
+            <button
+              type="button"
+              (click)="goTo('bank-integrations')"
+              class="mt-4 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
+              style="background: var(--primary); color: #fff"
+            >
+              Open bank integrations
+            </button>
+          </div>
+        }
+      </app-surface-card>
+
+      <!-- Recent activity -->
+      <app-surface-card class="overflow-hidden" animDelay="delay-250">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b" style="border-color: var(--border)">
+          <div>
+            <h2 class="text-[16px] font-bold font-display" style="color: var(--text-1)">Recent activity</h2>
+            <p class="text-[12.5px] mt-0.5" style="color: var(--text-3)">
+              Notifications the platform has received and processed
+            </p>
+          </div>
+          <button
+            type="button"
+            (click)="goTo('notifications')"
+            class="text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
+            style="border-color: var(--border); color: var(--text-2)"
+          >
+            View all
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[720px]">
+            <thead>
+              <tr style="background: var(--surface-2)">
+                @for (heading of ['Received', 'Bank', 'Flow', 'Reference', 'Signature', 'Status', 'Handled in']; track heading) {
+                  <th
+                    class="text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] px-5 py-3 first:rounded-l-xl last:rounded-r-xl"
+                    style="color: var(--text-3)"
+                  >{{ heading }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (event of events(); track event.id) {
+                <tr class="border-b last:border-0 transition-all hover:opacity-90" style="border-color: var(--border)">
+                  <td class="px-5 py-3.5 text-[12.5px] whitespace-nowrap" style="color: var(--text-2)">
+                    {{ receivedTime(event) }}
+                  </td>
+                  <td class="px-5 py-3.5">
+                    <span
+                      class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg"
+                      style="background: var(--primary-soft); color: var(--primary-ink)"
+                    >{{ event.bankId }}</span>
+                  </td>
+                  <td class="px-5 py-3.5 text-[12px] font-semibold whitespace-nowrap" [style.color]="flowColor(event)">
+                    {{ flowLabel(event) }}
+                    @if (event.simulated) {
+                      <span
+                        class="ml-2 text-[10.5px] font-semibold px-2 py-0.5 rounded-md align-middle"
+                        style="background: var(--gold-soft); color: var(--gold-ink)"
+                      >Demo</span>
+                    }
+                  </td>
+                  <td class="px-5 py-3.5 text-[12.5px] font-mono" style="color: var(--primary-ink)">
+                    {{ event.externalEventId ?? 'no reference' }}
+                  </td>
+                  <td class="px-5 py-3.5 text-[12.5px]" style="color: var(--text-3)">{{ signatureLabel(event) }}</td>
+                  <td class="px-5 py-3.5"><app-badge [status]="event.status" /></td>
+                  <td class="px-5 py-3.5 text-[12.5px] font-mono tabular" style="color: var(--text-2)">
+                    {{ duration(event) }}
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="7" class="px-5 py-14 text-center">
+                    <p class="text-[14px] font-semibold" style="color: var(--text-1)">Nothing received yet</p>
+                    <p class="text-[12.5px] mt-1" style="color: var(--text-3)">
+                      Once a bank delivers a notification it appears here within seconds.
+                    </p>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </app-surface-card>
+    </div>
+
+    <!-- ══════════════ Right rail ══════════════ -->
+    <div class="space-y-4">
+
+      <!-- Platform state -->
+      <app-surface-card class="p-4" animDelay="delay-100">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-[16px] font-bold font-display" style="color: var(--text-1)">Platform</h2>
+          <span class="pill" style="background: var(--surface-3); color: var(--text-2)">{{ environment() }}</span>
+        </div>
+
+        <div
+          class="relative rounded-2xl p-4 text-white overflow-hidden"
+          style="background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); min-height: 132px"
+        >
+          <span class="absolute w-40 h-40 rounded-full -right-14 -top-16" style="background: rgba(255,255,255,.12)"></span>
+          <span class="absolute w-24 h-24 rounded-full -left-10 -bottom-12" style="background: rgba(255,255,255,.10)"></span>
+
+          <div class="relative">
+            <p class="text-[10.5px] uppercase tracking-[0.14em] opacity-70">Bank connections</p>
+            <p class="text-[26px] font-bold font-display tabular leading-tight">
+              {{ banksConnected() }} of {{ banksSupported() }}
+            </p>
+          </div>
+          <div class="relative mt-3">
+            <p class="text-[10.5px] uppercase tracking-[0.14em] opacity-70">Processing success</p>
+            <p class="text-[16px] font-bold font-display tabular">{{ successRate() }}%</p>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <p class="eyebrow">Last notification</p>
+          <p class="text-[12.5px] mt-1" style="color: var(--text-2)">{{ lastReceived() }}</p>
+        </div>
+
+        <div class="mt-3 flex items-center justify-between">
+          <div>
+            <p class="eyebrow">Still processing</p>
+            <p class="text-[12.5px] mt-1 tabular" style="color: var(--text-2)">{{ pending() }}</p>
+          </div>
+          <div class="text-right">
+            <p class="eyebrow">Failed</p>
+            <p class="text-[12.5px] mt-1 tabular" style="color: var(--red-ink)">{{ failed() }}</p>
+          </div>
+        </div>
+      </app-surface-card>
+
+      <!-- Quick actions -->
+      <app-surface-card class="p-4" animDelay="delay-150">
+        <div class="grid grid-cols-4 gap-2">
+          @for (action of quickActions; track action.id) {
+            <button
+              type="button"
+              (click)="onQuickAction(action.id)"
+              class="flex flex-col items-center gap-2 py-3 rounded-2xl border transition-all hover:opacity-80"
+              style="border-color: var(--border)"
+            >
+              <span
+                class="icon-tile w-10 h-10 text-[15px]"
+                [style.background]="action.bg"
+                [style.color]="action.fg"
+              >{{ action.icon }}</span>
+              <span class="text-[11px] font-medium text-center leading-tight" style="color: var(--text-2)">
+                {{ action.label }}
+              </span>
+            </button>
+          }
+        </div>
+      </app-surface-card>
+
+      <!-- Processing breakdown -->
+      <app-surface-card class="p-4" animDelay="delay-200">
+        <h2 class="text-[16px] font-bold font-display" style="color: var(--text-1)">Processing</h2>
+        <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Notifications handled</p>
+        <p class="text-[22px] font-bold font-display tabular mt-1" style="color: var(--text-1)">{{ total() }}</p>
+
+        @if (processingMix().length > 0) {
+          <div class="mt-4 h-3 rounded-full overflow-hidden flex" style="background: var(--surface-3)">
+            @for (segment of processingMix(); track segment.label) {
+              <span
+                class="h-full animate-width"
+                [style.width.%]="segment.percent"
+                [style.background]="segment.color"
+                [title]="segment.label"
+              ></span>
+            }
+          </div>
+          <div class="mt-4 space-y-2.5">
+            @for (segment of processingMix(); track segment.label) {
+              <div class="flex items-center gap-2.5 text-[12.5px]">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" [style.background]="segment.color"></span>
+                <span style="color: var(--text-2)">{{ segment.label }}</span>
+                <span class="ml-auto font-semibold tabular" style="color: var(--text-1)">{{ segment.value }}</span>
+                <span class="text-[11px] tabular w-10 text-right" style="color: var(--text-3)">
+                  {{ segment.percent.toFixed(0) }}%
+                </span>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="text-[12.5px] mt-3" style="color: var(--text-3)">
+            Nothing has been processed yet.
+          </p>
+        }
+      </app-surface-card>
+    </div>
+  </div>
+</div>

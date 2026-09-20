@@ -1,0 +1,45 @@
+<app-surface-card class="p-5" animDelay="delay-250">
+  <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+    <div>
+      <h2 class="text-[16px] font-bold font-display" style="color: var(--text-1)">Developer portals</h2>
+      <p class="text-[12.5px] mt-0.5" style="color: var(--text-3)">
+        Where each bank issues the credentials and subscriptions this platform uses. Consumer
+        banking links belong to the business user interface, not here.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    @for (portal of portals; track portal.bankId) {
+      <div class="rounded-2xl border p-4 flex flex-col" style="border-color: var(--border); background: var(--surface-2)">
+        <div class="flex items-start gap-3">
+          <app-bank-logo [src]="logoFor(portal)" [name]="portal.name" size="sm" />
+          <div class="min-w-0">
+            <p class="text-[13.5px] font-bold font-display truncate" style="color: var(--text-1)">{{ portal.name }}</p>
+            <p class="text-[11.5px]" style="color: var(--text-3)">
+              {{ portal.portal ? 'Developer portal' : 'No portal recorded' }}
+            </p>
+          </div>
+        </div>
+
+        <p class="text-[12px] mt-3 flex-1" style="color: var(--text-2)">{{ portal.purpose }}</p>
+
+        <button
+          type="button"
+          (click)="open(portal.portal)"
+          [disabled]="!portal.portal"
+          class="mt-3.5 w-full text-[12.5px] font-semibold px-3 py-2 rounded-full transition-all hover:opacity-90 disabled:opacity-50"
+          style="background: var(--primary); color: #fff"
+        >
+          Open developer portal
+        </button>
+
+        @if (!portal.fromConfig) {
+          <p class="text-[11px] mt-2.5" style="color: var(--text-3)">
+            No address for this one in the repository yet. Add it here once the bank confirms it.
+          </p>
+        }
+      </div>
+    }
+  </div>
+</app-surface-card>

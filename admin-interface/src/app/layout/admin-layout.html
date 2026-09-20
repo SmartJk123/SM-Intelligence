@@ -1,0 +1,36 @@
+<!-- Full bleed shell: the application fills the viewport, so no page background
+     is visible around it. The content area carries the soft page colour. -->
+<div class="h-full flex overflow-hidden" style="background: var(--surface)">
+  <app-sidebar
+    [active]="activePage()"
+    [open]="ui.sidebarOpen()"
+    (closed)="ui.closeSidebar()"
+    (logout)="ui.openLogout()"
+  />
+
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <app-topbar
+      [page]="activePage()"
+      [theme]="theme.theme()"
+      (menuToggle)="ui.toggleSidebar()"
+      (themeToggle)="theme.toggle()"
+      (navigate)="navigate($event)"
+      (logout)="ui.openLogout()"
+      (profileClick)="goToProfile()"
+    />
+    <main class="flex-1 flex flex-col overflow-hidden min-h-0" style="background: var(--bg)">
+      <router-outlet />
+    </main>
+  </div>
+
+  @if (ui.logoutOpen()) {
+    <app-logout-modal (confirmed)="confirmLogout()" (cancelled)="ui.closeLogout()" />
+  }
+
+  @if (ui.inviteType(); as inviteType) {
+    <app-invite-modal [type]="inviteType" (closed)="ui.closeInvite()" />
+  }
+
+  <app-notification-dialog />
+  <app-toast-outlet />
+</div>

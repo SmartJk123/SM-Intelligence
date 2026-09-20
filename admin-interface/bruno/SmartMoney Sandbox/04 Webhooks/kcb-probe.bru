@@ -1,0 +1,29 @@
+meta {
+  name: KCB webhook probe
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/webhooks/kcb
+  body: none
+  auth: none
+}
+
+docs {
+  A GET on the notification address must answer, because a bank or a reviewer
+  will open it in a browser to confirm the address before registering it.
+
+  Run this against the tunnel address, not localhost, before giving the URL to
+  KCB. A tunnel that has stopped returns a host error rather than this message.
+}
+
+tests {
+  test("the notification endpoint answers with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the acknowledgement names the provider", function() {
+    expect(res.getBody()).to.include("KCB Bank Kenya");
+  });
+}

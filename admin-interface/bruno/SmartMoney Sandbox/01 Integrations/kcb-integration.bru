@@ -1,0 +1,29 @@
+meta {
+  name: KCB integration detail
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/kcb
+  body: none
+  auth: none
+}
+
+docs {
+  One bank only. The values behind the tiles on the bank detail drawer.
+}
+
+tests {
+  test("KCB detail returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the response belongs to KCB and carries measured counts", function() {
+    const body = res.getBody();
+    expect(body.bankId).to.equal("kcb");
+    expect(body).to.have.property("notificationsTotal");
+    expect(body).to.have.property("notificationsToday");
+    expect(body).to.have.property("errorsLast24h");
+  });
+}

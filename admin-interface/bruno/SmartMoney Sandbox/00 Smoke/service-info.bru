@@ -1,0 +1,23 @@
+meta {
+  name: Service info
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/
+  body: none
+  auth: none
+}
+
+docs {
+  Plain text landing page. It prints the notification and redirect addresses
+  that have to be given to the bank, which is the quickest place to copy them
+  from when filling in a portal form.
+}
+
+tests {
+  test("landing page answers with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

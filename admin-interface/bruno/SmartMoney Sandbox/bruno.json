@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "SmartMoney Sandbox",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

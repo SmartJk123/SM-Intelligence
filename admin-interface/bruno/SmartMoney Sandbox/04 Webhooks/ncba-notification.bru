@@ -1,0 +1,70 @@
+meta {
+  name: NCBA notification
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/webhooks/ncba
+  body: text
+  auth: none
+}
+
+headers {
+  content-type: text/xml
+}
+
+body:text {
+  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+    <soapenv:Header/>
+    <soapenv:Body>
+      <NCBAPaymentNotificationRequest>
+        <User>bruno-trial</User>
+        <Password>bruno-trial</Password>
+        <HashVal>not-a-real-hash</HashVal>
+        <TransType>220</TransType>
+        <TransID>NCBA-BRUNO-{{$guid}}</TransID>
+        <TransTime>2205041019</TransTime>
+        <TransAmount>1500.00</TransAmount>
+        <AccountNr>0000000000</AccountNr>
+        <Narrative>Bruno trial notification</Narrative>
+        <PhoneNr>254700000000</PhoneNr>
+        <CustomerName>Test Tenant</CustomerName>
+        <Status>SUCCESS</Status>
+        <FtCrNarration>BRUNO</FtCrNarration>
+      </NCBAPaymentNotificationRequest>
+    </soapenv:Body>
+  </soapenv:Envelope>
+}
+
+docs {
+  The body is well formed XML with a hash that cannot be right, which is the
+  point of the request. Bruno cannot compute the HashVal, because it is a double
+  encoded SHA-256 of the secret key and nine fields.
+
+  A FAIL result means the endpoint is verifying and refused it, which is the
+  correct outcome. An OK result means verification is switched off in the
+  settings, so the notification was stored unchecked.
+
+  Either way the HTTP status is 200 and the answer is a Result element, because
+  NCBA reads that element and requeues anything that does not contain OK.
+
+  To post a notification that actually verifies, use
+  backend\tools\send-ncba-notification.ps1, which computes the hash from the
+  secret key in .env.local.
+}
+
+tests {
+  test("the notification is acknowledged with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the answer carries a Result element", function() {
+    expect(String(res.getBody())).to.include("<Result>");
+  });
+
+  test("an unverifiable hash is refused unless verification is off", function() {
+    const text = String(res.getBody());
+    expect(text).to.match(/<Result>(OK|FAIL)/);
+  });
+}

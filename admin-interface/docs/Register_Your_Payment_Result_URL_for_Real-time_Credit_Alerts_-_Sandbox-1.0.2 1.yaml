@@ -1,0 +1,130 @@
+swagger: '2.0'
+info:
+  description: The API allows the user to register a url that real-time notifications into the account their subscriptions will be sent. The customer must be approved to consumer this API
+  version: 1.0.2
+  title: Register Your Payment Result URL for Real-time Credit Alerts - Sandbox
+  termsOfService: None
+  contact:
+    name: API Support
+    email: kilele@stanbic.com
+    url: https://uat-portal.apictest.stanbicbank.co.ke/api/test/support
+  x-ibm-name: register-api
+basePath: /api/sandbox/registerurl
+tags:
+  - name: Register Real-time alerts
+    description: The API allows the user to register a real time url that real-time notifications into the account their subscriptions will be sent. The customer must be approved to consumer this API.
+schemes:
+  - https
+paths:
+  /:
+    post:
+      tags:
+        - RegisterUrl
+      summary: Register the instant notification url for the client
+      operationId: RegisterUrl
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Register the callback url for the client Information request
+          required: true
+          schema:
+            $ref: '#/definitions/RegisterUrlRequest'
+      responses:
+        '200':
+          description: Successfully processed
+          schema:
+            $ref: '#/definitions/RegisterUrlResponse'
+        default:
+          description: Processing failed
+          schema:
+            $ref: '#/definitions/ErrorMessage'
+      consumes:
+        - application/json
+definitions:
+  RegisterUrlRequest:
+    type: object
+    properties:
+      ReferenceId:
+        type: string
+        example: P33KL312231221
+      ApiKey:
+        type: string
+        example: AwkekerrDE
+      CallBackUrl:
+        type: string
+        example: https://www.testing.dev.fsfsffsfssf.co.ke
+      NotificationType:
+        type: string
+        example: CREDIT
+        enum:
+          - DEBIT
+          - CREDIT
+      ProfileApprover:
+        type: string
+        example: Your app Channel
+      Channel:
+        type: string
+        example: APGW
+  RegisterUrlResponse:
+    type: object
+    properties:
+      ResponseCode:
+        type: string
+        example: '00'
+      ResponseMessage:
+        type: string
+        example: Success
+      ReferenceId:
+        type: string
+        example: P33KL312231221
+  ErrorMessage:
+    type: object
+    properties:
+      ErrorCode:
+        type: string
+        example: '01'
+      Status:
+        type: string
+        example: REJECTED
+      ErrorMessage:
+        type: string
+        example: Registration Failed
+      RefereneceId:
+        type: string
+        example: XVD12233333111
+      DatetimeStamp:
+        type: string
+        example: '2021-05-11 11:33:18.319423'
+x-ibm-configuration:
+  type: rest
+  phase: realized
+  enforced: true
+  testable: true
+  cors:
+    enabled: false
+  servers:
+    - url: https://api.connect.stanbicbank.co.ke/api/sandbox/registerurl
+      description: ''
+      type:
+        - production
+        - development
+  oauth-servers:
+    OAuth:
+      tokenUrls:
+        - https://api.connect.stanbicbank.co.ke/api/sandbox/auth/oauth2/token
+      authorizationUrls: []
+      refreshUrls: []
+securityDefinitions:
+  OAuth:
+    type: oauth2
+    x-ibm-oauth-provider: oauth2
+    flow: application
+    tokenUrl: /auth/oauth2/token
+    scopes:
+      payments: securely get Loan API Pricing
+security:
+  - OAuth:
+      - payments
+host: api.connect.stanbicbank.co.ke

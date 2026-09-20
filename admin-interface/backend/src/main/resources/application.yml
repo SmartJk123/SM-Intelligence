@@ -1,0 +1,107 @@
+server:
+  port: 8080
+
+# Keep the console readable. A DEBUG environment variable on the machine would
+# otherwise switch Spring into full debug logging and bury the useful lines.
+logging:
+  level:
+    root: INFO
+    io.smartmoney: INFO
+    org.springframework.web: WARN
+    org.hibernate: WARN
+
+spring:
+  application:
+    name: smartmoney-api
+  datasource:
+    url: jdbc:h2:file:./data/smartmoney;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+smartmoney:
+  # The address the bank can reach. For sandbox testing set this to your tunnel URL.
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}
+  security:
+    # Development only. Set to false before any shared deployment.
+    permit-all: ${PERMIT_ALL:true}
+
+  stanbic:
+    environment: ${STANBIC_ENV:SANDBOX}
+    portal-url: https://sandbox.stanbicbank.co.ke/
+    # Endpoints taken from the Stanbic "Register Your Payment Result URL for
+    # Real-time Credit Alerts - Sandbox" 1.0.2 specification.
+    api-base-url: ${STANBIC_API_BASE_URL:https://api.connect.stanbicbank.co.ke/api/sandbox}
+    token-url: ${STANBIC_TOKEN_URL:https://api.connect.stanbicbank.co.ke/api/sandbox/auth/oauth2/token}
+    oauth-scope: ${STANBIC_OAUTH_SCOPE:payments}
+    registration-path: ${STANBIC_REGISTRATION_PATH:/registerurl/}
+    client-key: ${STANBIC_CLIENT_KEY:}
+    client-secret: ${STANBIC_CLIENT_SECRET:}
+    # ApiKey is a field of the registerurl request body, from the same portal page.
+    api-key: ${STANBIC_API_KEY:}
+    channel: ${STANBIC_CHANNEL:APGW}
+    profile-approver: ${STANBIC_PROFILE_APPROVER:SmartMoney Intelligence}
+    account-number: ${STANBIC_ACCOUNT_NUMBER:0100013306316}
+    # Confirm the real account enquiry path from the API product page.
+    account-enquiry-path: "${STANBIC_ACCOUNT_ENQUIRY_PATH:/accounts/{accountNumber}}"
+    api-timeout-seconds: 30
+    retry-attempts: 3
+    retry-delay-seconds: 5
+    webhook-path: /api/v1/webhooks/stanbic
+    signature-verification: ${STANBIC_SIGNATURE_VERIFICATION:true}
+    # Set both once Stanbic confirms how the callback is authenticated.
+    signature-header: ${STANBIC_SIGNATURE_HEADER:}
+    signature-secret: ${STANBIC_SIGNATURE_SECRET:}
+
+  kcb:
+    environment: ${KCB_ENV:SANDBOX}
+    portal-url: https://buni.kcbgroup.com/
+    # BUNI keeps the OAuth endpoints on the accounts host, separate from the API gateway.
+    token-url: ${KCB_TOKEN_URL:https://accounts.buni.kcbgroup.com/oauth2/token}
+    revoke-url: https://accounts.buni.kcbgroup.com/oauth2/revoke
+    api-base-url: ${KCB_API_BASE_URL:}
+    # Generate a sandbox Key and Secret for the application in BUNI.
+    client-key: ${KCB_CLIENT_KEY:${KCB_CONSUMER_KEY:}}
+    client-secret: ${KCB_CLIENT_SECRET:${KCB_CONSUMER_SECRET:}}
+    # BUNI accepts client credentials in the Authorization header or the form body.
+    auth-style: ${KCB_AUTH_STYLE:basic}
+    webhook-path: /api/v1/webhooks/kcb
+    signature-verification: ${KCB_SIGNATURE_VERIFICATION:true}
+    signature-header: ${KCB_SIGNATURE_HEADER:Signature}
+    # KCB public key, as a PEM block, a path to a .pem file, or a base64 X.509 key.
+    public-key: ${KCB_PUBLIC_KEY:}
+    api-timeout-seconds: 30
+
+  # NCBA pushes account level notifications to us. There is no token endpoint and
+  # no registration API: the address, the secret key, the username, the password
+  # and the account number are sent to the bank in writing and they configure it
+  # on their side. See docs/ncba-integration-setup.md.
+  ncba:
+    environment: ${NCBA_ENV:SANDBOX}
+    portal-url: ${NCBA_PORTAL_URL:}
+    webhook-path: /api/v1/webhooks/ncba
+    # Generate the secret key, at least 16 alphanumeric characters, and never
+    # change it after it is submitted or every HashVal check will fail.
+    secret-key: ${NCBA_SECRET_KEY:}
+    username: ${NCBA_USERNAME:}
+    password: ${NCBA_PASSWORD:}
+    account-number: ${NCBA_ACCOUNT_NUMBER:}
+    signature-verification: ${NCBA_SIGNATURE_VERIFICATION:true}
+    api-timeout-seconds: 30

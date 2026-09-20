@@ -1,0 +1,99 @@
+@if (notification(); as item) {
+  <div
+    class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+    style="background: rgba(0, 0, 0, 0.55)"
+    (click)="close()"
+  >
+    <div
+      class="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border animate-fade-up overflow-hidden"
+      style="background: var(--surface); border-color: var(--border); box-shadow: var(--shadow-lg)"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Header -->
+      <div
+        class="flex items-start gap-3 px-4 sm:px-5 py-4 border-b"
+        style="border-color: var(--border)"
+      >
+        <span
+          class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
+          [style.background]="severityColor() + '22'"
+          [style.color]="severityColor()"
+        >
+          {{ item.severity === 'Critical' ? '⚠' : item.severity === 'Warning' ? '⚠' : 'ℹ' }}
+        </span>
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-2 mb-1">
+            <app-badge [status]="item.severity" />
+            <span class="text-[11px] uppercase tracking-wider" style="color: var(--text-3)">{{ item.cat }}</span>
+          </div>
+          <h3 class="text-sm font-bold font-display leading-snug" style="color: var(--text-1)">{{ item.title }}</h3>
+        </div>
+        <button
+          type="button"
+          (click)="close()"
+          aria-label="Close notification"
+          class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 border transition-all hover:opacity-80"
+          style="background: var(--surface-2); border-color: var(--border); color: var(--text-2)"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="px-4 sm:px-5 py-4">
+        <p class="text-[13px] leading-relaxed" style="color: var(--text-2)">{{ item.desc }}</p>
+
+        <div class="mt-4 rounded-xl border overflow-hidden" style="border-color: var(--border)">
+          <div
+            class="flex items-center justify-between px-3 py-2 border-b"
+            style="border-color: var(--border); background: var(--surface-2)"
+          >
+            <span class="text-[12px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">Received</span>
+            <span class="text-[12px] font-medium" style="color: var(--text-1)">{{ item.time }}</span>
+          </div>
+          <div
+            class="flex items-center justify-between px-3 py-2 border-b"
+            style="border-color: var(--border); background: var(--surface-2)"
+          >
+            <span class="text-[12px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">Category</span>
+            <span class="text-[12px] font-medium" style="color: var(--text-1)">{{ item.cat }}</span>
+          </div>
+          <div
+            class="flex items-center justify-between px-3 py-2 border-b"
+            style="border-color: var(--border); background: var(--surface-2)"
+          >
+            <span class="text-[12px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">Severity</span>
+            <span class="text-[12px] font-medium" [style.color]="severityColor()">{{ item.severity }}</span>
+          </div>
+          <div class="flex items-center justify-between px-3 py-2" style="background: var(--surface-2)">
+            <span class="text-[12px] font-semibold uppercase tracking-wider" style="color: var(--text-3)">Status</span>
+            <span class="text-[12px] font-medium" style="color: var(--text-1)">Read</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div
+        class="flex flex-col sm:flex-row gap-2 px-4 sm:px-5 py-4 border-t"
+        style="border-color: var(--border)"
+      >
+        <button
+          type="button"
+          (click)="close()"
+          class="w-full sm:flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-all order-2 sm:order-1"
+          style="border-color: var(--border); color: var(--text-2); background: var(--surface-2)"
+        >
+          Close
+        </button>
+        <button
+          type="button"
+          (click)="openArea()"
+          class="w-full sm:flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all order-1 sm:order-2"
+          style="background: var(--primary)"
+        >
+          Open {{ destination() }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
