@@ -3,6 +3,7 @@ package com.smi.identity_service.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 public class RegisterRequest {
 
@@ -20,6 +21,7 @@ public class RegisterRequest {
 
     private String phoneNumber;
 
+    @Pattern(regexp = "^(INDIVIDUAL|ORGANIZATION)$", message = "Invalid account type")
     private String accountType = "INDIVIDUAL";
 
     private String organizationName;

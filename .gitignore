@@ -64,3 +64,6 @@ node_modules/
 dist/
 **/dist/
 .angular/
+
+# Project-local Java/tool downloads
+.tools/

@@ -49,16 +49,6 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
-            },
-            "sample": {
-              "optimization": false,
-              "sourceMap": true,
-              "fileReplacements": [
-                {
-                  "replace": "src/app/auth-mode.ts",
-                  "with": "src/app/auth-mode.sample.ts"
-                }
-              ]
             }
           },
           "defaultConfiguration": "production"
@@ -71,10 +61,6 @@
             },
             "development": {
               "buildTarget": "web:build:development"
-            },
-            "sample": {
-              "buildTarget": "web:build:sample",
-              "proxyConfig": "proxy.sample.cjs"
             }
           },
           "defaultConfiguration": "development"

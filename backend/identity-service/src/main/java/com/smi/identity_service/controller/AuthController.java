@@ -81,6 +81,7 @@ public class AuthController {
 
         UUID userId = jwtService.extractUserId(token);
         User user = userService.findById(userId)
+                .filter(candidate -> candidate.getDeletedAt() == null)
                 .orElseThrow(() -> new InvalidCredentialsException("User associated with token not found"));
 
         return ResponseEntity.ok(UserProfileResponse.fromUser(user));
