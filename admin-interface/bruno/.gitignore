@@ -1,0 +1,14 @@
+# Bruno collections are plain text, so anything written into a .bru file reaches
+# the repository. Keep credentials out of this folder.
+
+# Values for the command line runner. Each developer copies .env.example to .env
+# and fills it in. Neither .env nor a version of it is ever committed.
+.env
+.env.*
+!.env.example
+
+# A personal copy of an environment, for example mine.local.bru
+*.local.bru
+
+# Node dependencies, if the CLI is ever installed into this folder
+node_modules/

@@ -1,0 +1,60 @@
+# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# Compiled output
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# Node
+/node_modules
+npm-debug.log
+yarn-error.log
+
+# IDEs and editors
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+.history/*
+
+# Miscellaneous
+/.angular/cache
+.sass-cache/
+/connect.lock
+/coverage
+/libpeerconnection.log
+testem.log
+/typings
+__screenshots__/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# ------------------------------------------------------------------ added by
+# The Angular ignore rules above cover the toolchain. These cover local runtime
+# output, crash artifacts and credentials.
+
+# Build and run logs, plus JVM crash and replay dumps. The dumps can contain
+# whatever was in memory when the process died, so they never belong in git.
+*.log
+hs_err_pid*.log
+replay_pid*.log
+*.hprof
+
+# Environment files. Copy .env.example and fill that in instead.
+.env
+.env.*
+!.env.example

@@ -1,0 +1,32 @@
+meta {
+  name: KCB register callback
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/kcb/register-callback
+  body: none
+  auth: none
+}
+
+docs {
+  KCB has no registration call. The notification address is set against the
+  application in the BUNI portal, so this request returns an empty list and
+  that is the correct answer.
+
+  An empty list here is not a failure. The address to paste into BUNI comes from
+  the KCB notification URL request in the Integrations folder.
+}
+
+tests {
+  test("the endpoint answers with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("no registration is attempted for KCB", function() {
+    const list = res.getBody();
+    expect(list).to.be.an("array");
+    expect(list.length).to.equal(0);
+  });
+}

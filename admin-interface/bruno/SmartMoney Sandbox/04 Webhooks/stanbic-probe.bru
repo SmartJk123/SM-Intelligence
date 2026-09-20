@@ -1,0 +1,28 @@
+meta {
+  name: Stanbic webhook probe
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/webhooks/stanbic
+  body: none
+  auth: none
+}
+
+docs {
+  A GET on the notification address must answer, because Stanbic treats a
+  non answering address as a failed registration.
+
+  Run this against the tunnel address before registering the URL.
+}
+
+tests {
+  test("the notification endpoint answers with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the acknowledgement names the provider", function() {
+    expect(res.getBody()).to.include("Stanbic Bank Kenya");
+  });
+}

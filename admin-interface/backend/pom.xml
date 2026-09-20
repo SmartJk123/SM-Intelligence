@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.6</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>io.smartmoney</groupId>
+    <artifactId>smartmoney-api</artifactId>
+    <version>0.1.0</version>
+    <name>smartmoney-api</name>
+    <description>SmartMoney Intelligence backend</description>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Development database. Swap to PostgreSQL with the postgres profile. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- Mockito and Byte Buddy reach the running test JVM through
+                         the JDK attach API. Windows and some CI images refuse that
+                         self attach, and every mocked test then errors with
+                         "Could not self-attach to current VM using external
+                         process". The flag is harmless where the attach already
+                         works.
+
+                         If a coverage agent is added later this line has to carry
+                         the late replacement token for argLine as well, or the
+                         agent is dropped and coverage silently reads zero.
+
+                         The caps below matter on this machine. It has no paging
+                         file, so the commit limit is the 16 GB of RAM itself.
+                         With no cap the forked JVM sizes its heap from physical
+                         memory, and once the API and the editor language server
+                         are already running it dies at startup with "The forked
+                         VM terminated without properly saying goodbye" and a
+                         native "malloc failed ... Chunk::new". Surefire then
+                         reports 0 tests and the real cause is only in the
+                         hs_err file and the surefire dumpstream. -->
+                    <argLine>-Xmx1g -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=192m -XX:CICompilerCount=2 -Djdk.attach.allowAttachSelf=true -XX:+EnableDynamicAgentLoading</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,40 @@
+meta {
+  name: Stanbic register callback
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/stanbic/register-callback
+  body: none
+  auth: none
+}
+
+docs {
+  Ask Stanbic to start sending credit and debit alerts to the registered
+  address. One outcome is returned per notification type.
+
+  This request leaves the machine and calls Stanbic. It needs a working access
+  token, and the address it registers is the one built from PUBLIC_BASE_URL, so
+  the tunnel has to be up and the probe request has to pass first.
+
+  accepted false with an error field is the useful failure. The error text
+  carries the bank's own message. The same run can be repeated, registration is
+  idempotent on the Stanbic side.
+}
+
+tests {
+  test("registration returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("one outcome is returned per notification type", function() {
+    const list = res.getBody();
+    expect(list).to.be.an("array");
+    list.forEach(function(outcome) {
+      expect(outcome).to.have.property("notificationType");
+      expect(outcome).to.have.property("accepted");
+      expect(outcome).to.have.property("callbackUrl");
+    });
+  });
+}

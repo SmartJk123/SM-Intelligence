@@ -1,0 +1,111 @@
+<div class="flex-1 overflow-auto p-4 lg:p-6 space-y-5">
+  <!-- Toolbar -->
+  <div class="flex flex-wrap items-center gap-3">
+    <span
+      class="pill"
+      [style.background]="backendConnected() ? 'var(--green-soft)' : 'var(--red-soft)'"
+      [style.color]="backendConnected() ? 'var(--green-ink)' : 'var(--red-ink)'"
+    >
+      <span
+        class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+        [style.background]="backendConnected() ? 'var(--green)' : 'var(--red)'"
+      ></span>
+      {{ backendConnected() ? 'Backend connected' : 'Backend unreachable' }}
+    </span>
+
+    @if (!backendConnected()) {
+      <span class="text-[12px]" style="color: var(--text-3)">
+        Start the Spring Boot service on port 8080 so these figures can be read.
+      </span>
+    }
+
+    <div class="ml-auto flex items-center gap-2">
+      <button
+        type="button"
+        (click)="refreshHealth()"
+        class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
+        style="border-color: var(--border); color: var(--text-2)"
+      >
+        <span>↻</span> Refresh status
+      </button>
+      <button
+        type="button"
+        (click)="exportHealth()"
+        class="flex items-center gap-1.5 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
+        style="background: var(--primary); color: #fff"
+      >
+        <span>⤓</span> Export CSV
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+    <app-kpi-card label="Connected banks" [value]="connectedCount() + ' of ' + banks.length" sub="token and gateway reachable" color="blue" delay="delay-50" />
+    <app-kpi-card label="Healthy APIs" [value]="healthyApiCount()" sub="within threshold" color="green" delay="delay-100" />
+    <app-kpi-card label="Webhook warnings" [value]="webhookWarnings()" sub="delayed delivery" color="gold" delay="delay-150" />
+    <app-kpi-card label="Webhook errors" [value]="webhookErrors()" sub="not delivering" color="red" delay="delay-200" />
+  </div>
+
+  <!-- Provider cards -->
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    @for (bank of banks; track bank.id; let i = $index) {
+      <app-surface-card
+        class="p-5 cursor-pointer"
+        [outline]="selected() === bank.id"
+        [animDelay]="'delay-' + (i + 1) * 50"
+        (click)="open(bank.id)"
+      >
+        <div class="flex items-start gap-3">
+          <app-bank-logo [src]="bank.logo" [name]="bank.name" size="md" />
+          <div class="flex-1 min-w-0">
+            <p class="text-[15px] font-bold font-display truncate" style="color: var(--text-1)">{{ bank.full }}</p>
+            <div class="flex flex-wrap items-center gap-2 mt-1.5">
+              <app-badge [status]="healthFor(bank.id).apiStatus" />
+              <app-badge [status]="healthFor(bank.id).webhookStatus" />
+            </div>
+          </div>
+          <app-action-menu [items]="bankMenu" (chosen)="onBankAction($event, bank)" />
+        </div>
+
+        <div class="grid grid-cols-4 gap-2 mt-4">
+          @for (stat of stats(bank); track stat[0]) {
+            <div class="rounded-xl p-2.5 text-center" style="background: var(--surface-2)">
+              <p class="text-[10.5px] uppercase tracking-[0.06em]" style="color: var(--text-3)">{{ stat[0] }}</p>
+              <p
+                class="text-[14px] font-bold font-mono mt-0.5 tabular"
+                [style.color]="stat[0] === 'Errors 24h' ? errorColor(stat[1]) : 'var(--text-1)'"
+              >
+                {{ stat[1] }}
+              </p>
+            </div>
+          }
+        </div>
+
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3.5 text-[12px]" style="color: var(--text-3)">
+          <span>Last webhook <span style="color: var(--text-2)">{{ lastWebhook(bank.id) }}</span></span>
+        </div>
+      </app-surface-card>
+    }
+  </div>
+
+  <app-bank-shortcuts />
+</div>
+
+<!-- Detail for the bank that was opened. A drawer keeps the click result in
+     view instead of placing it below the fold. -->
+@if (detail(); as open) {
+  <app-bank-detail
+    [bank]="open.bank"
+    [health]="open.health"
+    [settings]="open.settings"
+    [webhook]="open.webhook"
+    [result]="open.result"
+    [credentials]="open.credentials"
+    [testing]="open.testing"
+    (closed)="closeDetail()"
+    (test)="testConnection()"
+    (register)="onBankAction('register', open.bank)"
+    (openSettings)="onBankAction('settings', open.bank)"
+  />
+}

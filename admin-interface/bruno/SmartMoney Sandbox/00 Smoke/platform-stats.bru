@@ -1,0 +1,31 @@
+meta {
+  name: Platform statistics
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/stats
+  body: none
+  auth: none
+}
+
+docs {
+  The figures the operations dashboard shows. Every value is measured, so an
+  empty platform returns zeros instead of sample numbers. The admin surface
+  carries counts and states only, never a customer balance or an amount.
+}
+
+tests {
+  test("statistics return with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("counts, the daily series and recent events are present", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("notificationsTotal");
+    expect(body).to.have.property("processed");
+    expect(body).to.have.property("volume");
+    expect(body).to.have.property("recent");
+  });
+}

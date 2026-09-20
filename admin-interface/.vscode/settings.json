@@ -1,0 +1,10 @@
+{
+    // Spring Boot puts @NonNull annotations on the classpath, which switches the
+    // Java language server into null analysis and produces a "Null type safety"
+    // hint on almost every stream, comparator and map call in the service. No
+    // nullness contract is declared, so the hints are noise. Revisit this if the
+    // project ever adopts JSpecify or package level @NonNullApi.
+    "java.compile.nullAnalysis.mode": "disabled",
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "files.eol": "\n"
+}

@@ -1,0 +1,98 @@
+<div class="flex-1 overflow-auto p-4 lg:p-6 space-y-5">
+  <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+    <app-kpi-card label="Total users" [value]="total()" sub="with platform access" color="blue" delay="delay-50" action="all" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Active" [value]="active()" sub="signed in recently" color="green" delay="delay-100" action="Active" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Inactive" [value]="inactive()" sub="never or not lately" color="gold" delay="delay-150" action="Inactive" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Suspended" [value]="suspended()" sub="access withdrawn" color="red" delay="delay-200" action="Suspended" (selected)="applyCardAction($event)" />
+  </div>
+
+  <app-surface-card class="overflow-hidden" animDelay="delay-200">
+    <div class="flex flex-wrap items-center gap-3 px-5 py-4 border-b" style="border-color: var(--border)">
+      <label class="relative flex-1 min-w-[220px] max-w-sm">
+        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px]" style="color: var(--text-3)">⌕</span>
+        <input
+          type="text"
+          [value]="query()"
+          (input)="onSearch($any($event.target).value)"
+          placeholder="Search name, email or organisation"
+          class="w-full pl-9 pr-3 py-2 text-[12.5px] rounded-full border focus:outline-none"
+          style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+        />
+      </label>
+
+      <div class="segment-track">
+        @for (option of statusFilters; track option) {
+          <button type="button" class="segment" [attr.data-active]="statusFilter() === option" (click)="statusFilter.set(option)">
+            {{ option }}
+          </button>
+        }
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          (click)="exportCsv()"
+          class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
+          style="border-color: var(--border); color: var(--text-2)"
+        >
+          <span>⤓</span> Export
+        </button>
+        <button
+          type="button"
+          (click)="inviteUser()"
+          class="flex items-center gap-1.5 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
+          style="background: var(--primary); color: #fff"
+        >
+          + Invite user
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[880px]">
+        <thead>
+          <tr style="background: var(--surface-2)">
+            @for (heading of headings; track heading) {
+              <th
+                class="text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] px-5 py-3 first:rounded-l-xl last:rounded-r-xl"
+                style="color: var(--text-3)"
+              >{{ heading }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of filtered(); track user.id) {
+            <tr class="border-b last:border-0 transition-all hover:opacity-90" style="border-color: var(--border)">
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-3">
+                  <app-avatar [name]="user.name" size="md" />
+                  <span class="text-[13px] font-semibold" style="color: var(--text-1)">{{ user.name }}</span>
+                </div>
+              </td>
+              <td class="px-5 py-3.5 text-[12.5px] font-mono" style="color: var(--text-3)">{{ user.email }}</td>
+              <td class="px-5 py-3.5 text-[12.5px]" style="color: var(--text-2)">{{ user.org }}</td>
+              <td class="px-5 py-3.5">
+                <span
+                  class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg"
+                  style="background: var(--primary-soft); color: var(--primary-ink)"
+                >{{ user.role }}</span>
+              </td>
+              <td class="px-5 py-3.5"><app-badge [status]="user.status" /></td>
+              <td class="px-5 py-3.5 text-[12.5px] whitespace-nowrap" style="color: var(--text-3)">{{ user.lastLogin }}</td>
+              <td class="px-5 py-3.5">
+                <app-action-menu [items]="actionsFor(user)" (chosen)="onRowAction($event, user)" />
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="7" class="px-5 py-14 text-center">
+                <p class="text-[14px] font-semibold" style="color: var(--text-1)">No users match</p>
+                <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Clear the search or choose a different status.</p>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </app-surface-card>
+</div>

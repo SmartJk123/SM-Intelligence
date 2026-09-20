@@ -1,0 +1,29 @@
+meta {
+  name: Recent events
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/stats/events
+  body: none
+  auth: none
+}
+
+docs {
+  The recent activity list, newest first. This is the same data the Notifications
+  page and the dashboard activity table show.
+
+  signatureValid is true, false or null. Null means the notification was stored
+  without a signature check and must not be read as verified.
+}
+
+tests {
+  test("events return with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("an empty platform returns an empty list", function() {
+    expect(res.getBody()).to.be.an("array");
+  });
+}

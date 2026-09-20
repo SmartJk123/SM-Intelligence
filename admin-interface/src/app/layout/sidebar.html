@@ -1,0 +1,80 @@
+@if (open()) {
+  <div class="fixed inset-0 bg-black/40 z-30 lg:hidden animate-fade-in" (click)="closed.emit()"></div>
+}
+
+<aside
+  class="fixed lg:relative inset-y-0 left-0 z-40 w-[252px] h-full min-h-0 flex flex-col flex-shrink-0 sidebar-transition border-r"
+  [class]="open() ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+  style="background: var(--sidebar-bg); border-color: var(--border)"
+>
+  <!-- Brand -->
+  <div class="h-[76px] px-5 flex items-center gap-3 flex-shrink-0">
+    <div
+      class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-[15px] font-bold flex-shrink-0"
+      style="background: linear-gradient(135deg, var(--primary), #3f5fd0); box-shadow: 0 10px 20px -10px rgba(27,59,139,.7)"
+    >
+      SM
+    </div>
+    <div class="min-w-0">
+      <p class="text-[15px] font-bold font-display leading-tight truncate" style="color: var(--text-1)">SmartMoney</p>
+      <p class="text-[11.5px] truncate" style="color: var(--text-3)">Intelligence</p>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="flex-1 min-h-0 px-3.5 py-4 space-y-5 overflow-auto">
+    @for (group of navGroups; track group.name) {
+      <div>
+        <p class="px-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style="color: var(--text-3)">
+          {{ group.name }}
+        </p>
+        @for (item of group.items; track item.id) {
+          <a
+            [routerLink]="['/admin', item.id]"
+            class="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[13.5px] font-medium transition-all"
+            [style.background]="isActive(item.id) ? 'var(--primary)' : 'transparent'"
+            [style.color]="isActive(item.id) ? '#fff' : 'var(--text-2)'"
+            [style.box-shadow]="isActive(item.id) ? '0 12px 22px -14px rgba(27,59,139,.9)' : 'none'"
+            (mouseenter)="isActive(item.id) ? null : hoverIn($event)"
+            (mouseleave)="isActive(item.id) ? null : hoverOut($event)"
+            (click)="closed.emit()"
+          >
+            <span class="w-4 text-center leading-none text-[15px] opacity-90">{{ item.icon }}</span>
+            <span class="flex-1">{{ item.label }}</span>
+            @if (item.id === 'notifications' && unread() > 0) {
+              <span
+                class="text-[10.5px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center"
+                [style.background]="isActive(item.id) ? 'rgba(255,255,255,.25)' : 'var(--accent)'"
+                [style.color]="isActive(item.id) ? '#fff' : '#fff'"
+              >{{ unread() }}</span>
+            }
+          </a>
+        }
+      </div>
+    }
+  </nav>
+
+  <!-- Footer -->
+  <div class="px-3.5 pb-4 pt-3 border-t space-y-1 flex-shrink-0" style="border-color: var(--border)">
+    <a
+      [routerLink]="['/admin', 'settings']"
+      class="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[13px] font-medium transition-all"
+      style="color: var(--text-2)"
+      (mouseenter)="hoverIn($event)"
+      (mouseleave)="hoverOut($event)"
+      (click)="closed.emit()"
+    >
+      <span class="w-4 text-center leading-none text-[15px]">◎</span>
+      Help and support
+    </a>
+    <button
+      type="button"
+      (click)="logout.emit()"
+      class="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[13px] font-semibold transition-all"
+      style="color: var(--red-ink); background: var(--red-soft)"
+    >
+      <span class="w-4 text-center leading-none text-[15px]">⇥</span>
+      Log out
+    </button>
+  </div>
+</aside>

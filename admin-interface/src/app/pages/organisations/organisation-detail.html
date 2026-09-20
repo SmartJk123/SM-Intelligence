@@ -1,0 +1,239 @@
+<div
+  class="fixed inset-0 z-50 flex justify-end animate-fade-in"
+  style="background: rgba(16, 19, 34, .45)"
+  (click)="closed.emit()"
+>
+  <aside
+    class="w-full max-w-[560px] h-full flex flex-col animate-fade-up"
+    style="background: var(--surface); box-shadow: var(--shadow-lg)"
+    (click)="$event.stopPropagation()"
+  >
+    <!-- Header -->
+    <div class="flex items-start gap-3 px-5 py-4 border-b flex-shrink-0" style="border-color: var(--border)">
+      <span
+        class="w-11 h-11 rounded-2xl flex items-center justify-center text-[16px] font-bold flex-shrink-0"
+        style="background: var(--primary-soft); color: var(--primary-ink)"
+      >{{ org().name.charAt(0) }}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-[16px] font-bold font-display truncate" style="color: var(--text-1)">{{ org().name }}</p>
+        <div class="flex flex-wrap items-center gap-2 mt-1.5">
+          <app-badge [status]="org().status" />
+          <span
+            class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg"
+            style="background: var(--surface-3); color: var(--text-2)"
+          >{{ org().type }}</span>
+          <span class="text-[11.5px]" style="color: var(--text-3)">Joined {{ org().joined }}</span>
+        </div>
+      </div>
+      <button
+        type="button"
+        (click)="closed.emit()"
+        aria-label="Close details"
+        class="w-8 h-8 rounded-lg flex items-center justify-center border flex-shrink-0 transition-all hover:opacity-80"
+        style="border-color: var(--border); color: var(--text-2)"
+      >✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="flex-1 min-h-0 overflow-auto px-5 py-4 space-y-4">
+
+      <!-- Overview -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="rounded-2xl p-3" style="background: var(--surface-2)">
+          <p class="eyebrow">Users</p>
+          <p class="text-[18px] font-bold font-display tabular mt-1" style="color: var(--text-1)">{{ users().length || org().users }}</p>
+        </div>
+        <div class="rounded-2xl p-3" style="background: var(--surface-2)">
+          <p class="eyebrow">Accounts</p>
+          <p class="text-[18px] font-bold font-display tabular mt-1" style="color: var(--text-1)">{{ accounts().length || org().accounts }}</p>
+        </div>
+        <div class="rounded-2xl p-3" style="background: var(--surface-2)">
+          <p class="eyebrow">Inflow</p>
+          <p class="text-[15px] font-bold font-display tabular mt-1" style="color: var(--green-ink)">
+            {{ money(inflow()) }}
+          </p>
+        </div>
+        <div class="rounded-2xl p-3" style="background: var(--surface-2)">
+          <p class="eyebrow">Outflow</p>
+          <p class="text-[15px] font-bold font-display tabular mt-1" style="color: var(--red-ink)">
+            {{ money(outflow()) }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Business information, editable -->
+      <div class="rounded-2xl border p-4" style="border-color: var(--border)">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-[13.5px] font-bold font-display" style="color: var(--text-1)">Business information</p>
+          @if (!editing()) {
+            <button
+              type="button"
+              (click)="startEdit()"
+              class="text-[12px] font-semibold px-3 py-1.5 rounded-full border transition-all hover:opacity-80"
+              style="border-color: var(--border); color: var(--text-2)"
+            >Edit</button>
+          }
+        </div>
+
+        @if (editing()) {
+          <div class="space-y-3 mt-3">
+            <label class="block">
+              <span class="eyebrow">Organisation name</span>
+              <input
+                type="text"
+                [value]="draftName()"
+                (input)="draftName.set($any($event.target).value)"
+                class="w-full mt-1.5 px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+              />
+            </label>
+            <label class="block">
+              <span class="eyebrow">Business type</span>
+              <select
+                [value]="draftType()"
+                (change)="draftType.set($any($event.target).value)"
+                class="w-full mt-1.5 px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+              >
+                @for (type of businessTypes; track type) {
+                  <option [value]="type">{{ type }}</option>
+                }
+              </select>
+            </label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                (click)="saveEdit()"
+                class="text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
+                style="background: var(--primary); color: #fff"
+              >Save changes</button>
+              <button
+                type="button"
+                (click)="cancelEdit()"
+                class="text-[12.5px] font-semibold px-4 py-2 rounded-full border transition-all hover:opacity-80"
+                style="border-color: var(--border); color: var(--text-2)"
+              >Cancel</button>
+            </div>
+          </div>
+        } @else {
+          <div class="mt-2">
+            <div class="flex justify-between gap-3 py-2 border-b" style="border-color: var(--border)">
+              <span class="text-[12px]" style="color: var(--text-3)">Directory position</span>
+              <span class="text-[12.5px] font-semibold" style="color: var(--text-1)">{{ directoryPosition() }}</span>
+            </div>
+            <div class="flex justify-between gap-3 py-2 border-b" style="border-color: var(--border)">
+              <span class="text-[12px]" style="color: var(--text-3)">Organisation id</span>
+              <span class="text-[12.5px] font-mono" style="color: var(--text-1)">ORG-{{ org().id }}</span>
+            </div>
+            <div class="flex justify-between gap-3 py-2">
+              <span class="text-[12px]" style="color: var(--text-3)">Onboarding</span>
+              <span class="text-[12.5px] font-semibold" style="color: var(--text-1)">
+                {{ org().status === 'Pending' ? 'Awaiting bank connection' : 'Complete' }}
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Users -->
+      <div class="rounded-2xl border p-4" style="border-color: var(--border)">
+        <p class="text-[13.5px] font-bold font-display" style="color: var(--text-1)">Users</p>
+        @if (users().length === 0) {
+          <p class="text-[12.5px] mt-2" style="color: var(--text-3)">No user records are linked to this organisation yet.</p>
+        } @else {
+          <div class="mt-2">
+            @for (user of users(); track user.id) {
+              <div class="flex items-center gap-3 py-2.5 border-b last:border-0" style="border-color: var(--border)">
+                <app-avatar [name]="user.name" />
+                <div class="flex-1 min-w-0">
+                  <p class="text-[12.5px] font-semibold truncate" style="color: var(--text-1)">{{ user.name }}</p>
+                  <p class="text-[11.5px] truncate" style="color: var(--text-3)">{{ user.email }}</p>
+                </div>
+                <span
+                  class="text-[11px] font-semibold px-2 py-0.5 rounded-lg"
+                  style="background: var(--primary-soft); color: var(--primary-ink)"
+                >{{ user.role }}</span>
+                <app-badge [status]="user.status" />
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Bank accounts -->
+      <div class="rounded-2xl border p-4" style="border-color: var(--border)">
+        <p class="text-[13.5px] font-bold font-display" style="color: var(--text-1)">Bank accounts</p>
+        @if (accounts().length === 0) {
+          <p class="text-[12.5px] mt-2" style="color: var(--text-3)">No bank accounts are connected for this organisation.</p>
+        } @else {
+          <div class="mt-2">
+            @for (account of accounts(); track account.id) {
+              <div class="flex items-center gap-3 py-2.5 border-b last:border-0" style="border-color: var(--border)">
+                <span
+                  class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg flex-shrink-0"
+                  style="background: var(--primary-soft); color: var(--primary-ink)"
+                >{{ account.bank }}</span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[12.5px] font-semibold truncate" style="color: var(--text-1)">{{ account.name }}</p>
+                  <p class="text-[11.5px] font-mono" style="color: var(--text-3)">{{ account.masked }}</p>
+                </div>
+                <span class="text-[11.5px]" style="color: var(--text-3)">{{ account.lastSync }}</span>
+                <app-badge [status]="account.status" />
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Recent transactions -->
+      <div class="rounded-2xl border p-4" style="border-color: var(--border)">
+        <p class="text-[13.5px] font-bold font-display" style="color: var(--text-1)">Recent transactions</p>
+        @if (transactions().length === 0) {
+          <p class="text-[12.5px] mt-2" style="color: var(--text-3)">No transactions recorded for this organisation.</p>
+        } @else {
+          <div class="mt-2">
+            @for (tx of transactions(); track tx.id) {
+              <div class="flex items-center gap-3 py-2.5 border-b last:border-0" style="border-color: var(--border)">
+                <div class="flex-1 min-w-0">
+                  <p class="text-[12.5px] font-semibold truncate" style="color: var(--text-1)">{{ tx.desc }}</p>
+                  <p class="text-[11.5px] font-mono" style="color: var(--text-3)">{{ tx.id }} · {{ tx.bank }} {{ tx.acc }}</p>
+                </div>
+                <span class="text-[12.5px] font-semibold tabular" [style.color]="amountColor(tx.type)">
+                  {{ tx.type === 'Income' ? '+' : '-' }}KES {{ money(tx.amount) }}
+                </span>
+                <app-badge [status]="tx.status" />
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex flex-wrap items-center gap-2 px-5 py-4 border-t flex-shrink-0" style="border-color: var(--border)">
+      <button
+        type="button"
+        (click)="exportOrganisation()"
+        class="flex items-center gap-1.5 text-[12.5px] font-semibold px-4 py-2 rounded-full border transition-all hover:opacity-80"
+        style="border-color: var(--border); color: var(--text-2)"
+      >
+        <span>⤓</span> Export CSV
+      </button>
+      <button
+        type="button"
+        (click)="toggleStatus()"
+        class="text-[12.5px] font-semibold px-4 py-2 rounded-full border transition-all hover:opacity-80"
+        [style.borderColor]="org().status === 'Active' ? 'var(--red)' : 'var(--green)'"
+        [style.color]="org().status === 'Active' ? 'var(--red-ink)' : 'var(--green-ink)'"
+      >
+        {{ org().status === 'Active' ? 'Suspend organisation' : 'Activate organisation' }}
+      </button>
+      <button
+        type="button"
+        (click)="closed.emit()"
+        class="ml-auto text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
+        style="background: var(--primary); color: #fff"
+      >Done</button>
+    </div>
+  </aside>
+</div>

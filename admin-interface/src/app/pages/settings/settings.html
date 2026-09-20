@@ -1,0 +1,440 @@
+<div class="flex-1 flex overflow-hidden">
+  <!-- Section sidebar -->
+  <div
+    class="w-52 flex-shrink-0 border-r p-3 space-y-0.5 overflow-auto"
+    style="border-color: var(--border); background: var(--surface)"
+  >
+    <p class="text-[11px] font-bold uppercase tracking-widest px-3 py-2" style="color: var(--text-3)">Settings</p>
+    @for (section of sections; track section.id) {
+      <button
+        type="button"
+        (click)="active.set(section.id)"
+        class="w-full flex items-center gap-2.5 text-left px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all"
+        [style.background]="active() === section.id ? 'var(--primary)' : 'transparent'"
+        [style.color]="active() === section.id ? '#fff' : 'var(--text-2)'"
+      >
+        <span class="text-sm w-4 text-center leading-none">{{ section.icon }}</span>
+        {{ section.id }}
+      </button>
+    }
+  </div>
+
+  <!-- Content -->
+  <div class="flex-1 overflow-auto p-4 lg:p-6">
+    @switch (active()) {
+      @case ('General') {
+        <div class="max-w-xl space-y-5">
+          <app-surface-card class="p-6" animDelay="">
+            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Platform Information</h3>
+            <div class="space-y-4">
+              <app-settings-field label="Platform Name">
+                <app-settings-input defaultValue="SmartMoney Intelligence" />
+              </app-settings-field>
+              <div class="grid grid-cols-2 gap-4">
+                <app-settings-field label="Default Currency">
+                  <app-settings-input defaultValue="KES" />
+                </app-settings-field>
+                <app-settings-field label="Default Language">
+                  <app-settings-input defaultValue="English (Kenya)" />
+                </app-settings-field>
+              </div>
+              <app-settings-field label="Timezone">
+                <app-settings-input defaultValue="Africa/Nairobi (UTC+3)" />
+              </app-settings-field>
+              <app-settings-field label="Date Format">
+                <select
+                  class="w-full px-3 py-2.5 text-sm rounded-xl border focus:outline-none"
+                  style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+                >
+                  @for (format of dateFormats; track format) {
+                    <option>{{ format }}</option>
+                  }
+                </select>
+              </app-settings-field>
+              <app-settings-field label="Support Email">
+                <app-settings-input defaultValue="support@smartmoney.io" type="email" />
+              </app-settings-field>
+            </div>
+            <button
+              type="button"
+              class="mt-5 px-5 py-2 rounded-xl text-sm font-semibold text-white"
+              style="background: var(--primary)"
+            >
+              Save Changes
+            </button>
+          </app-surface-card>
+        </div>
+      }
+
+      @case ('Admin Profile') {
+        <div class="max-w-xl space-y-4">
+          <app-surface-card class="p-6" animDelay="">
+            <div class="flex items-center gap-4 mb-6 pb-5 border-b" style="border-color: var(--border)">
+              <div
+                class="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
+                style="background: linear-gradient(135deg,#d97706,#f59e0b)"
+              >
+                @if (profile.avatar(); as avatarUrl) {
+                  <img [src]="avatarUrl" alt="Administrator profile" class="w-full h-full object-cover" />
+                } @else {
+                  {{ profile.initials() }}
+                }
+              </div>
+              <div class="flex-1">
+                <p class="text-base font-bold font-display" style="color: var(--text-1)">{{ profile.fullName() }}</p>
+                <p class="text-[13px]" style="color: var(--text-3)">{{ profile.email() }} · {{ profile.role() }} role</p>
+                <div class="flex flex-wrap items-center gap-2 mt-2">
+                  <button
+                    type="button"
+                    (click)="pickAvatar()"
+                    [disabled]="profile.uploading()"
+                    class="text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                    style="background: var(--primary-soft); color: var(--primary)"
+                  >
+                    {{ profile.uploading() ? 'Uploading...' : (profile.avatar() ? 'Change avatar' : 'Upload avatar') }}
+                  </button>
+                  @if (profile.avatar()) {
+                    <button
+                      type="button"
+                      (click)="removeAvatar()"
+                      class="text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
+                      style="border-color: var(--border); color: var(--red)"
+                    >
+                      Remove
+                    </button>
+                  }
+                </div>
+                <p class="text-[12px] mt-1.5" style="color: var(--text-3)">PNG, JPG or WEBP. Maximum 2 MB.</p>
+                @if (profile.avatarError()) {
+                  <p class="text-[12px] mt-1" style="color: var(--red)">{{ profile.avatarError() }}</p>
+                }
+              </div>
+              <app-badge status="Active" />
+              <input
+                #avatarInput
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                class="hidden"
+                (change)="onAvatarSelected($event)"
+              />
+            </div>
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <app-settings-field label="First Name">
+                  <app-settings-input
+                    [defaultValue]="profile.firstName()"
+                    (valueChange)="profile.firstName.set($event)"
+                  />
+                </app-settings-field>
+                <app-settings-field label="Last Name">
+                  <app-settings-input
+                    [defaultValue]="profile.lastName()"
+                    (valueChange)="profile.lastName.set($event)"
+                  />
+                </app-settings-field>
+              </div>
+              <app-settings-field label="Email Address" hint="Changing email requires re-verification">
+                <app-settings-input
+                  [defaultValue]="profile.email()"
+                  type="email"
+                  (valueChange)="profile.email.set($event)"
+                />
+              </app-settings-field>
+              <app-settings-field label="Phone Number">
+                <app-settings-input
+                  [defaultValue]="profile.phone()"
+                  type="tel"
+                  (valueChange)="profile.phone.set($event)"
+                />
+              </app-settings-field>
+              <app-settings-field label="Job Title">
+                <app-settings-input
+                  [defaultValue]="profile.jobTitle()"
+                  (valueChange)="profile.jobTitle.set($event)"
+                />
+              </app-settings-field>
+            </div>
+            <button
+              type="button"
+              class="mt-5 px-5 py-2 rounded-xl text-sm font-semibold text-white"
+              style="background: var(--primary)"
+            >
+              Update Profile
+            </button>
+          </app-surface-card>
+
+          <app-surface-card class="p-6" animDelay="delay-50">
+            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Change Password</h3>
+            <div class="space-y-3">
+              <app-settings-field label="Current Password">
+                <app-settings-input type="password" placeholder="••••••••" />
+              </app-settings-field>
+              <app-settings-field label="New Password" hint="Minimum 12 characters with uppercase, numbers, and symbols">
+                <app-settings-input type="password" placeholder="••••••••" />
+              </app-settings-field>
+              <app-settings-field label="Confirm New Password">
+                <app-settings-input type="password" placeholder="••••••••" />
+              </app-settings-field>
+            </div>
+            <button
+              type="button"
+              class="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white"
+              style="background: var(--primary)"
+            >
+              Update Password
+            </button>
+          </app-surface-card>
+        </div>
+      }
+
+      @case ('Security') {
+        <div class="max-w-xl space-y-4">
+          <app-surface-card class="p-6" animDelay="">
+            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Two-Factor Authentication</h3>
+            <div
+              class="flex items-center gap-3 p-4 rounded-xl mb-4"
+              style="background: var(--green-soft); border: 1px solid var(--green)"
+            >
+              <span style="color: var(--green)">✓</span>
+              <p class="text-[13px] font-medium" style="color: var(--green)">2FA is currently enabled for this account</p>
+            </div>
+            <app-toggle label="Require 2FA for all admin logins" [defaultChecked]="true" />
+            <app-toggle label="Authenticator app (TOTP)" [defaultChecked]="true" />
+            <app-toggle label="SMS backup codes" [defaultChecked]="false" />
+            <div class="mt-4 flex gap-2">
+              <button
+                type="button"
+                class="px-4 py-2 rounded-xl text-[13px] font-semibold"
+                style="background: var(--primary-soft); color: var(--primary)"
+              >
+                Regenerate Backup Codes
+              </button>
+              <button
+                type="button"
+                class="px-4 py-2 rounded-xl text-[13px] font-semibold"
+                style="background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border)"
+              >
+                View Backup Codes
+              </button>
+            </div>
+          </app-surface-card>
+
+          <app-surface-card class="p-6" animDelay="delay-50">
+            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Session &amp; Access Policy</h3>
+            <div class="space-y-4">
+              <app-settings-field label="Session Timeout (minutes)" hint="Admins will be logged out after this period of inactivity">
+                <app-settings-input defaultValue="30" type="number" />
+              </app-settings-field>
+              <app-settings-field label="Max Failed Login Attempts before lockout">
+                <app-settings-input defaultValue="5" type="number" />
+              </app-settings-field>
+              <app-settings-field label="Allowed Email Domains" hint="Only these domains can sign in (comma-separated)">
+                <app-settings-input defaultValue="@smartmoney.io" />
+              </app-settings-field>
+              <app-settings-field label="IP Allowlist" hint="Leave empty to allow all IPs. Enter CIDR ranges separated by commas">
+                <app-settings-input placeholder="e.g. 41.90.64.0/24, 105.160.0.0/16" />
+              </app-settings-field>
+            </div>
+            <app-toggle label="Force Google OAuth for admin logins" [defaultChecked]="true" />
+            <app-toggle label="Log all admin actions to audit trail" [defaultChecked]="true" />
+            <app-toggle label="Allow concurrent admin sessions" [defaultChecked]="false" />
+            <button
+              type="button"
+              class="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white"
+              style="background: var(--primary)"
+            >
+              Save Security Settings
+            </button>
+          </app-surface-card>
+
+          <app-surface-card class="p-6" animDelay="delay-100">
+            <h3 class="text-sm font-bold mb-3 font-display" style="color: var(--text-1)">Active Sessions</h3>
+            @for (session of sessions; track session.device) {
+              <div class="flex items-center justify-between py-3 border-b last:border-0" style="border-color: var(--border)">
+                <div>
+                  <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ session.device }}</p>
+                  <p class="text-[12px]" style="color: var(--text-3)">
+                    {{ session.ip }} · {{ session.location }} · {{ session.time }}
+                  </p>
+                </div>
+                @if (session.current) {
+                  <app-badge status="Active" />
+                } @else {
+                  <button type="button" class="text-[12px] font-semibold" style="color: var(--red)">Revoke</button>
+                }
+              </div>
+            }
+          </app-surface-card>
+        </div>
+      }
+
+      @case ('Roles & Permissions') {
+        <div class="space-y-4 max-w-2xl">
+          @for (role of roles; track role.name; let i = $index) {
+            <app-surface-card class="p-5" [animDelay]="delayFor(i)">
+              <div class="flex items-start justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+                    [style.background]="roleColor(role.color)"
+                  >
+                    {{ role.name[0] }}
+                  </div>
+                  <div>
+                    <p class="text-sm font-bold font-display" style="color: var(--text-1)">{{ role.name }}</p>
+                    <p class="text-[12px]" style="color: var(--text-3)">{{ role.desc }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="text-[12px] font-semibold px-3 py-1 rounded-lg"
+                  style="background: var(--primary-soft); color: var(--primary)"
+                >
+                  Edit Role
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                @for (permission of allPermissions; track permission) {
+                  <span
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[12px] font-medium"
+                    [style.background]="hasPermission(role, permission) ? 'var(--green-soft)' : 'var(--surface-2)'"
+                    [style.borderColor]="hasPermission(role, permission) ? 'var(--green)' : 'var(--border)'"
+                    [style.color]="hasPermission(role, permission) ? 'var(--green)' : 'var(--text-3)'"
+                  >
+                    {{ hasPermission(role, permission) ? '✓' : '○' }} {{ permission }}
+                  </span>
+                }
+              </div>
+            </app-surface-card>
+          }
+          <button
+            type="button"
+            class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
+            style="background: var(--primary)"
+          >
+            + Add New Role
+          </button>
+        </div>
+      }
+
+      @case ('Notifications') {
+        <div class="max-w-xl space-y-4">
+          <app-surface-card class="p-6" animDelay="">
+            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Email Notification Preferences</h3>
+            <app-toggle label="Bank integration failures" [defaultChecked]="true" />
+            <app-toggle label="Webhook delivery failures" [defaultChecked]="true" />
+            <app-toggle label="Transaction processing errors" [defaultChecked]="true" />
+            <app-toggle label="Reconciliation issues" [defaultChecked]="true" />
+            <app-toggle label="New organisation registrations" [defaultChecked]="false" />
+            <app-toggle label="User account changes (suspend/activate)" [defaultChecked]="true" />
+            <app-toggle label="Daily platform summary digest" [defaultChecked]="false" />
+            <app-toggle label="Security alerts and admin logins" [defaultChecked]="true" />
+          </app-surface-card>
+
+          <app-surface-card class="p-6" animDelay="delay-50">
+            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Alert Thresholds</h3>
+            <div class="space-y-4">
+              <app-settings-field label="Webhook silence alert after (minutes)" hint="Alert if no webhook received within this period">
+                <app-settings-input defaultValue="10" type="number" />
+              </app-settings-field>
+              <app-settings-field label="Failed transaction alert threshold">
+                <app-settings-input defaultValue="5" type="number" />
+              </app-settings-field>
+              <app-settings-field label="Reconciliation backlog alert after (hours)">
+                <app-settings-input defaultValue="2" type="number" />
+              </app-settings-field>
+              <app-settings-field label="Notification email recipients" hint="Comma-separated list">
+                <app-settings-input defaultValue="admin@smartmoney.io, ops@smartmoney.io" />
+              </app-settings-field>
+            </div>
+            <button
+              type="button"
+              class="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white"
+              style="background: var(--primary)"
+            >
+              Save Preferences
+            </button>
+          </app-surface-card>
+        </div>
+      }
+
+      @case ('Bank Integration Settings') {
+        <div class="space-y-4 max-w-3xl">
+          @for (bank of banks; track bank.id; let i = $index) {
+            <app-surface-card class="p-5" [animDelay]="delayFor(i)">
+              <app-bank-connection-panel [bank]="bank" />
+            </app-surface-card>
+          }
+        </div>
+      }
+
+      @case ('System Configuration') {
+        <div class="max-w-xl space-y-4">
+          <app-surface-card class="p-6" animDelay="">
+            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Platform Configuration</h3>
+            <div class="space-y-4">
+              <app-settings-field label="Platform Version">
+                <app-settings-input defaultValue="v2.4.1" />
+              </app-settings-field>
+              <app-settings-field label="Spring Boot API Base URL">
+                <app-settings-input defaultValue="https://api.smartmoney.io/v1" />
+              </app-settings-field>
+              <app-settings-field label="PostgreSQL Database Host">
+                <app-settings-input defaultValue="db.smartmoney.io" />
+              </app-settings-field>
+              <app-settings-field label="Audit Log Retention (days)" hint="Logs older than this will be archived">
+                <app-settings-input defaultValue="365" type="number" />
+              </app-settings-field>
+              <app-settings-field label="Transaction Processing Workers">
+                <app-settings-input defaultValue="4" type="number" />
+              </app-settings-field>
+            </div>
+          </app-surface-card>
+
+          <app-surface-card class="p-6" animDelay="delay-50">
+            <h3 class="text-sm font-bold mb-3 font-display" style="color: var(--text-1)">System Toggles</h3>
+            <app-toggle label="Maintenance mode (disables user portal access)" [defaultChecked]="false" />
+            <app-toggle label="Transaction auto-processing" [defaultChecked]="true" />
+            <app-toggle label="Reconciliation engine enabled" [defaultChecked]="true" />
+            <app-toggle label="Notification service enabled" [defaultChecked]="true" />
+            <app-toggle label="Debug logging (verbose)" [defaultChecked]="false" />
+            <app-toggle label="Rate limiting on API endpoints" [defaultChecked]="true" />
+          </app-surface-card>
+
+          <app-surface-card class="p-6" animDelay="delay-100">
+            <h3 class="text-sm font-bold mb-3 font-display" style="color: var(--text-1)">Danger Zone</h3>
+            <div class="p-4 rounded-xl border" style="background: var(--red-soft); border-color: var(--red)">
+              <p class="text-[13px] font-semibold mb-1" style="color: var(--red)">Irreversible Actions</p>
+              <p class="text-[12px] mb-3" style="color: var(--text-2)">
+                These actions cannot be undone. Proceed with extreme caution.
+              </p>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="text-[12px] font-semibold px-3 py-1.5 rounded-lg border"
+                  style="border-color: var(--red); color: var(--red)"
+                >
+                  Clear Audit Logs
+                </button>
+                <button
+                  type="button"
+                  class="text-[12px] font-semibold px-3 py-1.5 rounded-lg border"
+                  style="border-color: var(--red); color: var(--red)"
+                >
+                  Reset Platform
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white"
+              style="background: var(--primary)"
+            >
+              Save Configuration
+            </button>
+          </app-surface-card>
+        </div>
+      }
+    }
+  </div>
+</div>

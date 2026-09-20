@@ -1,0 +1,38 @@
+meta {
+  name: KCB connection test
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/kcb/test
+  body: none
+  auth: none
+}
+
+docs {
+  Runs the four connection steps and stores the outcome, which is what moves
+  the API tile on the bank detail drawer.
+
+  The endpoint accepts an empty body and any content type, so this request
+  deliberately sends no body and no content type header.
+
+  ok is false when a step failed. The steps array names the step that failed
+  and carries the bank's own message, which is the useful part on a failure.
+}
+
+tests {
+  test("connection test returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("every step is reported with a status", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("steps");
+    expect(body.steps.length).to.be.above(0);
+    body.steps.forEach(function(step) {
+      expect(step).to.have.property("key");
+      expect(step).to.have.property("status");
+    });
+  });
+}

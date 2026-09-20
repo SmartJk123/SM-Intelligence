@@ -1,0 +1,21 @@
+meta {
+  name: Stanbic settings
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/stanbic/settings
+  body: none
+  auth: none
+}
+
+tests {
+  test("settings return with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the response belongs to Stanbic", function() {
+    expect(res.getBody().bankId).to.equal("stanbic");
+  });
+}

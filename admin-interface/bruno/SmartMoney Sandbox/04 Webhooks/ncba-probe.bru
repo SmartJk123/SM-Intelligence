@@ -1,0 +1,31 @@
+meta {
+  name: NCBA webhook probe
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/webhooks/ncba
+  body: none
+  auth: none
+}
+
+docs {
+  A GET on the notification address must answer, because NCBA and their
+  reviewers will open it in a browser to confirm the address before they
+  configure it on their side.
+
+  Run this against the tunnel address, not localhost, before the address goes on
+  the request letter. A tunnel that has stopped returns a host error rather than
+  this message.
+}
+
+tests {
+  test("the notification endpoint answers with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the acknowledgement names the provider", function() {
+    expect(String(res.getBody())).to.include("NCBA Bank Kenya");
+  });
+}
