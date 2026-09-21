@@ -1,0 +1,11 @@
+meta {
+  name: Stanbic Webhook Probe
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{bankIntegrationBaseUrl}}/api/v1/webhooks/stanbic
+  body: none
+  auth: none
+}

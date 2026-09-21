@@ -67,3 +67,9 @@ dist/
 
 # Project-local Java/tool downloads
 .tools/
+
+# Embedded database files
+*.mv.db
+*.trace.db
+data/
+**/data/

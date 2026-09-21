@@ -12,6 +12,26 @@ spring:
               uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/api/auth/**
+            - id: accounts-service
+              uri: ${ACCOUNTS_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/accounts/**
+            - id: transactions-service
+              uri: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/transactions/**
+            - id: bank-integration-webhooks
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              predicates:
+                - Path=/api/v1/webhooks/**
+            - id: bank-integration-admin
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              predicates:
+                - Path=/api/v1/admin/bank-integrations/**
+            - id: bank-integration-stats
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              predicates:
+                - Path=/api/v1/admin/stats/**
 management:
   endpoints:
     web:
