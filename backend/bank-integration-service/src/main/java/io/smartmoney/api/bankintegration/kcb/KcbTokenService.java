@@ -75,6 +75,7 @@ public class KcbTokenService implements TokenStateProvider {
 
         RestClient.RequestBodySpec request = http.post()
                 .uri(props.tokenUrl())
+                .accept(MediaType.APPLICATION_JSON, MediaType.ALL)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED);
         if (props.usesBasicAuth()) {
             request = request.header(HttpHeaders.AUTHORIZATION,
@@ -85,7 +86,8 @@ public class KcbTokenService implements TokenStateProvider {
 
         String raw;
         try {
-            raw = request.body(form).retrieve().body(String.class);
+            byte[] bytes = request.body(form).retrieve().body(byte[].class);
+            raw = bytes == null ? "" : new String(bytes, StandardCharsets.UTF_8);
         } catch (RestClientResponseException error) {
             int status = error.getStatusCode().value();
             throw new IllegalStateException("KCB token endpoint returned HTTP "

@@ -26,6 +26,7 @@ public class SecurityConfig {
         boolean permitAll = platform.security() == null || platform.security().permitAll();
 
         http.csrf(csrf -> csrf.disable());
+        http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
         http.cors(Customizer.withDefaults());
         http.authorizeHttpRequests(registry -> {
             if (permitAll) {

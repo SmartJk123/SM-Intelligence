@@ -10,4 +10,4 @@
  *   PUT  {API_BASE_URL}/admin/bank-integrations/{bankId}
  *   GET  {API_BASE_URL}/admin/stats
  */
-export const API_BASE_URL = 'http://localhost:8080/api/v1';
+export const API_BASE_URL = 'http://localhost:8090/api/v1';
