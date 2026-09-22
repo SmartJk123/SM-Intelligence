@@ -27,20 +27,41 @@ public class AccountService {
     }
 
     public AccountResponse createAccount(CreateAccountRequest request) {
-        if (accountRepository.existsByInstitutionAndProviderAccountId(request.getInstitution(), request.getProviderAccountId())) {
+        UUID effectiveUserId = request.getUserId() != null 
+            ? request.getUserId() 
+            : UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String effectiveInstitution = (request.getInstitution() != null && !request.getInstitution().isBlank())
+            ? request.getInstitution().trim()
+            : "Default Bank";
+        String effectiveAccountType = request.getAccountType() != null
+            ? request.getAccountType().trim().toUpperCase()
+            : "DEPOSIT";
+        if (effectiveAccountType.equals("DEBIT") || effectiveAccountType.equals("SAVINGS") || effectiveAccountType.equals("CHECKING")) {
+            effectiveAccountType = "DEPOSIT";
+        }
+        String effectiveAccountName = (request.getAccountName() != null && !request.getAccountName().isBlank())
+            ? request.getAccountName().trim()
+            : effectiveInstitution + " Account";
+        String effectiveMaskedId = request.getMaskedIdentifier();
+        if (effectiveMaskedId == null || effectiveMaskedId.isBlank()) {
+            String provId = request.getProviderAccountId() != null ? request.getProviderAccountId().trim() : "";
+            effectiveMaskedId = provId.length() > 4 ? "**** " + provId.substring(provId.length() - 4) : "**** " + provId;
+        }
+
+        if (accountRepository.existsByInstitutionAndProviderAccountId(effectiveInstitution, request.getProviderAccountId())) {
             throw new DuplicateAccountException(
                 String.format("Account with institution '%s' and provider account ID '%s' already exists",
-                    request.getInstitution(), request.getProviderAccountId())
+                    effectiveInstitution, request.getProviderAccountId())
             );
         }
 
         Account account = new Account(
-            request.getUserId(),
+            effectiveUserId,
             request.getProviderAccountId(),
-            request.getAccountName(),
-            request.getInstitution(),
-            request.getAccountType(),
-            request.getMaskedIdentifier(),
+            effectiveAccountName,
+            effectiveInstitution,
+            effectiveAccountType,
+            effectiveMaskedId,
             request.getCurrency(),
             request.getInitialBalance()
         );
@@ -59,7 +80,15 @@ public class AccountService {
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccountsByUserId(UUID userId, String status) {
         List<Account> accounts;
-        if (status != null && !status.isBlank()) {
+        if (userId == null) {
+            if (status != null && !status.isBlank()) {
+                accounts = accountRepository.findAll().stream()
+                    .filter(a -> a.getAccountStatus().equalsIgnoreCase(status.trim()))
+                    .collect(Collectors.toList());
+            } else {
+                accounts = accountRepository.findAll();
+            }
+        } else if (status != null && !status.isBlank()) {
             accounts = accountRepository.findByUserIdAndAccountStatus(userId, status.toUpperCase());
         } else {
             accounts = accountRepository.findByUserId(userId);

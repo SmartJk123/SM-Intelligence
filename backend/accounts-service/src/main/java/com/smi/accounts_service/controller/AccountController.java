@@ -41,7 +41,7 @@ public class AccountController {
 
     @GetMapping
     public ResponseEntity<List<AccountResponse>> getAccounts(
-            @RequestParam UUID userId,
+            @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) String status) {
         List<AccountResponse> accounts = accountService.getAccountsByUserId(userId, status);
         return ResponseEntity.ok(accounts);
