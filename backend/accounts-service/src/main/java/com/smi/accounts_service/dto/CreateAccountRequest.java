@@ -1,5 +1,6 @@
 package com.smi.accounts_service.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -11,33 +12,41 @@ import java.util.UUID;
 public class CreateAccountRequest {
 
     @NotNull(message = "userId is required")
+    @JsonAlias({"user_id"})
     private UUID userId;
 
     @NotBlank(message = "providerAccountId is required")
+    @JsonAlias({"provider_account_id", "accountId", "account_id", "accountNumber", "account_number"})
     private String providerAccountId;
 
     @NotBlank(message = "accountName is required")
     @Size(min = 1, max = 150, message = "accountName must be between 1 and 150 characters")
+    @JsonAlias({"account_name"})
     private String accountName;
 
     @NotBlank(message = "institution is required")
+    @JsonAlias({"bankName", "bank_name"})
     private String institution;
 
     @NotBlank(message = "accountType is required")
     @Pattern(regexp = "^(DEPOSIT|CREDIT)$", message = "accountType must be DEPOSIT or CREDIT")
+    @JsonAlias({"account_type", "cardType", "card_type"})
     private String accountType;
 
-    @NotBlank(message = "maskedIdentifier is required")
+    @JsonAlias({"masked_identifier", "maskedAccountNumber", "masked_account_number"})
     private String maskedIdentifier;
 
     @Pattern(regexp = "^[A-Z]{3}$", message = "currency must be a 3-letter ISO code")
     private String currency = "KES";
 
+    @JsonAlias({"initial_balance", "balance", "availableBalance", "available_balance"})
     private BigDecimal initialBalance = BigDecimal.ZERO;
 
+    @JsonAlias({"credit_limit"})
     private BigDecimal creditLimit = BigDecimal.ZERO;
 
     @Pattern(regexp = "^(BANK_API|MANUAL)$", message = "dataSource must be BANK_API or MANUAL")
+    @JsonAlias({"data_source"})
     private String dataSource = "MANUAL";
 
     public CreateAccountRequest() {
@@ -74,6 +83,10 @@ public class CreateAccountRequest {
 
     public void setProviderAccountId(String providerAccountId) {
         this.providerAccountId = providerAccountId;
+        if ((this.maskedIdentifier == null || this.maskedIdentifier.isBlank()) && providerAccountId != null && !providerAccountId.isBlank()) {
+            String trimmed = providerAccountId.trim();
+            this.maskedIdentifier = trimmed.length() > 4 ? "**** " + trimmed.substring(trimmed.length() - 4) : "**** " + trimmed;
+        }
     }
 
     public String getAccountName() {
@@ -97,10 +110,23 @@ public class CreateAccountRequest {
     }
 
     public void setAccountType(String accountType) {
-        this.accountType = accountType;
+        if (accountType != null) {
+            String upper = accountType.trim().toUpperCase();
+            if (upper.equals("DEBIT") || upper.equals("SAVINGS") || upper.equals("CHECKING")) {
+                this.accountType = "DEPOSIT";
+            } else {
+                this.accountType = upper;
+            }
+        } else {
+            this.accountType = null;
+        }
     }
 
     public String getMaskedIdentifier() {
+        if ((maskedIdentifier == null || maskedIdentifier.isBlank()) && providerAccountId != null && !providerAccountId.isBlank()) {
+            String trimmed = providerAccountId.trim();
+            return trimmed.length() > 4 ? "**** " + trimmed.substring(trimmed.length() - 4) : "**** " + trimmed;
+        }
         return maskedIdentifier;
     }
 

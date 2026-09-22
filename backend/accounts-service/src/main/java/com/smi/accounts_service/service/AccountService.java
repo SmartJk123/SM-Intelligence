@@ -71,21 +71,41 @@ public class AccountService {
     }
 
     @Transactional(readOnly = true)
+    public Account findAccountByIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new AccountNotFoundException("Account identifier cannot be empty");
+        }
+        try {
+            UUID uuid = UUID.fromString(identifier.trim());
+            return accountRepository.findById(uuid)
+                .or(() -> accountRepository.findByProviderAccountId(identifier.trim()).stream().findFirst())
+                .orElseThrow(() -> new AccountNotFoundException("Account not found with ID or account number: " + identifier));
+        } catch (IllegalArgumentException e) {
+            return accountRepository.findByProviderAccountId(identifier.trim()).stream().findFirst()
+                .orElseThrow(() -> new AccountNotFoundException("Account not found with account number: " + identifier));
+        }
+    }
+
+    @Transactional(readOnly = true)
     public AccountResponse getAccountById(UUID id, UUID userId) {
-        Account account;
-        if (userId != null) {
-            account = accountRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id + " for user: " + userId));
-        } else {
-            account = accountRepository.findById(id)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
+        return getAccountById(id.toString(), userId);
+    }
+
+    @Transactional(readOnly = true)
+    public AccountResponse getAccountById(String identifier, UUID userId) {
+        Account account = findAccountByIdentifier(identifier);
+        if (userId != null && !account.getUserId().equals(userId)) {
+            throw new AccountNotFoundException("Account not found with identifier: " + identifier + " for user: " + userId);
         }
         return AccountResponse.fromEntity(account);
     }
 
     public AccountResponse updateBalance(UUID id, UpdateBalanceRequest request) {
-        Account account = accountRepository.findById(id)
-            .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
+        return updateBalance(id.toString(), request);
+    }
+
+    public AccountResponse updateBalance(String identifier, UpdateBalanceRequest request) {
+        Account account = findAccountByIdentifier(identifier);
 
         account.setAvailableBalance(request.getAvailableBalance());
         if (request.getLedgerBalance() != null) {
@@ -101,8 +121,11 @@ public class AccountService {
     }
 
     public AccountResponse updateStatus(UUID id, UpdateStatusRequest request) {
-        Account account = accountRepository.findById(id)
-            .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
+        return updateStatus(id.toString(), request);
+    }
+
+    public AccountResponse updateStatus(String identifier, UpdateStatusRequest request) {
+        Account account = findAccountByIdentifier(identifier);
 
         if (request.getAccountStatus() != null) {
             account.setAccountStatus(request.getAccountStatus());
@@ -117,8 +140,11 @@ public class AccountService {
     }
 
     public AccountResponse closeAccount(UUID id) {
-        Account account = accountRepository.findById(id)
-            .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
+        return closeAccount(id.toString());
+    }
+
+    public AccountResponse closeAccount(String identifier) {
+        Account account = findAccountByIdentifier(identifier);
 
         account.setAccountStatus("CLOSED");
         account.setConnectionStatus("DISCONNECTED");
@@ -126,5 +152,16 @@ public class AccountService {
 
         Account updated = accountRepository.save(account);
         return AccountResponse.fromEntity(updated);
+    }
+
+    public AccountResponse deleteAccount(UUID id) {
+        return deleteAccount(id.toString());
+    }
+
+    public AccountResponse deleteAccount(String identifier) {
+        Account account = findAccountByIdentifier(identifier);
+        AccountResponse response = AccountResponse.fromEntity(account);
+        accountRepository.delete(account);
+        return response;
     }
 }

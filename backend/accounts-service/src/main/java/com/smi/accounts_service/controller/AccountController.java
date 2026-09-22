@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestMethod;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -47,31 +49,57 @@ public class AccountController {
 
     @GetMapping("/{id}")
     public ResponseEntity<AccountResponse> getAccountById(
-            @PathVariable UUID id,
+            @PathVariable String id,
             @RequestParam(required = false) UUID userId) {
-        AccountResponse account = accountService.getAccountById(id, userId);
-        return ResponseEntity.ok(account);
+        try {
+            UUID uuid = UUID.fromString(id);
+            return ResponseEntity.ok(accountService.getAccountById(uuid, userId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(accountService.getAccountById(id, userId));
+        }
     }
 
-    @PatchMapping("/{id}/balance")
+    @RequestMapping(value = "/{id}/balance", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<AccountResponse> updateBalance(
-            @PathVariable UUID id,
+            @PathVariable String id,
             @Valid @RequestBody UpdateBalanceRequest request) {
-        AccountResponse updated = accountService.updateBalance(id, request);
-        return ResponseEntity.ok(updated);
+        try {
+            UUID uuid = UUID.fromString(id);
+            return ResponseEntity.ok(accountService.updateBalance(uuid, request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(accountService.updateBalance(id, request));
+        }
     }
 
-    @PatchMapping("/{id}/status")
+    @RequestMapping(value = "/{id}/status", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<AccountResponse> updateStatus(
-            @PathVariable UUID id,
+            @PathVariable String id,
             @Valid @RequestBody UpdateStatusRequest request) {
-        AccountResponse updated = accountService.updateStatus(id, request);
-        return ResponseEntity.ok(updated);
+        try {
+            UUID uuid = UUID.fromString(id);
+            return ResponseEntity.ok(accountService.updateStatus(uuid, request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(accountService.updateStatus(id, request));
+        }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<AccountResponse> closeAccount(@PathVariable UUID id) {
-        AccountResponse closed = accountService.closeAccount(id);
-        return ResponseEntity.ok(closed);
+    public ResponseEntity<AccountResponse> deleteAccount(
+            @PathVariable String id,
+            @RequestParam(required = false) Boolean permanent) {
+        if (Boolean.FALSE.equals(permanent)) {
+            try {
+                UUID uuid = UUID.fromString(id);
+                return ResponseEntity.ok(accountService.closeAccount(uuid));
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.ok(accountService.closeAccount(id));
+            }
+        }
+        try {
+            UUID uuid = UUID.fromString(id);
+            return ResponseEntity.ok(accountService.deleteAccount(uuid));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(accountService.deleteAccount(id));
+        }
     }
 }

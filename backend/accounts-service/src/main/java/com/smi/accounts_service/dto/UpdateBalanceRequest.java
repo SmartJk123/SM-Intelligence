@@ -1,15 +1,19 @@
 package com.smi.accounts_service.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public class UpdateBalanceRequest {
 
     @NotNull(message = "availableBalance is required")
+    @JsonAlias({"available_balance", "balance"})
     private BigDecimal availableBalance;
 
+    @JsonAlias({"ledger_balance"})
     private BigDecimal ledgerBalance;
 
+    @JsonAlias({"credit_outstanding"})
     private BigDecimal creditOutstanding;
 
     public UpdateBalanceRequest() {

@@ -20,4 +20,6 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
     Optional<Account> findByInstitutionAndProviderAccountId(String institution, String providerAccountId);
 
     boolean existsByInstitutionAndProviderAccountId(String institution, String providerAccountId);
+
+    List<Account> findByProviderAccountId(String providerAccountId);
 }

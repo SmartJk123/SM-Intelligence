@@ -151,4 +151,67 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
     }
+
+    @Test
+    @DisplayName("POST /api/auth/register - Supports mobile app payload with 'email' and 'phoneNumber'")
+    void shouldRegisterWithMobileAppPayload() throws Exception {
+        UUID userId = UUID.randomUUID();
+        User mockUser = new User(userId, "Frank Mwangi", "frank@example.com", "+254712345678", "hashed_pwd");
+        mockUser.setAccountType("INDIVIDUAL");
+
+        when(userService.registerUser(any(RegisterRequest.class))).thenReturn(mockUser);
+        when(jwtService.generateToken(mockUser)).thenReturn("mobile.jwt.token");
+        when(jwtService.getExpirationMs()).thenReturn(86400000L);
+
+        String mobileJson = """
+            {
+                "name": "Frank Mwangi",
+                "email": "frank@example.com",
+                "phoneNumber": "+254712345678",
+                "password": "password123"
+            }
+        """;
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mobileJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.name").value("Frank Mwangi"))
+                .andExpect(jsonPath("$.email").value("frank@example.com"))
+                .andExpect(jsonPath("$.emailAddress").value("frank@example.com"))
+                .andExpect(jsonPath("$.phoneNumber").value("+254712345678"))
+                .andExpect(jsonPath("$.token").value("mobile.jwt.token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/login - Supports mobile app payload with 'email'")
+    void shouldLoginWithMobileAppPayload() throws Exception {
+        UUID userId = UUID.randomUUID();
+        User mockUser = new User(userId, "Frank Mwangi", "frank@example.com", "+254712345678", "hashed_pwd");
+
+        when(userService.authenticate(any(LoginRequest.class))).thenReturn(mockUser);
+        when(jwtService.generateToken(mockUser)).thenReturn("mobile.login.token");
+        when(jwtService.getExpirationMs()).thenReturn(86400000L);
+
+        String mobileJson = """
+            {
+                "email": "frank@example.com",
+                "password": "password123"
+            }
+        """;
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mobileJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.email").value("frank@example.com"))
+                .andExpect(jsonPath("$.emailAddress").value("frank@example.com"))
+                .andExpect(jsonPath("$.phoneNumber").value("+254712345678"))
+                .andExpect(jsonPath("$.token").value("mobile.login.token"));
+    }
 }

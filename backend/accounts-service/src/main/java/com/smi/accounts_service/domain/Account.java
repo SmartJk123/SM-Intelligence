@@ -10,7 +10,10 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
+import org.hibernate.annotations.JdbcTypeCode;
+
 import java.math.BigDecimal;
+import java.sql.Types;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -45,7 +48,8 @@ public class Account {
     @Column(name = "masked_identifier", nullable = false)
     private String maskedIdentifier;
 
-    @Column(name = "currency", nullable = false, columnDefinition = "bpchar")
+    @Column(name = "currency", nullable = false, length = 3)
+    @JdbcTypeCode(Types.CHAR)
     private String currency = "KES";
 
     @Column(name = "ledger_balance", nullable = false, precision = 19, scale = 4)

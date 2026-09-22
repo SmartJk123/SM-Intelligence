@@ -43,6 +43,7 @@ public class AuthController {
                 user.getId(),
                 user.getName(),
                 user.getEmailAddress(),
+                user.getPhoneNumber(),
                 user.getAccountType()
         );
 
@@ -60,6 +61,7 @@ public class AuthController {
                 user.getId(),
                 user.getName(),
                 user.getEmailAddress(),
+                user.getPhoneNumber(),
                 user.getAccountType()
         );
 
