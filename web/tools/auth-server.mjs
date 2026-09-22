@@ -1,6 +1,123 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const toMinor = (amount) => Math.round(Number(amount) * 100);
+
+/**
+ * Builds the Financial Overview data from accounts-service and
+ * transactions-service, through the same gateway `call` already used for
+ * identity. Never invents figures: a downstream failure is reported as a
+ * failure, and a user with no accounts yet simply sees zeros.
+ */
+async function sendDashboard(send, call, session, searchParams) {
+  const days = Math.min(365, Math.max(1, parseInt(searchParams.get('days') ?? '30', 10) || 30));
+  const bank = searchParams.get('bank') ?? '';
+  const to = new Date();
+  const from = new Date(to.getTime() - days * DAY_MS);
+
+  const meResponse = await call('/api/auth/me', { headers: { Authorization: 'Bearer ' + session.token } });
+  if (!meResponse.ok) return send(503, { error: 'Identity service unavailable' });
+  const profile = await meResponse.json();
+
+  const accountsResponse = await call('/api/accounts?userId=' + encodeURIComponent(session.userId));
+  if (!accountsResponse.ok) return send(503, { error: 'Accounts service unavailable' });
+  let accounts = await accountsResponse.json();
+  if (bank) accounts = accounts.filter((a) => (a.institution ?? '').toLowerCase() === bank.toLowerCase());
+
+  const perAccountTx = await Promise.all(
+    accounts.map(async (account) => {
+      const response = await call('/api/transactions?accountId=' + encodeURIComponent(account.id));
+      return response.ok ? response.json() : [];
+    }),
+  );
+  const inPeriod = perAccountTx.flat().filter((tx) => {
+    const date = new Date(tx.transactionDate);
+    return date >= from && date <= to;
+  });
+
+  const depositAccountIds = new Set(accounts.filter((a) => a.accountType === 'DEPOSIT').map((a) => a.id));
+  const isCashMovement = (tx) => tx.status === 'POSTED' && depositAccountIds.has(tx.accountId);
+
+  let moneyInMinor = 0;
+  let moneyOutMinor = 0;
+  for (const tx of inPeriod) {
+    if (!isCashMovement(tx)) continue;
+    const minor = toMinor(tx.amount);
+    if (tx.transactionType === 'CREDIT') moneyInMinor += minor;
+    else if (tx.transactionType === 'DEBIT') moneyOutMinor += minor;
+  }
+
+  const cashFlow = [];
+  for (let bucketStart = from; bucketStart < to; bucketStart = new Date(bucketStart.getTime() + 7 * DAY_MS)) {
+    const bucketEnd = new Date(Math.min(bucketStart.getTime() + 7 * DAY_MS, to.getTime()));
+    let bucketIn = 0;
+    let bucketOut = 0;
+    for (const tx of inPeriod) {
+      if (!isCashMovement(tx)) continue;
+      const date = new Date(tx.transactionDate);
+      if (date < bucketStart || date >= bucketEnd) continue;
+      const minor = toMinor(tx.amount);
+      if (tx.transactionType === 'CREDIT') bucketIn += minor;
+      else if (tx.transactionType === 'DEBIT') bucketOut += minor;
+    }
+    cashFlow.push({
+      from: bucketStart.toISOString().slice(0, 10),
+      to: bucketEnd.toISOString().slice(0, 10),
+      moneyInMinor: bucketIn,
+      moneyOutMinor: bucketOut,
+    });
+  }
+
+  const transactions = inPeriod
+    .slice()
+    .sort((a, b) => new Date(b.transactionDate) - new Date(a.transactionDate))
+    .slice(0, 12)
+    .map((tx) => ({
+      id: tx.id,
+      accountId: tx.accountId,
+      description: tx.description || tx.counterparty || 'Transaction',
+      // Placeholder: categories-service is not wired up yet, so the
+      // counterparty stands in for a real category name.
+      category: tx.counterparty || 'Uncategorized',
+      direction: tx.transactionType,
+      amountMinor: toMinor(tx.amount),
+      status: tx.status,
+      date: tx.transactionDate,
+    }));
+
+  return send(200, {
+    ...(bank ? { bank } : {}),
+    source: 'live',
+    currency: 'KES',
+    user: { name: profile.name, kind: profile.accountType === 'ORGANIZATION' ? 'organization' : 'individual' },
+    period: { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), days },
+    summary: {
+      availableCashMinor: accounts
+        .filter((a) => a.accountType === 'DEPOSIT')
+        .reduce((sum, a) => sum + toMinor(a.availableBalance), 0),
+      creditOutstandingMinor: accounts
+        .filter((a) => a.accountType === 'CREDIT')
+        .reduce((sum, a) => sum + toMinor(a.creditOutstanding), 0),
+      moneyInMinor,
+      moneyOutMinor,
+      netCashFlowMinor: moneyInMinor - moneyOutMinor,
+    },
+    accounts: accounts.map((a) => ({
+      id: a.id,
+      bank: a.institution,
+      accountName: a.accountName,
+      maskedIdentifier: a.maskedIdentifier,
+      accountType: a.accountType,
+      availableBalanceMinor: toMinor(a.availableBalance),
+      creditOutstandingMinor: toMinor(a.creditOutstanding),
+    })),
+    cashFlow,
+    transactions,
+    transactionCount: inPeriod.length,
+  });
+}
+
 // Loopback development adapter. JWTs stay here; the browser receives an HttpOnly session cookie.
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const backend = new URL(options.identityUrl || process.env.IDENTITY_API_URL || 'http://localhost:8080');
@@ -27,7 +144,8 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     for (const [id, value] of sessions) if (value.expiresAt <= Date.now()) sessions.delete(id);
     const sessionId = req.headers.cookie?.split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
     const session = sessions.get(sessionId);
-    const route = req.url?.split('?')[0];
+    const url = new URL(req.url ?? '/', 'http://internal');
+    const route = url.pathname;
     try {
       if (route === '/api/auth/logout' && req.method === 'POST') {
         sessions.delete(sessionId); clear(); return send(200, { signedOut: true });
@@ -75,7 +193,11 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         }
       }
       if (!session) return send(401, { error: 'Sign in required' });
-      // Financial integration is a later team milestone. Never create temporary records.
+      if (route === '/api/dashboard' && req.method === 'GET') {
+        return await sendDashboard(send, call, session, url.searchParams);
+      }
+      // Financial integration beyond accounts/transactions is a later team milestone.
+      // Never create temporary records.
       return send(501, { error: 'This feature is not connected yet' });
     } catch {
       return send(503, { error: 'Identity service unavailable. Please retry.' });

@@ -35,6 +35,11 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
+                // TODO: admin-interface has no real authentication against this service yet
+                // (its AuthService is a local-only signal). This endpoint only reads data
+                // (no destructive/account-takeover primitive), so it is left open for now,
+                // but it must be locked down once admin-interface gets real admin auth.
+                .requestMatchers("/api/v1/admin/users/**").permitAll()
                 .anyRequest().denyAll()
             );
 

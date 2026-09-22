@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ORGS, OrgStatus, Organisation } from '../../core/data';
+import { OrgStatus, Organisation } from '../../core/data';
 import { CsvExportService } from '../../core/csv-export.service';
 import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
+import { UserService } from '../../core/user.service';
 import { ActionMenu, ActionMenuItem } from '../../shared/action-menu';
 import { Badge } from '../../shared/badge';
 import { KpiCard } from '../../shared/kpi-card';
@@ -29,12 +30,13 @@ export class Organisations {
   private readonly ui = inject(UiService);
   private readonly csv = inject(CsvExportService);
   private readonly toasts = inject(ToastService);
+  private readonly userDirectory = inject(UserService);
 
   /** Status changes made from the row menu, so the actions really take effect. */
-  private readonly statusOverrides = signal<Record<number, OrgStatus>>({});
+  private readonly statusOverrides = signal<Record<string, OrgStatus>>({});
 
   /** Edits saved from the detail view, applied straight to the table. */
-  private readonly edits = signal<Record<number, { name: string; type: string }>>({});
+  private readonly edits = signal<Record<string, { name: string; type: string }>>({});
 
   /** Organisation currently open in the detail view. */
   protected readonly selectedOrg = signal<Organisation | null>(null);
@@ -55,7 +57,7 @@ export class Organisations {
   protected readonly orgs = computed<Organisation[]>(() => {
     const overrides = this.statusOverrides();
     const edits = this.edits();
-    return ORGS.map((org) => ({
+    return this.userDirectory.organisations().map((org) => ({
       ...org,
       ...(edits[org.id] ?? {}),
       status: overrides[org.id] ?? org.status,

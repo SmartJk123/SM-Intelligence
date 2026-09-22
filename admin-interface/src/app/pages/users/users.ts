@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { AppUser, USERS, UserStatus } from '../../core/data';
+import { AppUser, UserStatus } from '../../core/data';
 import { CsvExportService } from '../../core/csv-export.service';
 import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
+import { UserService } from '../../core/user.service';
 import { ActionMenu, ActionMenuItem } from '../../shared/action-menu';
 import { Avatar } from '../../shared/avatar';
 import { Badge } from '../../shared/badge';
@@ -22,8 +23,9 @@ export class Users {
   private readonly ui = inject(UiService);
   private readonly csv = inject(CsvExportService);
   private readonly toasts = inject(ToastService);
+  private readonly userDirectory = inject(UserService);
 
-  private readonly statusOverrides = signal<Record<number, UserStatus>>({});
+  private readonly statusOverrides = signal<Record<string, UserStatus>>({});
 
   protected readonly statusFilters = ['All', 'Active', 'Inactive', 'Suspended'];
   protected readonly query = signal('');
@@ -40,7 +42,7 @@ export class Users {
 
   protected readonly users = computed<AppUser[]>(() => {
     const overrides = this.statusOverrides();
-    return USERS.map((user) => ({ ...user, status: overrides[user.id] ?? user.status }));
+    return this.userDirectory.users().map((user) => ({ ...user, status: overrides[user.id] ?? user.status }));
   });
 
   protected readonly total = computed(() => this.users().length);

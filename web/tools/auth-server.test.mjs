@@ -78,3 +78,56 @@ test('session refresh rejects a revoked backend token', async () => {
     assert.ok(result.cookie.includes('Max-Age=0'));
   } finally { await fx.close(); }
 });
+
+const accountId = '87654321-4321-4321-8321-abcdef123456';
+
+test('builds the Financial Overview from accounts-service and transactions-service', async () => {
+  const fx = await fixture(async (url) => {
+    if (url.pathname.endsWith('/me')) return Response.json(profile);
+    if (url.pathname === '/api/auth/login') return Response.json({ token: jwt(), userId });
+    if (url.pathname === '/api/accounts') {
+      assert.equal(url.searchParams.get('userId'), userId);
+      return Response.json([{
+        id: accountId, institution: 'KCB', accountName: 'Everyday', maskedIdentifier: '••1234',
+        accountType: 'DEPOSIT', availableBalance: '1000.00', creditOutstanding: '0.00',
+      }]);
+    }
+    if (url.pathname === '/api/transactions') {
+      assert.equal(url.searchParams.get('accountId'), accountId);
+      return Response.json([{
+        id: 'tx-1', accountId, amount: '250.00', transactionType: 'CREDIT', status: 'POSTED',
+        description: 'Salary', counterparty: 'Employer', transactionDate: new Date().toISOString(),
+      }]);
+    }
+    throw new Error('unexpected call to ' + url.pathname);
+  });
+  try {
+    const login = await fx.call('/api/auth/login', input);
+    const cookie = login.cookie.split(';')[0];
+    const result = await fx.call('/api/dashboard?days=30', null, cookie);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.source, 'live');
+    assert.equal(result.body.accounts.length, 1);
+    assert.equal(result.body.accounts[0].availableBalanceMinor, 100000);
+    assert.equal(result.body.summary.moneyInMinor, 25000);
+    assert.equal(result.body.summary.moneyOutMinor, 0);
+    assert.equal(result.body.transactions[0].description, 'Salary');
+    assert.equal(result.body.transactionCount, 1);
+  } finally { await fx.close(); }
+});
+
+test('dashboard requires a session and never invents data when downstream is unreachable', async () => {
+  const anon = await fixture(async () => { throw new Error('should not be called'); });
+  try { assert.equal((await anon.call('/api/dashboard')).status, 401); } finally { await anon.close(); }
+
+  const fx = await fixture(async (url) => {
+    if (url.pathname.endsWith('/me')) return Response.json(profile);
+    if (url.pathname === '/api/auth/login') return Response.json({ token: jwt(), userId });
+    throw new Error('offline');
+  });
+  try {
+    const login = await fx.call('/api/auth/login', input);
+    const cookie = login.cookie.split(';')[0];
+    assert.equal((await fx.call('/api/dashboard', null, cookie)).status, 503);
+  } finally { await fx.close(); }
+});
