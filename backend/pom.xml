@@ -19,26 +19,7 @@
     <description>Parent POM for SM-Intelligence microservices</description>
 
     <properties>
-        <!-- The compiler release for every module.
-
-             It was 25, so the whole reactor needed a JDK 25 toolchain before
-             anything built and every module reported "release 25 is not found in
-             the system" on a machine with JDK 21. The code does not need it:
-             compiled against release 21 the reactor succeeds, because every
-             dependency on the classpath, Spring Boot 4.1.1 included, carries Java
-             21 bytecode or older.
-
-             Override with -Djava.release=25 where a JDK 25 toolchain exists. -->
-        <java.release>21</java.release>
-        <java.version>${java.release}</java.version>
-
-        <!-- Mockito reaches the test JVM through the JDK attach API. Without this
-             every mocked test fails with "Could not self-attach to current VM
-             using external process", wrapped in "Could not initialize inline
-             Byte Buddy mock maker". Override with -Dsurefire.argLine=... rather
-             than editing this line, so a coverage agent can never be silently
-             dropped. -->
-        <surefire.argLine>-Djdk.attach.allowAttachSelf=true -XX:+EnableDynamicAgentLoading</surefire.argLine>
+        <java.version>25</java.version>
         <spring-cloud.version>2025.1.3</spring-cloud.version>
     </properties>
 
@@ -67,17 +48,5 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <argLine>${surefire.argLine}</argLine>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 
 </project>

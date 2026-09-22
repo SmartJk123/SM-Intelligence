@@ -1,11 +1,7 @@
 # Activate with: --spring.profiles.active=postgres
 spring:
   datasource:
-    # DB_URL wins when it is a full JDBC URL. Otherwise the parts are used, which
-    # is how a managed host supplies them: Render hands over a host, a port and a
-    # database name separately, and the connection string it offers is a
-    # postgres:// URI that a JDBC driver cannot read.
-    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:smartmoney}}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smartmoney}
     driver-class-name: org.postgresql.Driver
     username: ${DB_USER:smartmoney}
     password: ${DB_PASSWORD:smartmoney}
