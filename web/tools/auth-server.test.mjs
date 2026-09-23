@@ -96,7 +96,10 @@ test('builds the Financial Overview from accounts-service and transactions-servi
       assert.equal(url.searchParams.get('accountId'), accountId);
       return Response.json([{
         id: 'tx-1', accountId, amount: '250.00', transactionType: 'CREDIT', status: 'POSTED',
-        description: 'Salary', counterparty: 'Employer', transactionDate: new Date().toISOString(),
+        // A fixed point safely in the past: sendDashboard captures `to = new Date()`
+        // before this mock ever runs, so a transactionDate of "right now" can
+        // flakily land a few ms after `to` and get excluded from the period.
+        description: 'Salary', counterparty: 'Employer', transactionDate: new Date(Date.now() - 60000).toISOString(),
       }]);
     }
     throw new Error('unexpected call to ' + url.pathname);
