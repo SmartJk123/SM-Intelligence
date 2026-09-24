@@ -27,4 +27,14 @@ Authentication responses contain `token,userId,name,emailAddress,accountType,exp
 
 ## Financial APIs
 
-Accounts, transactions and aggregate workspace contracts are deliberately not connected in this step. The adapter returns 501 for unsupported authenticated requests, never a fake success or temporary record. The preserved UI designs and backend DTOs will need explicit mapping and ownership enforcement in the next milestone.
+Accounts, bank transactions and aggregate workspace contracts are not connected. The adapter returns 501 for unsupported authenticated requests. Invoice-backed pending activity is supported below; bank-ledger integration still needs explicit mapping and ownership enforcement.
+
+## Invoice-backed pending activity
+
+- `GET /api/invoices?page=0`: signed-in owner's invoices, newest first, 50 per page. Response is an array containing `id`, `vendor`, `invoiceNumber`, `amount`, `currency`, `invoiceDate`, `dueDate`, `filename`, `createdAt`, `status: "PENDING"`, and `source: "INVOICE"`.
+- `POST /api/invoices`: multipart form with `file`, `vendor`, `amount`, `currency`, `invoiceDate` (ISO date), optional `invoiceNumber` and `dueDate`. Returns 201 with the saved record. Requires a reviewed positive amount and JPEG/PNG/PDF file up to 10 MB. Same document bytes for the same owner return 409.
+- `GET /api/invoices/:id/document`: authenticated attachment download. Other users' documents return 404.
+
+The adapter forwards its server-held bearer token to the gateway; the transactions service verifies it with identity. The invoice owner is derived from the verified profile. These pending expected expenses are stored separately from posted bank transactions and do not affect balances. No bank payment, reconciliation or cancellation is implemented in this milestone. Browser extraction is best-effort and must be reviewed; it never creates a record before Save.
+
+`INVOICE_API_URL` optionally overrides the adapter's invoice upstream; by default it uses `IDENTITY_API_URL` (the gateway). When pointing identity directly to port 8081, set `INVOICE_API_URL=http://localhost:8083` or keep both behind the gateway.

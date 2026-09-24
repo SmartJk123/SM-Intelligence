@@ -16,6 +16,30 @@ async function fixture(fetchAuth) {
 }
 const input = { name: ' Team Member ', email: 'MEMBER@example.invalid', phone: ' +254700000000 ', password: 'ValidPassword123!', kind: 'organization' };
 
+test('invoice proxy requires a session and forwards the verified token, multipart body and document response', async () => {
+  const token = jwt(); let uploadBody;
+  const fx = await fixture(async (url, init) => {
+    if (url.pathname.endsWith('/me')) return Response.json(profile);
+    if (url.pathname.endsWith('/login')) return Response.json({ token, userId });
+    assert.equal(init.headers.Authorization, 'Bearer ' + token);
+    if (init.method === 'POST') { uploadBody = init.body; return Response.json({ status: 'PENDING' }, { status: 201 }); }
+    if (url.pathname.endsWith('/document')) return new Response('%PDF-test', { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="invoice.pdf"' } });
+    return Response.json([]);
+  });
+  try {
+    assert.equal((await fx.call('/api/invoices')).status, 401);
+    const login = await fx.call('/api/auth/login', input);
+    const cookie = login.cookie.split(';')[0];
+    assert.deepEqual((await fx.call('/api/invoices', null, cookie)).body, []);
+    const form = new FormData(); form.append('file', new Blob(['%PDF-test'], { type: 'application/pdf' }), 'invoice.pdf');
+    const base = 'http://127.0.0.1:' + fx.server.address().port;
+    const response = await fetch(base + '/api/invoices', { method: 'POST', headers: { Cookie: cookie }, body: form });
+    assert.equal(response.status, 201); assert.ok(uploadBody.includes(Buffer.from('%PDF-test')));
+    const doc = await fetch(base + '/api/invoices/' + userId + '/document', { headers: { Cookie: cookie } });
+    assert.equal(doc.headers.get('content-type'), 'application/pdf'); assert.equal(await doc.text(), '%PDF-test');
+  } finally { await fx.close(); }
+});
+
 test('maps the real identity contract, validates /me, restores profile and never creates financial records', async () => {
   const calls = [];
   const fx = await fixture(async (url, init) => {

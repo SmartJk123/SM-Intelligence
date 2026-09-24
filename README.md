@@ -2,7 +2,9 @@
 
 Angular customer frontend and Spring Boot services for financial monitoring.
 
-The current connected workflow is registration, login, session restoration, profile display and logout. Financial service integration is the next team milestone. No sample users, temporary accounts or financial records are created by the frontend.
+The connected account workflow is registration, login, session restoration, profile display and logout. Bank service integration is the next team milestone. The frontend does not generate sample users, accounts or financial activity.
+
+Invoice capture is also available: upload a photo/PDF, review extracted details and save an invoice-backed pending transaction. These records and original files persist in the transactions database, independently of bank balances. Start the transactions service as described in [backend setup](backend/README.md#invoices-and-pending-activity). See [frontend invoice capture](web/README.md#invoice-capture) for mobile Wi-Fi testing.
 
 ## Run locally
 

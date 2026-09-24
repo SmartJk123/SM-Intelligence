@@ -40,9 +40,10 @@ export const routes: Routes = [
         loadComponent: () => import('./connection-pending').then((m) => m.ConnectionPending),
       },
       { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'invoices', title: 'Invoices | SM-Intelligence', loadComponent: () => import('./invoices').then(m => m.Invoices) },
+      { path: 'transactions', title: 'Transactions | SM-Intelligence', data: { page: 'transactions' }, loadComponent: () => import('./invoices').then(m => m.Invoices) },
       ...[
         { page: 'accounts', title: 'Accounts' },
-        { page: 'transactions', title: 'Transactions' },
         { page: 'cashflow', title: 'Cash Flow' },
         { page: 'budgets', title: 'Budgets' },
         { page: 'investments', title: 'Investments' },

@@ -66,6 +66,7 @@ export class App {
           '/overview',
           '/accounts',
           '/transactions',
+          '/invoices',
           '/cashflow',
           '/budgets',
           '/investments',

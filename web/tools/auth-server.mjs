@@ -4,10 +4,15 @@ import { randomUUID } from 'node:crypto';
 // Loopback development adapter. JWTs stay here; the browser receives an HttpOnly session cookie.
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const backend = new URL(options.identityUrl || process.env.IDENTITY_API_URL || 'http://localhost:8080');
+  const invoiceBackend = new URL(options.invoiceUrl || process.env.INVOICE_API_URL || backend);
+  if (invoiceBackend.protocol !== 'https:' && !(invoiceBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(invoiceBackend.hostname)))
+    throw new Error('Invoice API requires HTTPS, except on loopback.');
   if (backend.protocol !== 'https:' && !(backend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(backend.hostname)))
     throw new Error('Identity API requires HTTPS, except on loopback.');
   const requestBackend = options.fetchAuth || fetch;
   const sessions = new Map();
+  const allowedOrigins = ['http://localhost:' + webPort, 'http://127.0.0.1:' + webPort];
+  if (process.env.WEB_ORIGIN) allowedOrigins.push(new URL(process.env.WEB_ORIGIN).origin);
   const cookieName = 'sm_identity_session';
   const cookie = value => cookieName + '=' + value + '; HttpOnly; SameSite=Lax; Path=/api';
   const call = (route, init) => requestBackend(new URL(route, backend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
@@ -21,7 +26,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     res.setHeader('Content-Type', 'application/json');
     const send = (status, data) => { res.writeHead(status); res.end(JSON.stringify(data)); };
     const clear = () => res.setHeader('Set-Cookie', cookie('') + '; Max-Age=0');
-    if (req.headers.origin && !['http://localhost:' + webPort, 'http://127.0.0.1:' + webPort].includes(req.headers.origin))
+    if (req.headers.origin && !allowedOrigins.includes(req.headers.origin))
       return send(403, { error: 'Cross-origin requests are not allowed' });
     if (req.headers['sec-fetch-site'] === 'cross-site') return send(403, { error: 'Cross-site requests are not allowed' });
     for (const [id, value] of sessions) if (value.expiresAt <= Date.now()) sessions.delete(id);
@@ -75,6 +80,33 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         }
       }
       if (!session) return send(401, { error: 'Sign in required' });
+      if ((route === '/api/invoices' && ['GET', 'POST'].includes(req.method)) ||
+          (/^\/api\/invoices\/[0-9a-f-]{36}\/document$/i.test(route) && req.method === 'GET')) {
+        const chunks = []; let size = 0;
+        if (req.method === 'POST') {
+          if (!req.headers['content-type']?.startsWith('multipart/form-data;')) return send(415, { error: 'Upload a multipart document' });
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > 11 * 1024 * 1024) return send(413, { error: 'Choose a file up to 10 MB' });
+            chunks.push(chunk);
+          }
+        }
+        const response = await requestBackend(new URL(req.url, invoiceBackend), { method: req.method, redirect: 'error', signal: AbortSignal.timeout(20000),
+          headers: { Authorization: 'Bearer ' + session.token,
+            ...(req.method === 'POST' ? { 'Content-Type': req.headers['content-type'] } : {}) },
+          ...(req.method === 'POST' ? { body: Buffer.concat(chunks) } : {}) });
+        if (!response.ok) {
+          const messages = { 400: 'Check the invoice details and file format.', 401: 'Your session expired. Sign in again.',
+            403: 'You cannot access this invoice.', 404: 'Invoice not found.', 409: 'This document has already been saved.',
+            413: 'Choose a file up to 10 MB.' };
+          return send(messages[response.status] ? response.status : 503,
+            { error: messages[response.status] || 'Invoice service unavailable. Start the transactions service and retry.' });
+        }
+        res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (response.headers.has('content-disposition')) res.setHeader('Content-Disposition', response.headers.get('content-disposition'));
+        res.writeHead(response.status); res.end(Buffer.from(await response.arrayBuffer())); return;
+      }
       // Financial integration is a later team milestone. Never create temporary records.
       return send(501, { error: 'This feature is not connected yet' });
     } catch {
