@@ -1,4 +1,4 @@
-# Customer frontend: authentication milestone
+# Customer frontend: account onboarding
 
 Registration and login connect to the repository's identity service. The old hosted-sample URL, sample authentication mode, seeded personas and in-memory financial API have been removed.
 
@@ -22,7 +22,8 @@ Open http://localhost:4200. The Angular server uses port 4200 and the authentica
 - Login and page refresh load the actual backend profile and stable user UUID. Passwords and JWTs are never returned to browser code by the adapter.
 - Logout deletes the adapter session and clears its HttpOnly cookie. JWTs expire in the backend; there is no backend refresh-token or global revocation endpoint yet.
 - The identity database owns user records. Restarting the adapter requires signing in again, but does not delete registered backend users.
-- Finance pages display 'Not connected yet'. No temporary accounts, balances, transactions, budgets, or investments are created. Profile is read-only; appearance remains a device preference.
+- Users without an active saved account are redirected to `/setup`, including direct workspace links and refreshes. Saving the first account unlocks the dashboard. Onboarding progress comes from the accounts database, not browser storage.
+- Dashboard and Accounts show persisted manual balances. Credit outstanding is separate from available cash. Other finance modules remain unconnected. No sample financial records are generated.
 
 This adapter is for loopback development. Production requires a deployed session layer, HTTPS/Secure cookies and persistent session management; a static frontend build by itself does not implement the adapter endpoints. See [API-CONTRACT.md](API-CONTRACT.md).
 
@@ -70,3 +71,7 @@ npm run test:auth
 npm test -- --watch=false
 npm run build
 ```
+
+## Account onboarding services
+
+Start PostgreSQL with `docker compose -f backend/docker-compose.yml up -d postgres-accounts` and run `./backend/mvn.ps1 -pl accounts-service spring-boot:run` from the repository root. The gateway forwards accounts to port 8082. Restart `npm start` after adapter changes (this requires signing in again). `ACCOUNTS_API_URL` optionally overrides the accounts upstream; when identity points directly to 8081, set `ACCOUNTS_API_URL=http://localhost:8082`. Account creation stores only a masked identifier and an owner-scoped fingerprint of the account number.

@@ -5,6 +5,9 @@ import { randomUUID } from 'node:crypto';
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const backend = new URL(options.identityUrl || process.env.IDENTITY_API_URL || 'http://localhost:8080');
   const invoiceBackend = new URL(options.invoiceUrl || process.env.INVOICE_API_URL || backend);
+  const accountsBackend = new URL(options.accountsUrl || process.env.ACCOUNTS_API_URL || backend);
+  if (accountsBackend.protocol !== 'https:' && !(accountsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(accountsBackend.hostname)))
+    throw new Error('Accounts API requires HTTPS, except on loopback.');
   if (invoiceBackend.protocol !== 'https:' && !(invoiceBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(invoiceBackend.hostname)))
     throw new Error('Invoice API requires HTTPS, except on loopback.');
   if (backend.protocol !== 'https:' && !(backend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(backend.hostname)))
@@ -80,6 +83,29 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         }
       }
       if (!session) return send(401, { error: 'Sign in required' });
+      if (route === '/api/accounts' && ['GET', 'POST'].includes(req.method)) {
+        let body;
+        if (req.method === 'POST') {
+          let raw = ''; let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > 16384) return send(413, { error: 'Request too large' });
+            raw += chunk;
+          }
+          try { body = JSON.stringify(JSON.parse(raw)); } catch { return send(400, { error: 'Invalid JSON' }); }
+        }
+        const response = await requestBackend(new URL(req.method === 'POST' ? '/api/accounts/manual' : '/api/accounts', accountsBackend), {
+          method: req.method, redirect: 'error', signal: AbortSignal.timeout(15000),
+          headers: { Authorization: 'Bearer ' + session.token, 'Content-Type': 'application/json' },
+          ...(body ? { body } : {})
+        });
+        if (!response.ok) return send([400, 401, 403, 409].includes(response.status) ? response.status : 503,
+          { error: response.status === 409 ? 'This account has already been added.' : 'Unable to load or save accounts. Please retry.' });
+        const publicAccount = ({ id, accountName, institution, maskedIdentifier, accountType, currency, availableBalance, creditOutstanding, accountStatus }) =>
+          ({ id, accountName, institution, maskedIdentifier, accountType, currency, availableBalance, creditOutstanding, accountStatus });
+        const result = await response.json();
+        return send(response.status, Array.isArray(result) ? result.map(publicAccount) : publicAccount(result));
+      }
       if ((route === '/api/invoices' && ['GET', 'POST'].includes(req.method)) ||
           (/^\/api\/invoices\/[0-9a-f-]{36}$/i.test(route) && req.method === 'DELETE') ||
           (/^\/api\/invoices\/[0-9a-f-]{36}\/document$/i.test(route) && req.method === 'GET')) {

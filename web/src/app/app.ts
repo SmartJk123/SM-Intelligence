@@ -16,7 +16,7 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
         >
         <nav aria-label="Main navigation" [class.authenticated-nav]="api.authenticated()">
           @if (api.authenticated()) {
-            <a routerLink="/dashboard">Dashboard</a
+            <a [routerLink]="api.setupCompleted() ? '/dashboard' : '/setup'">{{ api.setupCompleted() ? 'Dashboard' : 'Account setup' }}</a
             ><button class="button small" (click)="signOut()" [disabled]="signingOut()">
               Sign out
             </button>
@@ -65,6 +65,7 @@ export class App {
           '/dashboard',
           '/overview',
           '/accounts',
+          '/accounts/new',
           '/transactions',
           '/invoices',
           '/cashflow',

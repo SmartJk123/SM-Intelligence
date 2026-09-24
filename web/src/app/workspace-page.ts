@@ -373,8 +373,6 @@ export class WorkspacePage implements OnInit, OnDestroy {
         : this.start + ' to ' + this.end + ' · KES',
     );
     add('p', 'Generated ' + new Date().toLocaleString('en-KE') + ' · ' + rows.length + ' records');
-    if (this.data()?.source === 'sample')
-      add('p', 'Sample data — local development. No live bank connection.').className = 'note';
     const table = add('table', '');
     const head = add('thead', '', table);
     const header = add('tr', '', head);

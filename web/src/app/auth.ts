@@ -213,7 +213,8 @@ export class Auth {
       else await this.api.login({ email: value.email.trim(), password: value.password });
       this.form.controls.password.reset();
       this.form.controls.confirm.reset();
-      await this.router.navigate(['/dashboard']);
+      await this.api.refreshAccounts();
+      await this.router.navigate([this.api.setupCompleted() ? '/dashboard' : '/setup']);
     } catch (e) {
       this.error.set(
         'Unable to ' +

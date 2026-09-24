@@ -6,6 +6,8 @@ import com.smi.accounts_service.dto.UpdateBalanceRequest;
 import com.smi.accounts_service.dto.UpdateStatusRequest;
 import com.smi.accounts_service.service.AccountService;
 import jakarta.validation.Valid;
+import com.smi.accounts_service.service.AccountIdentity;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,37 +28,40 @@ import java.util.UUID;
 public class AccountController {
 
     private final AccountService accountService;
+    private final AccountIdentity identity;
 
-    public AccountController(AccountService accountService) {
-        this.accountService = accountService;
+    public AccountController(AccountService accountService, AccountIdentity identity) {
+        this.accountService = accountService; this.identity = identity;
     }
 
     @PostMapping
-    public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountRequest request) {
+    public ResponseEntity<AccountResponse> createAccount(@RequestHeader(value="Authorization", required=false) String authorization, @Valid @RequestBody CreateAccountRequest request) {
+        request.setUserId(identity.owner(authorization));
         AccountResponse created = accountService.createAccount(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping
     public ResponseEntity<List<AccountResponse>> getAccounts(
-            @RequestParam UUID userId,
+            @RequestHeader(value="Authorization", required=false) String authorization,
             @RequestParam(required = false) String status) {
-        List<AccountResponse> accounts = accountService.getAccountsByUserId(userId, status);
+        List<AccountResponse> accounts = accountService.getAccountsByUserId(identity.owner(authorization), status);
         return ResponseEntity.ok(accounts);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<AccountResponse> getAccountById(
             @PathVariable UUID id,
-            @RequestParam(required = false) UUID userId) {
-        AccountResponse account = accountService.getAccountById(id, userId);
+            @RequestHeader(value="Authorization", required=false) String authorization) {
+        AccountResponse account = accountService.getAccountById(id, identity.owner(authorization));
         return ResponseEntity.ok(account);
     }
 
     @PatchMapping("/{id}/balance")
     public ResponseEntity<AccountResponse> updateBalance(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateBalanceRequest request) {
+            @RequestHeader(value="Authorization", required=false) String authorization, @Valid @RequestBody UpdateBalanceRequest request) {
+        accountService.getAccountById(id, identity.owner(authorization));
         AccountResponse updated = accountService.updateBalance(id, request);
         return ResponseEntity.ok(updated);
     }
@@ -64,13 +69,15 @@ public class AccountController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<AccountResponse> updateStatus(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateStatusRequest request) {
+            @RequestHeader(value="Authorization", required=false) String authorization, @Valid @RequestBody UpdateStatusRequest request) {
+        accountService.getAccountById(id, identity.owner(authorization));
         AccountResponse updated = accountService.updateStatus(id, request);
         return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<AccountResponse> closeAccount(@PathVariable UUID id) {
+    public ResponseEntity<AccountResponse> closeAccount(@PathVariable UUID id, @RequestHeader(value="Authorization", required=false) String authorization) {
+        accountService.getAccountById(id, identity.owner(authorization));
         AccountResponse closed = accountService.closeAccount(id);
         return ResponseEntity.ok(closed);
     }

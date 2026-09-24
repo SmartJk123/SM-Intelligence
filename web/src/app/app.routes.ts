@@ -27,13 +27,14 @@ export const routes: Routes = [
     path: 'setup',
     canActivate: [setupGuard],
     title: 'Set up your workspace | SM-Intelligence',
-    loadComponent: () => import('./connection-pending').then((m) => m.ConnectionPending),
+    loadComponent: () => import('./setup').then((m) => m.Setup),
   },
   {
     path: '',
     canActivateChild: [dashboardGuard],
     loadComponent: () => import('./workspace-shell').then((m) => m.WorkspaceShell),
     children: [
+      { path: 'accounts/new', title: 'Add an account | SM-Intelligence', loadComponent: () => import('./setup').then(m => m.Setup) },
       {
         path: 'dashboard',
         title: 'Financial Overview | SM-Intelligence',
@@ -61,5 +62,3 @@ export const routes: Routes = [
   },
   { path: '**', redirectTo: '' },
 ];
-
-
