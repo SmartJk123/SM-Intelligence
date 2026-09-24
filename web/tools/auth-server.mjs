@@ -81,6 +81,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       }
       if (!session) return send(401, { error: 'Sign in required' });
       if ((route === '/api/invoices' && ['GET', 'POST'].includes(req.method)) ||
+          (/^\/api\/invoices\/[0-9a-f-]{36}$/i.test(route) && req.method === 'DELETE') ||
           (/^\/api\/invoices\/[0-9a-f-]{36}\/document$/i.test(route) && req.method === 'GET')) {
         const chunks = []; let size = 0;
         if (req.method === 'POST') {

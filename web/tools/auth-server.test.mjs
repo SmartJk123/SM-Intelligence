@@ -22,6 +22,10 @@ test('invoice proxy requires a session and forwards the verified token, multipar
     if (url.pathname.endsWith('/me')) return Response.json(profile);
     if (url.pathname.endsWith('/login')) return Response.json({ token, userId });
     assert.equal(init.headers.Authorization, 'Bearer ' + token);
+    if (init.method === 'DELETE') {
+      assert.equal(url.pathname, '/api/invoices/' + userId);
+      return new Response(null, {status: 204});
+    }
     if (init.method === 'POST') { uploadBody = init.body; return Response.json({ status: 'PENDING' }, { status: 201 }); }
     if (url.pathname.endsWith('/document')) return new Response('%PDF-test', { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="invoice.pdf"' } });
     return Response.json([]);
@@ -33,6 +37,11 @@ test('invoice proxy requires a session and forwards the verified token, multipar
     assert.deepEqual((await fx.call('/api/invoices', null, cookie)).body, []);
     const form = new FormData(); form.append('file', new Blob(['%PDF-test'], { type: 'application/pdf' }), 'invoice.pdf');
     const base = 'http://127.0.0.1:' + fx.server.address().port;
+    assert.equal((await fetch(base + '/api/invoices/' + userId, { method: 'DELETE' })).status, 401);
+    assert.equal((await fetch(base + '/api/invoices/' + userId, { method: 'DELETE', headers: { Cookie: cookie, Origin: 'https://untrusted.example' } })).status, 403);
+    const deletion = await fetch(base + '/api/invoices/' + userId, {method: 'DELETE', headers: {Cookie: cookie}});
+    assert.equal(deletion.status, 204);
+    assert.equal(await deletion.text(), '');
     const response = await fetch(base + '/api/invoices', { method: 'POST', headers: { Cookie: cookie }, body: form });
     assert.equal(response.status, 201); assert.ok(uploadBody.includes(Buffer.from('%PDF-test')));
     const doc = await fetch(base + '/api/invoices/' + userId + '/document', { headers: { Cookie: cookie } });

@@ -13,21 +13,14 @@ export function parseInvoiceText(text: string): InvoiceFields {
     .split(/\r?\n/)
     .map((v) => v.trim())
     .filter(Boolean);
-  const date = (value: string) => {
-    const iso = value.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
-    const local = value.match(/\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b/);
-    // Ambiguous dates are left blank for the reviewer.
-    const parts = iso
-      ? [iso[1], iso[2], iso[3]]
-      : local && Number(local[1]) > 12
-        ? [local[3], local[2], local[1]]
-        : null;
-    if (!parts) return '';
-    const result = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-    const parsed = new Date(result);
-    return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === result
-      ? result
-      : '';
+  const normalized = text.replace(/[\u2010-\u2015]/g, '-').replace(/\u00a0/g, ' ');
+  // Read the date immediately after its label, including when PDF text puts the value
+  // on the next line. This keeps issue and due dates distinct in multi-column rows.
+  const datePattern =
+    '(?:20\\d{2}[-/]\\d{1,2}[-/]\\d{1,2}|\\d{1,2}[-/]\\d{1,2}[-/]20\\d{2}|\\d{1,2}(?:st|nd|rd|th)?[\\s-]+[a-z]{3,9}\\.?[\\s,-]+20\\d{2}|[a-z]{3,9}\\.?[\\s-]+\\d{1,2}(?:st|nd|rd|th)?[\\s,-]+20\\d{2})';
+  const labelledDate = (label: string) => {
+    const match = normalized.match(new RegExp(label + '\\s*:?\\s*(' + datePattern + ')\\b', 'im'));
+    return match ? parseInvoiceDate(match[1]) : '';
   };
   const totalLines = lines.filter(
     (l) =>
@@ -55,9 +48,71 @@ export function parseInvoiceText(text: string): InvoiceFields {
       text.match(/invoice\s*(?:no\.?|number|#)\s*[:#-]?\s*([a-z0-9][a-z0-9/-]*)/i)?.[1] || '',
     amount,
     currency,
-    invoiceDate: date(lines.find((l) => /\bdate\b/i.test(l) && !/due/i.test(l)) || ''),
-    dueDate: date(lines.find((l) => /due\s*(date)?/i.test(l)) || ''),
+    invoiceDate:
+      labelledDate(
+        '\\b(?:invoice\\s+date|issue(?:d)?\\s+date|date\\s+issued|date\\s+of\\s+issue|issued\\s+on)\\b',
+      ) || labelledDate('^\\s*date\\b'),
+    dueDate: labelledDate(
+      '\\b(?:due\\s+date|date\\s+due|payment\\s+due(?:\\s+date)?|due\\s+on)\\b',
+    ),
   };
+}
+
+function parseInvoiceDate(value: string): string {
+  const months = [
+    'january',
+    'february',
+    'march',
+    'april',
+    'may',
+    'june',
+    'july',
+    'august',
+    'september',
+    'october',
+    'november',
+    'december',
+  ];
+  const monthNumber = (name: string) => {
+    const normalized = name.toLowerCase().replace(/\.$/, '');
+    return (
+      months.findIndex(
+        (month) =>
+          month === normalized ||
+          month.slice(0, 3) === normalized ||
+          (month === 'september' && normalized === 'sept'),
+      ) + 1
+    );
+  };
+  const iso = value.match(/^(20\d{2})[-/](\d{1,2})[-/](\d{1,2})$/);
+  const numeric = value.match(/^(\d{1,2})[-/](\d{1,2})[-/](20\d{2})$/);
+  const dayFirst = value.match(
+    /^(\d{1,2})(?:st|nd|rd|th)?[\s-]+([a-z]{3,9}\.?)?[\s,-]+(20\d{2})$/i,
+  );
+  const monthFirst = value.match(
+    /^([a-z]{3,9}\.?)[\s-]+(\d{1,2})(?:st|nd|rd|th)?[\s,-]+(20\d{2})$/i,
+  );
+  let parts: number[] | null = null;
+  if (iso) parts = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  else if (dayFirst?.[2])
+    parts = [Number(dayFirst[3]), monthNumber(dayFirst[2]), Number(dayFirst[1])];
+  else if (monthFirst)
+    parts = [Number(monthFirst[3]), monthNumber(monthFirst[1]), Number(monthFirst[2])];
+  // Keep ambiguous numeric dates blank instead of guessing the invoice's locale.
+  else if (numeric && Number(numeric[1]) > 12)
+    parts = [Number(numeric[3]), Number(numeric[2]), Number(numeric[1])];
+  else if (numeric && Number(numeric[2]) > 12)
+    parts = [Number(numeric[3]), Number(numeric[1]), Number(numeric[2])];
+  if (!parts) return '';
+  const [year, month, day] = parts;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  )
+    return '';
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 export async function extractInvoice(

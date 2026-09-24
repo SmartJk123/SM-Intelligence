@@ -67,6 +67,12 @@ public class InvoiceController {
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(InvoiceView.of(i));
     }
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@RequestHeader(value = "Authorization", required = false) String authorization, @PathVariable UUID id) {
+        UUID owner = identity.owner(authorization);
+        if (repository.deleteOwned(id, owner) == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return ResponseEntity.noContent().build();
+    }
     @GetMapping("/{id}/document")
     public ResponseEntity<byte[]> document(@RequestHeader(value = "Authorization", required = false) String authorization, @PathVariable UUID id) {
         UUID owner = identity.owner(authorization);

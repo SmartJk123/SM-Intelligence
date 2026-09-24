@@ -7,6 +7,7 @@ import { firstValueFrom, timeout } from 'rxjs';
 import { extractInvoice } from './invoice-extraction';
 import { WorkspaceIcon } from './workspace-icon';
 import { InvoiceCamera } from './invoice-camera';
+import { InvoicePreview } from './invoice-preview';
 
 interface Invoice {
   id: string;
@@ -22,7 +23,15 @@ interface Invoice {
 }
 
 @Component({
-  imports: [ReactiveFormsModule, CurrencyPipe, DatePipe, RouterLink, WorkspaceIcon, InvoiceCamera],
+  imports: [
+    ReactiveFormsModule,
+    CurrencyPipe,
+    DatePipe,
+    RouterLink,
+    WorkspaceIcon,
+    InvoiceCamera,
+    InvoicePreview,
+  ],
   templateUrl: './invoices.html',
   styleUrl: './invoices.css',
 })
@@ -48,6 +57,7 @@ export class Invoices implements OnDestroy {
   readonly notice = signal('');
   readonly extracting = signal(false);
   readonly saving = signal(false);
+  readonly deleting = signal<string | null>(null);
   readonly progress = signal('');
   readonly extractionNote = signal('');
   readonly rawText = signal('');
@@ -55,6 +65,7 @@ export class Invoices implements OnDestroy {
   readonly preview = signal('');
   readonly hasMore = signal(false);
   readonly cameraOpen = signal(false);
+  readonly previewInvoice = signal<Invoice | null>(null);
   readonly readingClipboard = signal(false);
   private page = 0;
   private disposed = false;
@@ -110,7 +121,7 @@ export class Invoices implements OnDestroy {
     this.error.set('');
     if (!navigator.clipboard?.read) {
       this.error.set(
-        'Click the paste area and press Ctrl+V or Cmd+V. The clipboard button needs a supported browser on HTTPS or localhost.',
+        'Click the paste area and press Ctrl+V. The clipboard button needs a supported browser on HTTPS or localhost.',
       );
       return;
     }
@@ -135,7 +146,7 @@ export class Invoices implements OnDestroy {
       );
     } catch {
       this.error.set(
-        'Clipboard access was not available. Click the paste area and press Ctrl+V or Cmd+V, or upload the file.',
+        'Clipboard access was not available. Click the paste area and press Ctrl+V, or upload the file.',
       );
     } finally {
       this.readingClipboard.set(false);
@@ -224,6 +235,31 @@ export class Invoices implements OnDestroy {
       this.error.set(this.message(e));
     } finally {
       this.saving.set(false);
+    }
+  }
+  async deleteInvoice(invoice: Invoice) {
+    if (this.deleting() || this.loading() || this.saving()) return;
+    if (
+      !window.confirm(
+        `Delete the invoice from ${invoice.vendor}${invoice.invoiceNumber ? ' (' + invoice.invoiceNumber + ')' : ''}? This permanently removes its document and pending transaction. This cannot be undone.`,
+      )
+    )
+      return;
+    this.deleting.set(invoice.id);
+    this.error.set('');
+    this.notice.set('');
+    try {
+      await firstValueFrom(
+        this.http.delete('/api/invoices/' + encodeURIComponent(invoice.id)).pipe(timeout(20000)),
+      );
+      this.invoices.update((items) => items.filter((item) => item.id !== invoice.id));
+      if (this.previewInvoice()?.id === invoice.id) this.previewInvoice.set(null);
+      this.notice.set('Invoice and its pending transaction deleted.');
+      await this.load();
+    } catch (e) {
+      this.error.set(this.message(e));
+    } finally {
+      this.deleting.set(null);
     }
   }
   private message(e: unknown) {

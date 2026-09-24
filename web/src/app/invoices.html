@@ -70,7 +70,7 @@
         >
           <h3>Or paste an invoice</h3>
           <p id="invoice-paste-help">
-            Copy an image or screenshot, click here, then press <kbd>Ctrl+V</kbd> or <kbd>⌘V</kbd>.
+            Copy an image or screenshot, click here, then press <kbd>Ctrl+V</kbd>.
           </p>
           <button
             type="button"
@@ -156,8 +156,9 @@
                 /></label>
               </div>
               <label class="review-check"
-                ><input type="checkbox" formControlName="reviewed" />I have checked these details
-                against the invoice.</label
+                ><input type="checkbox" formControlName="reviewed" /><span
+                  >I have checked these details against the invoice.</span
+                ></label
               >
               <p class="muted">
                 Saved as <strong>Pending</strong>. This records an expected expense and does not
@@ -190,7 +191,9 @@
         <span class="step">PENDING ACTIVITY</span>
         <h2>{{ activity ? 'Pending transactions' : 'Your invoices' }}</h2>
       </div>
-      <button class="button secondary" (click)="load()" [disabled]="loading()">Refresh</button>
+      <button class="button secondary" (click)="load()" [disabled]="loading() || !!deleting()">
+        Refresh
+      </button>
     </div>
     @if (loading() && !invoices().length) {
       <p role="status">Loading invoices…</p>
@@ -227,18 +230,35 @@
             <strong class="invoice-amount">{{
               invoice.amount | currency: invoice.currency : 'code'
             }}</strong>
-            <span class="pending-badge">Pending</span
-            ><a
-              class="document-link"
-              [href]="'/api/invoices/' + invoice.id + '/document'"
-              [attr.aria-label]="'Download invoice from ' + invoice.vendor"
-              >Document ↗</a
-            >
+            <span class="pending-badge">Pending</span>
+            <div class="invoice-actions">
+              <button
+                type="button"
+                class="document-link"
+                (click)="previewInvoice.set(invoice)"
+                [attr.aria-label]="'Preview invoice from ' + invoice.vendor"
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                class="document-link"
+                (click)="deleteInvoice(invoice)"
+                [disabled]="!!deleting() || loading() || saving()"
+                [attr.aria-label]="'Delete invoice from ' + invoice.vendor"
+              >
+                {{ deleting() === invoice.id ? 'Deleting…' : 'Delete' }}
+              </button>
+            </div>
           </article>
         }
       </div>
       @if (hasMore()) {
-        <button class="button secondary" (click)="load(true)" [disabled]="loading()">
+        <button
+          class="button secondary"
+          (click)="load(true)"
+          [disabled]="loading() || !!deleting()"
+        >
           Load more
         </button>
       }
@@ -247,4 +267,11 @@
 </section>
 @if (cameraOpen()) {
   <app-invoice-camera (captured)="useFile($event)" (closed)="cameraOpen.set(false)" />
+}
+@if (previewInvoice(); as invoice) {
+  <app-invoice-preview
+    [invoiceId]="invoice.id"
+    [filename]="invoice.filename"
+    (closed)="previewInvoice.set(null)"
+  />
 }

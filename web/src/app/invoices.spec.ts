@@ -15,7 +15,59 @@ describe('Invoice review and persistence', () => {
       ],
     }),
   );
-  afterEach(() => TestBed.inject(HttpTestingController).verify());
+  afterEach(() => {
+    TestBed.inject(HttpTestingController).verify();
+    vi.restoreAllMocks();
+  });
+  it('cancels deletion without a request and refreshes totals after confirmed deletion', async () => {
+    const page = TestBed.createComponent(Invoices).componentInstance;
+    const http = TestBed.inject(HttpTestingController);
+    const invoice = {
+      id: 'delete-id',
+      vendor: 'Store',
+      invoiceNumber: 'INV-1',
+      amount: 250,
+      currency: 'KES',
+      invoiceDate: '2026-09-24',
+      dueDate: null,
+      filename: 'invoice.pdf',
+      status: 'PENDING' as const,
+      source: 'INVOICE' as const,
+    };
+    http.expectOne('/api/invoices?page=0').flush([invoice]);
+    await Promise.resolve();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await page.deleteInvoice(invoice);
+    http.expectNone('/api/invoices/delete-id');
+    confirm.mockReturnValue(true);
+    const deleting = page.deleteInvoice(invoice);
+    const request = http.expectOne('/api/invoices/delete-id');
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/invoices?page=0').flush([]);
+    await deleting;
+    expect(page.invoices()).toEqual([]);
+    expect(page.totals()).toEqual([]);
+    expect(page.deleting()).toBeNull();
+  });
+  it('keeps the saved invoice when deletion fails', async () => {
+    const page = TestBed.createComponent(Invoices).componentInstance;
+    const http = TestBed.inject(HttpTestingController);
+    http
+      .expectOne('/api/invoices?page=0')
+      .flush([{ id: 'id', vendor: 'Store', amount: 250, currency: 'KES' }]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const deleting = page.deleteInvoice(page.invoices()[0]);
+    http
+      .expectOne('/api/invoices/id')
+      .flush({ error: 'Service unavailable' }, { status: 503, statusText: 'Unavailable' });
+    await deleting;
+    expect(page.invoices()).toHaveLength(1);
+    expect(page.error()).toBe('Service unavailable');
+    expect(page.deleting()).toBeNull();
+  });
   it('requires review before upload and reloads saved pending entries from the backend', async () => {
     const fixture = TestBed.createComponent(Invoices);
     const page = fixture.componentInstance;

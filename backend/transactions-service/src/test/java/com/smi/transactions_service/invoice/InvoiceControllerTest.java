@@ -52,9 +52,21 @@ class InvoiceControllerTest {
         mvc.perform(get("/api/invoices/" + otherInvoice + "/document").header("Authorization", "Bearer test")).andExpect(status().isNotFound());
         verify(repository).findByIdAndOwnerId(otherInvoice, owner);
     }
+    @Test void deletesOnlyInvoicesOwnedByVerifiedUser() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(repository.deleteOwned(id, owner)).thenReturn(1);
+        mvc.perform(delete("/api/invoices/" + id).header("Authorization", "Bearer test"))
+            .andExpect(status().isNoContent()).andExpect(content().string(""));
+        verify(repository).deleteOwned(id, owner);
+        UUID inaccessible = UUID.randomUUID();
+        mvc.perform(delete("/api/invoices/" + inaccessible).header("Authorization", "Bearer test"))
+            .andExpect(status().isNotFound());
+        verify(repository).deleteOwned(inaccessible, owner);
+    }
     @Test void refusesUnauthenticatedAccess() throws Exception {
         when(identity.owner(null)).thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         mvc.perform(get("/api/invoices")).andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/invoices/" + UUID.randomUUID())).andExpect(status().isUnauthorized());
         verifyNoInteractions(repository);
     }
 }
