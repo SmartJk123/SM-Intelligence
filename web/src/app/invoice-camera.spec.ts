@@ -2,6 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { InvoiceCamera } from './invoice-camera';
 
 describe('Live invoice camera', () => {
+  const modalDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
+  const closeDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
   let getUserMedia: ReturnType<typeof vi.fn>;
   let stop: ReturnType<typeof vi.fn>;
   let stream: MediaStream;
@@ -12,21 +14,42 @@ describe('Live invoice camera', () => {
     stream = { getTracks: () => [track], getVideoTracks: () => [track] } as unknown as MediaStream;
     getUserMedia = vi.fn().mockResolvedValue(stream);
     vi.stubGlobal('isSecureContext', true);
-    vi.stubGlobal('navigator', new Proxy(navigator, {
-      get(target, key) { return key === 'mediaDevices' ? { getUserMedia } : Reflect.get(target, key); },
-    }));
-    vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(() => {});
-    vi.spyOn(HTMLDialogElement.prototype, 'close').mockImplementation(() => {});
-    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
-    vi.stubGlobal('URL', class extends URL {
-      static override createObjectURL = vi.fn().mockReturnValue('blob:camera-test');
-      static override revokeObjectURL = vi.fn();
+    vi.stubGlobal(
+      'navigator',
+      new Proxy(navigator, {
+        get(target, key) {
+          return key === 'mediaDevices' ? { getUserMedia } : Reflect.get(target, key);
+        },
+      }),
+    );
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+      configurable: true,
+      value: vi.fn(),
     });
+    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static override createObjectURL = vi.fn().mockReturnValue('blob:camera-test');
+        static override revokeObjectURL = vi.fn();
+      },
+    );
   });
   afterEach(() => {
     TestBed.resetTestingModule();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    for (const [name, descriptor] of [
+      ['showModal', modalDescriptor],
+      ['close', closeDescriptor],
+    ] as const) {
+      if (descriptor) Object.defineProperty(HTMLDialogElement.prototype, name, descriptor);
+      else Reflect.deleteProperty(HTMLDialogElement.prototype, name);
+    }
   });
   async function open() {
     const fixture = TestBed.createComponent(InvoiceCamera);

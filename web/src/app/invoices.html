@@ -37,7 +37,7 @@
               type="button"
               class="button primary"
               (click)="cameraOpen.set(true)"
-              [disabled]="extracting() || saving()"
+              [disabled]="extracting() || saving() || readingClipboard()"
             >
               Take a photo
             </button>
@@ -45,7 +45,7 @@
               type="button"
               class="button secondary"
               (click)="upload.click()"
-              [disabled]="extracting() || saving()"
+              [disabled]="extracting() || saving() || readingClipboard()"
             >
               Upload a file
             </button>
@@ -58,6 +58,28 @@
             (change)="select($event)"
           />
           <small>JPEG, PNG or PDF · Up to 10 MB · PDFs up to 5 pages</small>
+        </div>
+        <div
+          class="paste-area"
+          tabindex="0"
+          role="region"
+          aria-label="Paste an invoice image"
+          aria-describedby="invoice-paste-help"
+          (paste)="paste($event)"
+          [attr.aria-busy]="readingClipboard() || extracting()"
+        >
+          <h3>Or paste an invoice</h3>
+          <p id="invoice-paste-help">
+            Copy an image or screenshot, click here, then press <kbd>Ctrl+V</kbd> or <kbd>⌘V</kbd>.
+          </p>
+          <button
+            type="button"
+            class="button secondary"
+            (click)="pasteFromClipboard()"
+            [disabled]="extracting() || saving() || readingClipboard()"
+          >
+            {{ readingClipboard() ? 'Reading clipboard…' : 'Paste from clipboard' }}
+          </button>
         </div>
         @if (file()) {
           <p class="filename">{{ file()!.name }}</p>

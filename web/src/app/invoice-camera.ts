@@ -236,7 +236,7 @@ export class InvoiceCamera implements OnDestroy {
     } catch (e) {
       if (this.disposed || generation !== this.generation) return;
       this.stopStream();
-      const name = e instanceof Error ? e.name : '';
+      const name = e && typeof e === 'object' && 'name' in e ? String(e.name) : '';
       this.error.set(
         name === 'NotAllowedError' || name === 'SecurityError'
           ? 'Camera permission was denied. Allow camera access in your browser’s site settings, then try again.'

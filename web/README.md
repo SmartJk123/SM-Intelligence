@@ -32,6 +32,8 @@ Open **Invoices** from workspace navigation (on mobile, under **More**). Take a 
 
 Saving uploads the original file and reviewed fields to the transactions service through the authenticated adapter and gateway. Pending invoices persist across restarts and appear on both Invoices and Transactions. Totals are grouped by currency and cover the loaded records. Bank balances and posted transactions remain separate. See backend/README.md for starting the additional service.
 
+You can also copy an invoice image or screenshot and paste it into **Or paste an invoice** with Ctrl+V / Cmd+V, or click **Paste from clipboard**. The clipboard button needs HTTPS or localhost and may request browser permission. Pasted images use the same 10 MB limit, extraction and review flow. Text and links are not accepted as invoice attachments; use Upload a file for PDFs when your browser cannot paste files.
+
 For testing on a phone connected to the same trusted Wi-Fi, set the following in the frontend PowerShell terminal before `npm start`, replacing the IP with your Windows machine's LAN IPv4 address:
 
 ```powershell

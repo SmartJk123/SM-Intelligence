@@ -55,6 +55,31 @@ app-workspace-icon {
   font-size: 12px;
   margin: 20px 0 0;
 }
+.paste-area {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1.5px dashed var(--ws-line);
+  border-radius: 12px;
+  background: var(--ws-bg);
+  text-align: center;
+}
+.paste-area:focus-within {
+  border-color: var(--ws-accent);
+}
+.paste-area h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.paste-area p {
+  font-size: 13px;
+  color: var(--ws-muted);
+  margin-bottom: 14px;
+}
+.paste-area kbd {
+  white-space: nowrap;
+  font-family: inherit;
+  font-weight: 600;
+}
 .document-preview {
   display: block;
   width: 100%;

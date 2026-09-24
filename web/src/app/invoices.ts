@@ -55,6 +55,7 @@ export class Invoices implements OnDestroy {
   readonly preview = signal('');
   readonly hasMore = signal(false);
   readonly cameraOpen = signal(false);
+  readonly readingClipboard = signal(false);
   private page = 0;
   private disposed = false;
   readonly totals = computed(() => {
@@ -88,6 +89,57 @@ export class Invoices implements OnDestroy {
     const file = input.files?.[0];
     input.value = '';
     if (file) await this.useFile(file);
+  }
+  async paste(event: ClipboardEvent) {
+    event.preventDefault();
+    if (this.extracting() || this.saving() || this.readingClipboard()) return;
+    const files = Array.from(event.clipboardData?.files || []);
+    const file = files.find((item) =>
+      ['image/png', 'image/jpeg', 'application/pdf'].includes(item.type),
+    );
+    if (!file) {
+      this.error.set(
+        'Copy an invoice image or screenshot, then paste it here. For a PDF, use Upload a file. Copied text and links are not invoice files.',
+      );
+      return;
+    }
+    await this.useFile(file);
+  }
+  async pasteFromClipboard() {
+    if (this.extracting() || this.saving() || this.readingClipboard()) return;
+    this.error.set('');
+    if (!navigator.clipboard?.read) {
+      this.error.set(
+        'Click the paste area and press Ctrl+V or Cmd+V. The clipboard button needs a supported browser on HTTPS or localhost.',
+      );
+      return;
+    }
+    this.readingClipboard.set(true);
+    try {
+      const items = await navigator.clipboard.read();
+      if (this.disposed) return;
+      for (const item of items) {
+        const type = ['image/png', 'image/jpeg', 'application/pdf'].find((type) =>
+          item.types.includes(type),
+        );
+        if (!type) continue;
+        const blob = await item.getType(type);
+        if (this.disposed) return;
+        const extension =
+          type === 'application/pdf' ? 'pdf' : type === 'image/jpeg' ? 'jpg' : 'png';
+        await this.useFile(new File([blob], `pasted-invoice-${Date.now()}.${extension}`, { type }));
+        return;
+      }
+      this.error.set(
+        'No invoice image was found on your clipboard. Copy an image or screenshot first, or use Upload a file.',
+      );
+    } catch {
+      this.error.set(
+        'Clipboard access was not available. Click the paste area and press Ctrl+V or Cmd+V, or upload the file.',
+      );
+    } finally {
+      this.readingClipboard.set(false);
+    }
   }
   async useFile(file: File) {
     if (!file || this.extracting() || this.saving()) return;
