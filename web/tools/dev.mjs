@@ -3,6 +3,16 @@ import { createServer } from 'node:net';
 import { startAuthServer } from './auth-server.mjs';
 const port = Number(process.env.WEB_PORT || 4200);
 const apiPort = Number(process.env.AUTH_ADAPTER_PORT || 4301);
+const webHost = process.env.WEB_HOST || 'localhost';
+const https = process.env.WEB_HTTPS === 'true';
+const tlsArgs = https ? ['--ssl'] : [];
+if (https) {
+  if (!!process.env.WEB_SSL_CERT !== !!process.env.WEB_SSL_KEY) {
+    throw new Error('Set both WEB_SSL_CERT and WEB_SSL_KEY for your trusted development certificate.');
+  }
+  if (process.env.WEB_SSL_CERT) tlsArgs.push('--ssl-cert', process.env.WEB_SSL_CERT, '--ssl-key', process.env.WEB_SSL_KEY);
+  process.env.WEB_ORIGIN ||= 'https://localhost:' + port;
+}
 async function check(port, host) {
   await new Promise((resolve, reject) => {
     const probe = createServer();
@@ -31,7 +41,7 @@ server.on('error', (e) => {
   process.exitCode = 1;
 });
 server.once('listening', () => {
-  console.log('Workspace: http://localhost:' + port + '/login\nIdentity API: ' + (process.env.IDENTITY_API_URL || 'http://localhost:8080'));
+  console.log('Workspace: ' + (process.env.WEB_ORIGIN || 'http://localhost:' + port) + '/login\nIdentity API: ' + (process.env.IDENTITY_API_URL || 'http://localhost:8080'));
   const app = spawn(
     process.execPath,
     [
@@ -40,11 +50,12 @@ server.once('listening', () => {
       '--configuration',
       'development',
       '--host',
-      'localhost',
+      webHost,
       '--port',
       String(port),
       '--proxy-config',
       'proxy.auth.cjs',
+      ...tlsArgs,
     ],
     { stdio: 'inherit', env: { ...process.env, AUTH_ADAPTER_PORT: String(apiPort) } },
   );

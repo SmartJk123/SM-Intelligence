@@ -7,6 +7,7 @@ import com.smi.accounts_service.exception.AccountNotFoundException;
 import com.smi.accounts_service.exception.DuplicateAccountException;
 import com.smi.accounts_service.exception.GlobalExceptionHandler;
 import com.smi.accounts_service.service.AccountService;
+import com.smi.accounts_service.service.AccountIdentity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +40,7 @@ class AccountControllerTest {
 
     @Mock
     private AccountService accountService;
+    @Mock private AccountIdentity identity;
 
     @InjectMocks
     private AccountController accountController;
@@ -54,6 +56,7 @@ class AccountControllerTest {
 
         userId = UUID.randomUUID();
         accountId = UUID.randomUUID();
+        org.mockito.Mockito.lenient().when(identity.owner(any())).thenReturn(userId);
     }
 
     private AccountResponse createSampleResponse() {
