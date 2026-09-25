@@ -38,7 +38,7 @@ export const routes: Routes = [
       {
         path: 'dashboard',
         title: 'Financial Overview | SM-Intelligence',
-        loadComponent: () => import('./connection-pending').then((m) => m.ConnectionPending),
+        loadComponent: () => import('./dashboard').then((m) => m.Dashboard),
       },
       { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'invoices', title: 'Invoices | SM-Intelligence', loadComponent: () => import('./invoices').then(m => m.Invoices) },
