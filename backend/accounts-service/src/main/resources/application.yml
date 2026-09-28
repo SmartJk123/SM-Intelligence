@@ -6,7 +6,7 @@ spring:
     name: accounts-service
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/smi_accounts}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smi_accounts}
     username: ${DB_USER:admin}
     password: ${DB_PASSWORD:secretpassword}
     driver-class-name: org.postgresql.Driver
