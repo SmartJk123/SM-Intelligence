@@ -11,6 +11,36 @@ echo -e "${BLUE}   SM-Intelligence: Full Mobile E2E Integration Test Suite      
 echo -e "${BLUE}================================================================${NC}"
 echo ""
 
+# Pre-flight Health Checks
+echo -e "${BLUE}[Step 0] Probing Microservice Health Endpoints...${NC}"
+check_service() {
+  local name=$1
+  local url=$2
+  local port=$3
+  local status
+  status=$(curl -s --connect-timeout 2 "$url" | grep -o '"status":"[^"]*' | cut -d'"' -f4 || echo "DOWN")
+  if [[ "$status" == "UP" ]]; then
+    echo -e "  ${GREEN}✔ ${name} on port ${port} is UP${NC}"
+  else
+    echo -e "  ${RED}✖ ${name} on port ${port} is DOWN or unreachable${NC}"
+    echo -e "    -> Start it with: ./backend/mvnw -pl $(echo "$name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-') spring-boot:run"
+    return 1
+  fi
+}
+
+FAILED=0
+check_service "identity-service" "http://localhost:8081/actuator/health" "8081" || FAILED=1
+check_service "accounts-service" "http://localhost:8082/actuator/health" "8082" || FAILED=1
+check_service "transactions-service" "http://localhost:8083/actuator/health" "8083" || FAILED=1
+
+if [[ "$FAILED" -eq 1 ]]; then
+  echo ""
+  echo -e "${RED}[ERROR] One or more microservices are not running.${NC}"
+  echo -e "Tip: You can start all 3 services concurrently with: ${BLUE}./backend/run-services.sh${NC}"
+  exit 1
+fi
+echo -e "  ${GREEN}All services healthy. Proceeding to functional E2E tests...${NC}\n"
+
 # Generate unique email for clean idempotent execution
 UNIQUE_ID=$(date +%s)
 TEST_EMAIL="mobile.user.${UNIQUE_ID}@example.com"
