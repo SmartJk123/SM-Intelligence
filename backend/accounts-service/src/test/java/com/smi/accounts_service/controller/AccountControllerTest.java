@@ -205,6 +205,17 @@ class AccountControllerTest {
     }
 
     @Test
+    void deleteAccount_Success() throws Exception {
+        AccountResponse response = createSampleResponse();
+
+        when(accountService.deleteAccount(eq(accountId))).thenReturn(response);
+
+        mockMvc.perform(delete("/api/accounts/{id}", accountId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(accountId.toString()));
+    }
+
+    @Test
     void closeAccount_Success() throws Exception {
         AccountResponse response = createSampleResponse();
         response.setAccountStatus("CLOSED");
@@ -212,7 +223,7 @@ class AccountControllerTest {
 
         when(accountService.closeAccount(eq(accountId))).thenReturn(response);
 
-        mockMvc.perform(delete("/api/accounts/{id}", accountId))
+        mockMvc.perform(delete("/api/accounts/{id}", accountId).param("permanent", "false"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accountStatus").value("CLOSED"))
             .andExpect(jsonPath("$.connectionStatus").value("DISCONNECTED"));
