@@ -1,0 +1,302 @@
+:host {
+  display: block;
+  color: var(--ws-ink);
+}
+.invoice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.invoice-page h2 {
+  font-size: 24px;
+  margin: 12px 0 22px;
+}
+.step {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  color: var(--ws-muted);
+}
+.upload-area,
+.paste-area {
+  border: 1.5px dashed var(--ws-line);
+  text-align: center;
+  background: var(--ws-bg);
+}
+.upload-area {
+  border-radius: 16px;
+  padding: 28px 20px;
+}
+app-workspace-icon {
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 18px;
+  color: var(--ws-accent);
+}
+.upload-area h3 {
+  font-size: 19px;
+  line-height: 1.4;
+  max-width: 310px;
+  margin: 0 auto 12px;
+}
+.upload-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.upload-area .upload-actions {
+  justify-content: center;
+}
+.upload-area small {
+  display: block;
+  color: var(--ws-muted);
+}
+.privacy-note {
+  font-size: 12px;
+  margin: 20px 0 0;
+}
+.paste-area {
+  margin-top: 18px;
+  padding: 20px;
+  border-radius: 12px;
+}
+.paste-area:focus-within {
+  border-color: var(--ws-accent);
+}
+.paste-area h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.paste-area p {
+  font-size: 13px;
+  color: var(--ws-muted);
+  margin-bottom: 14px;
+}
+.paste-area kbd {
+  white-space: nowrap;
+  font-family: inherit;
+  font-weight: 600;
+}
+.document-preview {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--ws-bg);
+}
+.filename {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  margin: 16px 0;
+}
+.review-empty,
+.empty-list {
+  text-align: center;
+  padding: 48px 12px;
+}
+.review-empty p {
+  margin-bottom: 8px;
+}
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+label input:not([type='checkbox']) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 8px;
+  border: 1px solid var(--ws-line);
+  background: var(--ws-bg);
+  color: var(--ws-ink);
+  padding: 12px;
+  border-radius: 8px;
+}
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.invoice-page form label.review-check {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.invoice-page .review-check input[type='checkbox'] {
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+form .muted {
+  font-size: 12px;
+}
+.feedback {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--ws-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+.feedback.error {
+  border-left: 4px solid #db5151;
+}
+.feedback.success {
+  border-left: 4px solid #189d75;
+}
+.list-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+.pending-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px;
+  background: var(--ws-bg);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.pending-totals span {
+  color: var(--ws-muted);
+  font-size: 13px;
+}
+.invoice-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 2fr) minmax(100px, 1fr) auto auto auto;
+  gap: 20px;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--ws-line);
+}
+.invoice-vendor {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.invoice-vendor small,
+.invoice-due small {
+  display: block;
+  color: var(--ws-muted);
+  margin-top: 6px;
+}
+.invoice-due span {
+  font-size: 13px;
+}
+.invoice-amount {
+  white-space: nowrap;
+  font-size: 14px;
+}
+.pending-badge {
+  font-size: 11px;
+  background: var(--ws-soft);
+  color: var(--ws-ink);
+  padding: 6px 10px;
+  border-radius: 20px;
+  width: fit-content;
+}
+.invoice-actions {
+  display: flex;
+  gap: 16px;
+}
+.document-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  color: var(--ws-accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+details {
+  margin-top: 20px;
+  font-size: 12px;
+}
+summary {
+  cursor: pointer;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 200px;
+  overflow: auto;
+  line-height: 1.6;
+}
+.invoice-list > .button {
+  margin-top: 18px;
+}
+@media (max-width: 1100px) {
+  .invoice-row {
+    grid-template-columns: 2fr 1fr auto;
+  }
+  .invoice-due {
+    grid-column: 1;
+  }
+  .invoice-amount {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .pending-badge {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .invoice-actions {
+    grid-column: 2 / 4;
+  }
+}
+@media (max-width: 760px) {
+  .invoice-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .upload-area {
+    padding: 24px 14px;
+  }
+  .invoice-row {
+    gap: 12px;
+  }
+  .invoice-page h1 {
+    font-size: 30px;
+  }
+  .field-pair {
+    gap: 12px;
+  }
+  .upload-actions .button {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+  }
+  .invoice-amount {
+    font-size: 12px;
+  }
+  .pending-badge {
+    font-size: 10px;
+  }
+  .list-heading {
+    align-items: start;
+  }
+  .invoice-page .ws-card {
+    padding: 20px;
+  }
+}
+input[hidden] {
+  display: none !important;
+}

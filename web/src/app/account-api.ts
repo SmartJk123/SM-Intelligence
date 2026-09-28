@@ -1,6 +1,6 @@
 // Authentication and initial account-setup API service.
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 
 
@@ -25,6 +25,17 @@ export interface AccountDetails {
 interface Session {
   user: { name?: string; email?: string; id: string; kind: AccountKind; setupCompleted: boolean };
 }
+export interface SavedAccount {
+  id: string;
+  accountName: string;
+  institution: string;
+  maskedIdentifier: string;
+  accountType: 'DEPOSIT' | 'CREDIT';
+  currency: string;
+  availableBalance: number;
+  creditOutstanding: number;
+  accountStatus: string;
+}
 // Same-origin, cookie-based API contract. See API-CONTRACT.md before backend integration.
 @Injectable({ providedIn: 'root' })
 export class AccountApi {
@@ -41,6 +52,8 @@ export class AccountApi {
   });
   readonly authenticated = signal(false);
   readonly setupCompleted = signal(false);
+  readonly accounts = signal<SavedAccount[]>([]);
+  readonly accountsError = signal('');
   readonly kind = signal<AccountKind>('individual');
   private acceptSession(session: Session) {
     if (
@@ -76,6 +89,8 @@ export class AccountApi {
       );
       return true;
     } catch {
+      this.accounts.set([]);
+      this.accountsError.set('');
       this.displayName.set('');
       this.email.set('');
       this.kind.set('individual');
@@ -84,12 +99,30 @@ export class AccountApi {
       return false;
     }
   }
-  async saveSetup(_input: AccountDetails): Promise<void> {
-    throw new Error('Account setup is not connected yet.');
+  async refreshAccounts() {
+    this.accountsError.set('');
+    try {
+      const accounts = await firstValueFrom(this.http.get<SavedAccount[]>('/api/accounts').pipe(timeout(20000)));
+      this.accounts.set(accounts.filter(account => account.accountStatus === 'ACTIVE'));
+      this.setupCompleted.set(this.accounts().length > 0);
+    } catch (error) {
+      this.accounts.set([]);
+      this.setupCompleted.set(false);
+      if (error instanceof HttpErrorResponse && error.status === 401) this.authenticated.set(false);
+      this.accountsError.set('We could not load your accounts. Check your connection and retry.');
+    }
+  }
+  async saveSetup(input: AccountDetails): Promise<void> {
+    const account = await firstValueFrom(this.http.post<SavedAccount>('/api/accounts', input).pipe(timeout(20000)));
+    this.accounts.update(accounts => [...accounts.filter(item => item.id !== account.id), account]);
+    this.setupCompleted.set(true);
+    this.accountsError.set('');
   }
   async logout() {
     await firstValueFrom(this.http.post('/api/auth/logout', {}).pipe(timeout(95000)));
     this.authenticated.set(false);
+    this.accounts.set([]);
+    this.accountsError.set('');
     this.setupCompleted.set(false);
     this.displayName.set('');
     this.email.set('');

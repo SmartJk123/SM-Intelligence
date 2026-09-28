@@ -26,24 +26,13 @@ import { BankLogo } from './bank-logo';
         <div class="orbit"></div>
         <article class="preview">
           <div class="preview-top">
-            <span>Financial overview</span><span class="pill">Illustrative preview</span>
+            <span>Financial overview</span><span class="pill">Your journey</span>
           </div>
-          <p class="eyebrow">TOTAL BALANCE</p>
-          <div class="amount">KES 284,500<span>.00</span></div>
-          <p class="muted">Across your connected view</p>
-          <div class="metric-row">
-            <div><small>Money in</small><strong>KES 156,000</strong></div>
-            <div><small>Money out</small><strong>KES 92,400</strong></div>
-          </div>
-          <div class="chart" role="img" aria-label="Illustrative monthly cash flow bar chart">
-            <i style="height:38%"></i><i style="height:59%"></i><i style="height:46%"></i
-            ><i style="height:75%"></i><i style="height:61%"></i><i style="height:90%"></i
-            ><i style="height:71%"></i><i style="height:100%"></i>
-          </div>
-          <div class="chart-labels">
-            <span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span>
-          </div>
-        </article>
+          <h2>Your financial picture starts with one account.</h2>
+          <p class="muted">Add your own account and opening balance, then build your records over time.</p>
+          <div class="account-summary"><div><strong>1. Create your profile</strong><small>Individual or organization</small></div></div>
+          <div class="account-summary"><div><strong>2. Add your first account</strong><small>A manual snapshot of your balance</small></div></div>
+          <div class="account-summary"><div><strong>3. Open your dashboard</strong><small>Your saved accounts and invoice records</small></div></div>        </article>
         <div class="floating">
           <span class="check">✓</span>
           <div>
@@ -93,13 +82,13 @@ import { BankLogo } from './bank-logo';
         <article>
           <span>02</span>
           <h3>Set up your workspace</h3>
-          <p>Add your business details and a manual opening account snapshot.</p>
+          <p>Add at least one bank account and its manual opening balance.</p>
         </article>
         <article>
           <span>03</span>
-          <h3>Build your financial picture</h3>
+          <h3>Open your dashboard</h3>
           <p>
-            Your workspace will bring your records together as financial modules become available.
+            Review your saved accounts and start adding invoice records.
           </p>
         </article>
       </div>

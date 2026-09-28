@@ -48,8 +48,8 @@ public class Account {
     @Column(name = "masked_identifier", nullable = false)
     private String maskedIdentifier;
 
-    @Column(name = "currency", nullable = false, length = 3)
-    @JdbcTypeCode(Types.CHAR)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = "currency", nullable = false, length = 3, columnDefinition = "char(3)")
     private String currency = "KES";
 
     @Column(name = "ledger_balance", nullable = false, precision = 19, scale = 4)

@@ -6,6 +6,8 @@ import com.smi.accounts_service.dto.UpdateBalanceRequest;
 import com.smi.accounts_service.dto.UpdateStatusRequest;
 import com.smi.accounts_service.service.AccountService;
 import jakarta.validation.Valid;
+import com.smi.accounts_service.service.AccountIdentity;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,78 +30,107 @@ import java.util.UUID;
 public class AccountController {
 
     private final AccountService accountService;
+    private final AccountIdentity identity;
 
-    public AccountController(AccountService accountService) {
-        this.accountService = accountService;
+    public AccountController(AccountService accountService, AccountIdentity identity) {
+        this.accountService = accountService; this.identity = identity;
     }
 
     @PostMapping
-    public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountRequest request) {
+    public ResponseEntity<AccountResponse> createAccount(@RequestHeader(value="Authorization", required=false) String authorization, @Valid @RequestBody CreateAccountRequest request) {
+        request.setUserId(identity.owner(authorization));
         AccountResponse created = accountService.createAccount(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping
     public ResponseEntity<List<AccountResponse>> getAccounts(
-            @RequestParam(required = false) UUID userId,
+            @RequestHeader(value="Authorization", required=false) String authorization,
             @RequestParam(required = false) String status) {
-        List<AccountResponse> accounts = accountService.getAccountsByUserId(userId, status);
+        List<AccountResponse> accounts = accountService.getAccountsByUserId(identity.owner(authorization), status);
         return ResponseEntity.ok(accounts);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<AccountResponse> getAccountById(
-            @PathVariable String id,
-            @RequestParam(required = false) UUID userId) {
-        try {
-            UUID uuid = UUID.fromString(id);
-            return ResponseEntity.ok(accountService.getAccountById(uuid, userId));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.ok(accountService.getAccountById(id, userId));
-        }
+      @PathVariable String id,
+      @RequestParam(required = false) UUID userId,
+      @RequestHeader(value="Authorization", required=false) String authorization) {
+        
+    try {
+        UUID uuid = UUID.fromString(id);
+        AccountResponse account = accountService.getAccountById(uuid, identity.owner(authorization));
+        return ResponseEntity.ok(account);
+    } catch (IllegalArgumentException e) {
+        AccountResponse account = accountService.getAccountById(id, identity.owner(authorization));
+        return ResponseEntity.ok(account);
     }
+}
 
     @RequestMapping(value = "/{id}/balance", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<AccountResponse> updateBalance(
-            @PathVariable String id,
-            @Valid @RequestBody UpdateBalanceRequest request) {
-        try {
-            UUID uuid = UUID.fromString(id);
-            return ResponseEntity.ok(accountService.updateBalance(uuid, request));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.ok(accountService.updateBalance(id, request));
-        }
+      @PathVariable String id,
+      @RequestHeader(value="Authorization", required=false) String authorization, 
+      @Valid @RequestBody UpdateBalanceRequest request) {
+        
+    try {
+        UUID uuid = UUID.fromString(id);
+        accountService.getAccountById(uuid, identity.owner(authorization));
+        AccountResponse updated = accountService.updateBalance(uuid, request);
+        return ResponseEntity.ok(updated);
+    } catch (IllegalArgumentException e) {
+        accountService.getAccountById(id, identity.owner(authorization));
+        AccountResponse updated = accountService.updateBalance(id, request);
+        return ResponseEntity.ok(updated);
     }
+}
 
     @RequestMapping(value = "/{id}/status", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<AccountResponse> updateStatus(
-            @PathVariable String id,
-            @Valid @RequestBody UpdateStatusRequest request) {
-        try {
-            UUID uuid = UUID.fromString(id);
-            return ResponseEntity.ok(accountService.updateStatus(uuid, request));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.ok(accountService.updateStatus(id, request));
-        }
+        @PathVariable String id,
+        @RequestHeader(value="Authorization", required=false) String authorization,
+        @Valid @RequestBody UpdateStatusRequest request) {
+        
+    try {
+        UUID uuid = UUID.fromString(id);
+        accountService.getAccountById(uuid, identity.owner(authorization));
+        AccountResponse updated = accountService.updateStatus(uuid, request);
+        return ResponseEntity.ok(updated);
+    } catch (IllegalArgumentException e) {
+        accountService.getAccountById(id, identity.owner(authorization));
+        AccountResponse updated = accountService.updateStatus(id, request);
+        return ResponseEntity.ok(updated);
     }
+}
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<AccountResponse> deleteAccount(
-            @PathVariable String id,
-            @RequestParam(required = false) Boolean permanent) {
-        if (Boolean.FALSE.equals(permanent)) {
-            try {
-                UUID uuid = UUID.fromString(id);
-                return ResponseEntity.ok(accountService.closeAccount(uuid));
-            } catch (IllegalArgumentException e) {
-                return ResponseEntity.ok(accountService.closeAccount(id));
-            }
-        }
+@DeleteMapping("/{id}")
+public ResponseEntity<AccountResponse> deleteAccount(
+        @PathVariable String id,
+        @RequestParam(required = false) Boolean permanent,
+        @RequestHeader(value="Authorization", required=false) String authorization) {
+            
+    if (Boolean.FALSE.equals(permanent)) {
         try {
             UUID uuid = UUID.fromString(id);
-            return ResponseEntity.ok(accountService.deleteAccount(uuid));
+            accountService.getAccountById(uuid, identity.owner(authorization));
+            AccountResponse closed = accountService.closeAccount(uuid);
+            return ResponseEntity.ok(closed);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.ok(accountService.deleteAccount(id));
+            accountService.getAccountById(id, identity.owner(authorization));
+            AccountResponse closed = accountService.closeAccount(id);
+            return ResponseEntity.ok(closed);
         }
     }
+    
+    try {
+        UUID uuid = UUID.fromString(id);
+        accountService.getAccountById(uuid, identity.owner(authorization));
+        AccountResponse deleted = accountService.deleteAccount(uuid);
+        return ResponseEntity.ok(deleted);
+    } catch (IllegalArgumentException e) {
+        accountService.getAccountById(id, identity.owner(authorization));
+        AccountResponse deleted = accountService.deleteAccount(id);
+        return ResponseEntity.ok(deleted);
+    }
+}
 }

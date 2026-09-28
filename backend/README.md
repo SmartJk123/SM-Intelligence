@@ -27,6 +27,7 @@ In the identity terminal, generate a private local signing key and start the ser
 
 ```powershell
 $env:JWT_SECRET = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+$env:DB_URL = 'jdbc:postgresql://localhost:55432/smi_identity'
 ./backend/mvn.ps1 -pl identity-service spring-boot:run
 ```
 
@@ -43,3 +44,19 @@ The gateway listens on 8080 and forwards /api/auth/** to identity. Its configura
 Run `npm start` in `web/` and open http://localhost:4200. Registered users are stored in PostgreSQL; sessions in the local adapter end when it restarts.
 
 Environment overrides: identity accepts DB_URL, DB_USER, DB_PASSWORD, PORT, JWT_SECRET and JWT_EXPIRATION_MS. Gateway accepts PORT and IDENTITY_SERVICE_URL. Set values separately in the shell for each process; .env files are not automatically imported by Maven.
+
+## Invoices and pending activity
+
+With identity and the gateway running, open an additional PowerShell terminal at the repository root:
+
+```powershell
+docker compose -f backend/docker-compose.yml up -d postgres-transactions
+$env:DB_URL = 'jdbc:postgresql://localhost:5434/smi_transactions'
+./backend/mvn.ps1 -pl transactions-service spring-boot:run
+```
+
+Restart the gateway to load its `/api/invoices` route. Restart `npm start` after installing the updated frontend dependencies with `npm ci`.
+
+Invoices are persisted in the transactions database by Flyway migration V2, including the original document (maximum 10 MB). Each request validates the bearer token against identity `/api/auth/me`; owner IDs never come from the browser. Duplicate document bytes are rejected per owner. Lists return 50 records per page. Supported files are JPEG, PNG and PDF; the server checks file signatures rather than trusting MIME headers.
+
+Invoice-backed pending activity lives in `invoices`, separate from posted bank ledger entries. It has no bank account assignment and does not affect balances. Both customer Invoices and Transactions show these pending records. Payment, reconciliation, cancellation and merging with bank activity are future work; uploading an invoice does not execute or record payment. Existing account-based transaction APIs are unchanged.
