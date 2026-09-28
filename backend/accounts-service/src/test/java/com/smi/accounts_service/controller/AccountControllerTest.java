@@ -7,6 +7,7 @@ import com.smi.accounts_service.exception.AccountNotFoundException;
 import com.smi.accounts_service.exception.DuplicateAccountException;
 import com.smi.accounts_service.exception.GlobalExceptionHandler;
 import com.smi.accounts_service.service.AccountService;
+import com.smi.accounts_service.service.AccountIdentity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +40,7 @@ class AccountControllerTest {
 
     @Mock
     private AccountService accountService;
+    @Mock private AccountIdentity identity;
 
     @InjectMocks
     private AccountController accountController;
@@ -54,6 +56,7 @@ class AccountControllerTest {
 
         userId = UUID.randomUUID();
         accountId = UUID.randomUUID();
+        org.mockito.Mockito.lenient().when(identity.owner(any())).thenReturn(userId);
     }
 
     private AccountResponse createSampleResponse() {
@@ -202,6 +205,17 @@ class AccountControllerTest {
     }
 
     @Test
+    void deleteAccount_Success() throws Exception {
+        AccountResponse response = createSampleResponse();
+
+        when(accountService.deleteAccount(eq(accountId))).thenReturn(response);
+
+        mockMvc.perform(delete("/api/accounts/{id}", accountId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(accountId.toString()));
+    }
+
+    @Test
     void closeAccount_Success() throws Exception {
         AccountResponse response = createSampleResponse();
         response.setAccountStatus("CLOSED");
@@ -209,7 +223,7 @@ class AccountControllerTest {
 
         when(accountService.closeAccount(eq(accountId))).thenReturn(response);
 
-        mockMvc.perform(delete("/api/accounts/{id}", accountId))
+        mockMvc.perform(delete("/api/accounts/{id}", accountId).param("permanent", "false"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accountStatus").value("CLOSED"))
             .andExpect(jsonPath("$.connectionStatus").value("DISCONNECTED"));

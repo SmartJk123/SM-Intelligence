@@ -9,6 +9,7 @@ export const workspaceLinks = [
   { path: 'dashboard', label: 'Financial Overview', group: '', icon: '🌌' },
   { path: 'accounts', label: 'Accounts', group: 'FINANCES', icon: '💳' },
   { path: 'transactions', label: 'Transactions', group: '', icon: '🧾' },
+  { path: 'invoices', label: 'Invoices', group: '', icon: '📄' },
   { path: 'cashflow', label: 'Cash Flow', group: '', icon: '💸' },
   { path: 'budgets', label: 'Budgets', group: '', icon: '🛡️' },
   { path: 'investments', label: 'Investments', group: '', icon: '💼' },

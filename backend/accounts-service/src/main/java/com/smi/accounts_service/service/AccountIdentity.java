@@ -1,0 +1,37 @@
+package com.smi.accounts_service.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import java.time.Duration;
+import java.util.Map;
+import java.util.UUID;
+
+@Component
+public class AccountIdentity {
+    private final RestClient client;
+    public AccountIdentity(@Value("${IDENTITY_SERVICE_URL:http://localhost:8081}") String identityUrl) {
+        var factory = new JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
+        factory.setReadTimeout(Duration.ofSeconds(10));
+        client = RestClient.builder().baseUrl(identityUrl).requestFactory(factory).build();
+    }
+    public UUID owner(String authorization) {
+        if (authorization == null || !authorization.startsWith("Bearer "))
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in required");
+        try {
+            var profile = client.get().uri("/api/auth/me").header("Authorization", authorization).retrieve().body(Map.class);
+            return UUID.fromString((String) profile.get("id"));
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 403)
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session expired");
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Identity service unavailable");
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Identity service unavailable");
+        }
+    }
+}
+

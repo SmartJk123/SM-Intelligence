@@ -27,22 +27,24 @@ export const routes: Routes = [
     path: 'setup',
     canActivate: [setupGuard],
     title: 'Set up your workspace | SM-Intelligence',
-    loadComponent: () => import('./connection-pending').then((m) => m.ConnectionPending),
+    loadComponent: () => import('./setup').then((m) => m.Setup),
   },
   {
     path: '',
     canActivateChild: [dashboardGuard],
     loadComponent: () => import('./workspace-shell').then((m) => m.WorkspaceShell),
     children: [
+      { path: 'accounts/new', title: 'Add an account | SM-Intelligence', loadComponent: () => import('./setup').then(m => m.Setup) },
       {
         path: 'dashboard',
         title: 'Financial Overview | SM-Intelligence',
-        loadComponent: () => import('./connection-pending').then((m) => m.ConnectionPending),
+        loadComponent: () => import('./dashboard').then((m) => m.Dashboard),
       },
       { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'invoices', title: 'Invoices | SM-Intelligence', loadComponent: () => import('./invoices').then(m => m.Invoices) },
+      { path: 'transactions', title: 'Transactions | SM-Intelligence', data: { page: 'transactions' }, loadComponent: () => import('./invoices').then(m => m.Invoices) },
       ...[
         { page: 'accounts', title: 'Accounts' },
-        { page: 'transactions', title: 'Transactions' },
         { page: 'cashflow', title: 'Cash Flow' },
         { page: 'budgets', title: 'Budgets' },
         { page: 'investments', title: 'Investments' },
@@ -60,5 +62,3 @@ export const routes: Routes = [
   },
   { path: '**', redirectTo: '' },
 ];
-
-

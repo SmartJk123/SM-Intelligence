@@ -23,3 +23,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+jwt:
+  secret: ${JWT_SECRET:smart-money-intelligence-super-secret-key-for-jwt-signing-minimum-256-bits-long-key-12345}
+  expiration-ms: 86400000
