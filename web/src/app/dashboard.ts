@@ -1,11 +1,13 @@
 // Customer financial overview.
 import { WorkspaceIcon } from './workspace-icon';
 import { CategoryChart, FinanceChart } from './finance-chart';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 import { BankLogo } from './bank-logo';
+import { AccountApi } from './account-api';
+import { RouterLink } from '@angular/router';
 
 interface Account {
   id: string;
@@ -28,7 +30,7 @@ interface Transaction {
 }
 interface DashboardData {
   bank?: string;
-  source: 'sample' | 'live' | 'local';
+  source: 'live';
   currency: 'KES';
   user: { name: string; kind: string };
   period: { from: string; to: string; days: number };
@@ -47,7 +49,7 @@ interface DashboardData {
 
 // Converts workspace API data into summary metrics and dashboard visualizations.
 @Component({
-  imports: [CurrencyPipe, DatePipe, BankLogo, FinanceChart, CategoryChart, WorkspaceIcon],
+  imports: [RouterLink, CurrencyPipe, DatePipe, BankLogo, FinanceChart, CategoryChart, WorkspaceIcon],
   template: `
     <section class="dashboard-page">
       <header class="dashboard-heading">
@@ -56,7 +58,7 @@ interface DashboardData {
           <h1>Financial Overview</h1>
           <p class="muted">
             {{
-              data() ? 'Welcome back, ' + data()!.user.name + '.' : 'Your money, in one clear view.'
+              'Welcome back, ' + (api.displayName() || 'there') + '.'
             }}
           </p>
         </div>
@@ -64,7 +66,7 @@ interface DashboardData {
       </header>
       <div class="dashboard-toolbar">
         <span>{{
-          data()?.user?.kind === 'organization' ? 'Organization overview' : 'Personal overview'
+          api.kind() === 'organization' ? 'Organization overview' : 'Personal overview'
         }}</span>
         <label class="overview-bank">Bank
           <select [value]="bank()" (change)="changeBank($any($event.target).value)" [disabled]="loading()">
@@ -92,42 +94,40 @@ interface DashboardData {
         <div class="dashboard-loading" role="status" aria-live="polite">
           <span class="loading-dot"></span>Loading your financial overview…
         </div>
-      } @else if (error()) {
+      }
+      @if (error()) {
         <div class="dashboard-empty" role="alert">
-          <h2>We could not load your dashboard</h2>
+          <h2>{{ disconnected() ? 'Not connected yet' : 'Connection unavailable' }}</h2>
           <p>{{ error() }}</p>
           <button class="button" (click)="load()">Try again</button>
         </div>
-      } @else if (data(); as d) {
-        @if (d.source === 'local') { <p class="sample-label">Local workspace · Financial records reset when the development server restarts.</p> }
-        @if (d.source === 'sample') {
-          <p class="sample-label">Sample data · Local development</p>
-        }
+      }
+      @if (view(); as d) {
         <div class="dashboard-metrics">
           <article>
             <p><app-workspace-icon name="content-cash" /> Available cash</p>
             <strong>{{
-              d.summary.availableCashMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
+              d.accounts.length > 0 || data() ? (d.summary.availableCashMinor / 100 | currency: 'KES' : 'code' : '1.2-2') : '—'
             }}</strong
-            ><small>Deposit accounts only</small>
+            ><small>Manual deposit snapshots · no live sync</small>
           </article>
           <article>
             <p><app-workspace-icon name="content-credit" /> Credit outstanding</p>
             <strong>{{
-              d.summary.creditOutstandingMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
+              d.accounts.length > 0 || data() ? (d.summary.creditOutstandingMinor / 100 | currency: 'KES' : 'code' : '1.2-2') : '—'
             }}</strong
-            ><small>Amount owed · excluded from cash</small>
+            ><small>Manual credit snapshots · excluded from cash</small>
           </article>
           <article>
             <p><app-workspace-icon name="content-income" /> Money in</p>
             <strong class="positive">{{
-              d.summary.moneyInMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
+              data() ? (d.summary.moneyInMinor / 100 | currency: 'KES' : 'code' : '1.2-2') : '—'
             }}</strong
             ><small>Posted deposit-account credits</small>
           </article>
           <article>
             <p><app-workspace-icon name="content-expense" /> Money out</p>
-            <strong>{{ d.summary.moneyOutMinor / 100 | currency: 'KES' : 'code' : '1.2-2' }}</strong
+            <strong>{{ data() ? (d.summary.moneyOutMinor / 100 | currency: 'KES' : 'code' : '1.2-2') : '—' }}</strong
             ><small>Posted deposit-account debits</small>
           </article>
         </div>
@@ -145,7 +145,9 @@ interface DashboardData {
                 <span class="money-in">↗ Money in</span><span class="money-out">↘ Money out</span>
               </div>
             </div>
-            @if (d.summary.moneyInMinor === 0 && d.summary.moneyOutMinor === 0) {
+            @if (!data()) {
+              <div class="chart-empty">{{ loading() ? 'Loading cash flow…' : 'No cash-flow data available. Bank activity is not connected.' }}</div>
+            } @else if (d.summary.moneyInMinor === 0 && d.summary.moneyOutMinor === 0) {
               <div class="chart-empty">No posted cash movements in this period.</div>
             } @else {
               <app-finance-chart [points]="chartPoints" mode="line" />
@@ -153,9 +155,10 @@ interface DashboardData {
             <div class="net-flow">
               <span>Net cash flow</span
               ><strong>{{
-                d.summary.netCashFlowMinor / 100 | currency: 'KES' : 'code' : '1.2-2'
+                data() ? (d.summary.netCashFlowMinor / 100 | currency: 'KES' : 'code' : '1.2-2') : '—'
               }}</strong>
             </div>
+            @if (data() && d.cashFlow.length) {
             <details class="chart-details">
               <summary>View exact cash-flow figures</summary>
               <div class="dashboard-table-wrap">
@@ -179,22 +182,23 @@ interface DashboardData {
                 </table>
               </div>
             </details>
+            }
           </article>
           <article class="dashboard-panel hybrid-spending">
             <div class="panel-heading"><div><h2><app-workspace-icon name="content-spending" /> Spending breakdown</h2><p>Recent posted deposit-account debits</p></div></div>
             @if (spendingPoints.length) { <app-category-chart [points]="spendingPoints" /> }
-            @else { <div class="chart-empty">No posted spending in the recent transactions.</div> }
+            @else { <div class="chart-empty">{{ loading() ? 'Loading spending…' : data() ? 'No posted spending in this period.' : 'No spending data available. Bank activity is not connected.' }}</div> }
             <p class="dashboard-footnote">Based on the recent transactions shown below, which may be a subset of this period.</p>
           </article>
         <article class="dashboard-panel hybrid-accounts">
             <div class="panel-heading">
               <div>
                 <h2><app-workspace-icon name="content-accounts" /> Your accounts</h2>
-                <p>{{ d.accounts.length }} accounts · KES</p>
+                <p>{{ d.accounts.length }} accounts · KES · manual snapshots</p><a routerLink="/accounts/new">Add account</a>
               </div>
             </div>
             @if (!d.accounts.length) {
-              <div class="chart-empty">No accounts to display yet.</div>
+              <div class="chart-empty">{{ api.accountsError() ? 'Account connection unavailable. Try refreshing.' : 'No accounts available for this selection.' }}</div>
             }
             @for (account of d.accounts; track account.id) {
               <div class="dashboard-account">
@@ -220,13 +224,13 @@ interface DashboardData {
           <div class="panel-heading">
             <div>
               <h2><app-workspace-icon name="content-ledger" /> Recent transactions</h2>
-              <p>{{ d.transactionCount }} records in this period · showing up to 12</p>
+              <p>{{ data() ? d.transactionCount + ' records in this period · showing up to 12' : 'Posted bank activity' }}</p>
             </div>
           </div>
           @if (!d.transactions.length) {
             <div class="dashboard-empty">
-              <h3>No transactions yet</h3>
-              <p>Your activity will appear here once transaction records are available.</p>
+              <h3>{{ data() ? 'No transactions yet' : 'No transaction data available' }}</h3>
+              <p>Your activity will appear here once transaction records are available. <a routerLink="/invoices">View invoice records</a></p>
             </div>
           } @else {
             <div class="dashboard-table-wrap" tabindex="0" aria-label="Recent transactions">
@@ -280,11 +284,28 @@ interface DashboardData {
 
 export class Dashboard {
   private http = inject(HttpClient);
+  readonly api = inject(AccountApi);
+  readonly disconnected = signal(false);
   readonly data = signal<DashboardData | null>(null);
   readonly loading = signal(false);
   readonly error = signal('');
   readonly days = signal(30);
   readonly bank = signal('');
+  readonly view = computed<DashboardData>(() => {
+    if (this.data()) return this.data()!;
+    const accounts = this.api.accounts().filter(a => !this.bank() || a.institution === this.bank()).map(a => ({
+      id: a.id, bank: a.institution, accountName: a.accountName, maskedIdentifier: a.maskedIdentifier,
+      accountType: a.accountType, availableBalanceMinor: Math.round(a.availableBalance * 100),
+      creditOutstandingMinor: Math.round(a.creditOutstanding * 100),
+    }));
+    const to = new Date(); const from = new Date(to); from.setUTCDate(to.getUTCDate() - this.days() + 1);
+    return {source: 'live', currency: 'KES', user: {name: this.api.displayName(), kind: this.api.kind()},
+      period: {from: from.toISOString(), to: to.toISOString(), days: this.days()}, accounts,
+      summary: {availableCashMinor: accounts.filter(a => a.accountType === 'DEPOSIT').reduce((sum,a) => sum+a.availableBalanceMinor,0),
+        creditOutstandingMinor: accounts.filter(a => a.accountType === 'CREDIT').reduce((sum,a) => sum+a.creditOutstandingMinor,0),
+        moneyInMinor: 0, moneyOutMinor: 0, netCashFlowMinor: 0},
+      cashFlow: [], transactions: [], transactionCount: 0};
+  });
   readonly banks = ['KCB', 'Equity', 'Stanbic', 'NCBA'];
   changeBank(bank: string) {
     if (this.loading() || bank === this.bank()) return;
@@ -297,6 +318,8 @@ export class Dashboard {
   async load() {
     this.loading.set(true);
     this.error.set('');
+    this.disconnected.set(false);
+    this.data.set(null);
     try {
       const d = await firstValueFrom(
         this.http.get<DashboardData>('/api/dashboard?days=' + this.days() + '&bank=' + encodeURIComponent(this.bank())).pipe(timeout(15000)),
@@ -310,9 +333,10 @@ export class Dashboard {
       )
         throw new Error('Invalid response');
       this.data.set(d);
-    } catch {
+    } catch (error) {
+      this.disconnected.set(error instanceof HttpErrorResponse && error.status === 501);
       this.data.set(null);
-      this.error.set(this.bank() ? 'Unable to load this bank overview. The account service must support bank-filtered totals. Please try again or select All banks.' : 'Please try again. Your account details have not been changed.');
+      this.error.set(this.disconnected() ? 'Live financial activity is not connected. Your dashboard layout and saved account snapshots remain available.' : 'We could not load financial activity. Your dashboard layout remains available. Please try again.');
     } finally {
       this.loading.set(false);
     }

@@ -1,5 +1,6 @@
 package com.smi.accounts_service.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.smi.accounts_service.domain.Account;
 
 import java.math.BigDecimal;
@@ -197,5 +198,15 @@ public class AccountResponse {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    @JsonProperty("accountId")
+    public String getAccountId() {
+        return providerAccountId;
+    }
+
+    @JsonProperty("bankName")
+    public String getBankName() {
+        return institution;
     }
 }

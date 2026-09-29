@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.smartmoney.AuthFlowTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-21T07:26:09.098Z" hostname="friday" time="0.261">
+  <properties/>
+  <testcase name="register_failure_unpacks_backend_error_json" classname="com.example.smartmoney.AuthFlowTest" time="0.168"/>
+  <testcase name="register_success_updates_session_and_passes_exact_parameters" classname="com.example.smartmoney.AuthFlowTest" time="0.05"/>
+  <testcase name="signOut_clears_session_state" classname="com.example.smartmoney.AuthFlowTest" time="0.006"/>
+  <testcase name="login_success_updates_session_and_passes_credentials" classname="com.example.smartmoney.AuthFlowTest" time="0.003"/>
+  <testcase name="register_network_failure_maps_to_connectivity_message" classname="com.example.smartmoney.AuthFlowTest" time="0.01"/>
+  <testcase name="http_502_maps_to_server_waking_up_message" classname="com.example.smartmoney.AuthFlowTest" time="0.002"/>
+  <testcase name="login_failure_unpacks_plain_text_error" classname="com.example.smartmoney.AuthFlowTest" time="0.007"/>
+  <testcase name="login_timeout_maps_to_server_waking_up_message" classname="com.example.smartmoney.AuthFlowTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

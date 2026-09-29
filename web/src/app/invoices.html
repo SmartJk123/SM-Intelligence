@@ -1,0 +1,277 @@
+<section class="dashboard-page invoice-page">
+  <header class="dashboard-heading">
+    <div>
+      <p class="eyebrow">YOUR FINANCES</p>
+      <h1>{{ activity ? 'Transactions' : 'Invoices' }}</h1>
+      <p class="muted">
+        {{
+          activity
+            ? 'Invoice-backed pending activity. Bank transactions are not connected yet.'
+            : 'Turn an invoice into a reviewed, pending transaction.'
+        }}
+      </p>
+    </div>
+    @if (activity) {
+      <a class="button primary" routerLink="/invoices">Add an invoice</a>
+    }
+  </header>
+  @if (error()) {
+    <div class="feedback error" role="alert">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="feedback success" role="status">{{ notice() }}</div>
+  }
+  @if (!activity) {
+    <div class="invoice-grid">
+      <section class="ws-card upload-card">
+        <span class="step">01 · CAPTURE</span>
+        <h2>Add your document</h2>
+        <div class="upload-area">
+          <app-workspace-icon name="invoices" />
+          <h3>A photo today. A clearer picture of what’s due.</h3>
+          <p class="muted">
+            Take a clear photo of the whole invoice, or choose a document from your device.
+          </p>
+          <div class="upload-actions">
+            <button
+              type="button"
+              class="button primary"
+              (click)="cameraOpen.set(true)"
+              [disabled]="extracting() || saving() || readingClipboard()"
+            >
+              Take a photo
+            </button>
+            <button
+              type="button"
+              class="button secondary"
+              (click)="upload.click()"
+              [disabled]="extracting() || saving() || readingClipboard()"
+            >
+              Upload a file
+            </button>
+          </div>
+          <input
+            #upload
+            hidden
+            type="file"
+            accept="image/jpeg,image/png,application/pdf"
+            (change)="select($event)"
+          />
+          <small>JPEG, PNG or PDF · Up to 10 MB · PDFs up to 5 pages</small>
+        </div>
+        <div
+          class="paste-area"
+          tabindex="0"
+          role="region"
+          aria-label="Paste an invoice image"
+          aria-describedby="invoice-paste-help"
+          (paste)="paste($event)"
+          [attr.aria-busy]="readingClipboard() || extracting()"
+        >
+          <h3>Or paste an invoice</h3>
+          <p id="invoice-paste-help">
+            Copy an image or screenshot, click here, then press <kbd>Ctrl+V</kbd>.
+          </p>
+          <button
+            type="button"
+            class="button secondary"
+            (click)="pasteFromClipboard()"
+            [disabled]="extracting() || saving() || readingClipboard()"
+          >
+            {{ readingClipboard() ? 'Reading clipboard…' : 'Paste from clipboard' }}
+          </button>
+        </div>
+        @if (file()) {
+          <p class="filename">{{ file()!.name }}</p>
+          @if (preview()) {
+            <img class="document-preview" [src]="preview()" alt="Selected invoice for review" />
+          }
+          @if (extracting()) {
+            <p class="feedback" role="status" aria-live="polite">{{ progress() }}</p>
+          }
+        }
+        <p class="privacy-note muted">
+          Text recognition runs on your device. The first scan downloads the English recognition
+          data. Your document is uploaded when you save.
+        </p>
+      </section>
+      <section class="ws-card review-card">
+        <span class="step">02 · REVIEW</span>
+        <h2>Check the details</h2>
+        @if (!file()) {
+          <div class="review-empty">
+            <app-workspace-icon name="content-ledger" />
+            <p>Choose an invoice to get started.</p>
+            <span class="muted">We’ll suggest the details. You have the final say.</span>
+          </div>
+        } @else {
+          @if (extractionNote()) {
+            <p class="feedback" role="status">{{ extractionNote() }}</p>
+          }
+          <form [formGroup]="form" (ngSubmit)="save()">
+            <fieldset [disabled]="extracting() || saving()">
+              <label
+                >Vendor / supplier
+                <input
+                  formControlName="vendor"
+                  maxlength="200"
+                  autocomplete="organization"
+                  required
+              /></label>
+              <label
+                >Invoice number <span class="muted">(optional)</span
+                ><input formControlName="invoiceNumber" maxlength="100"
+              /></label>
+              <div class="field-pair">
+                <label
+                  >Total amount<input
+                    formControlName="amount"
+                    inputmode="decimal"
+                    placeholder="0.00"
+                    required
+                /></label>
+                <label
+                  >Currency<input
+                    formControlName="currency"
+                    maxlength="3"
+                    placeholder="KES"
+                    list="invoice-currencies"
+                    required
+                /></label>
+              </div>
+              <datalist id="invoice-currencies">
+                <option value="KES"></option>
+                <option value="USD"></option>
+                <option value="EUR"></option>
+                <option value="GBP"></option>
+                <option value="UGX"></option>
+                <option value="TZS"></option>
+              </datalist>
+              <div class="field-pair">
+                <label
+                  >Invoice date<input formControlName="invoiceDate" type="date" required /></label
+                ><label
+                  >Due date <span class="muted">(optional)</span
+                  ><input formControlName="dueDate" type="date"
+                /></label>
+              </div>
+              <label class="review-check"
+                ><input type="checkbox" formControlName="reviewed" /><span
+                  >I have checked these details against the invoice.</span
+                ></label
+              >
+              <p class="muted">
+                Saved as <strong>Pending</strong>. This records an expected expense and does not
+                change your bank balance.
+              </p>
+              <div class="upload-actions">
+                <button
+                  class="button primary"
+                  type="submit"
+                  [disabled]="form.invalid || extracting() || saving()"
+                >
+                  {{ saving() ? 'Saving…' : 'Save pending transaction' }}</button
+                ><button class="button secondary" type="button" (click)="clear()">Discard</button>
+              </div>
+            </fieldset>
+          </form>
+          @if (rawText()) {
+            <details>
+              <summary>View extracted text</summary>
+              <pre>{{ rawText() }}</pre>
+            </details>
+          }
+        }
+      </section>
+    </div>
+  }
+  <section class="ws-card invoice-list">
+    <div class="list-heading">
+      <div>
+        <span class="step">PENDING ACTIVITY</span>
+        <h2>{{ activity ? 'Pending transactions' : 'Your invoices' }}</h2>
+      </div>
+      <button class="button secondary" (click)="load()" [disabled]="loading() || !!deleting()">
+        Refresh
+      </button>
+    </div>
+    @if (loading() && !invoices().length) {
+      <p role="status">Loading invoices…</p>
+    } @else if (!invoices().length && !error()) {
+      <div class="empty-list">
+        <app-workspace-icon name="invoices" />
+        <h3>No pending invoices yet</h3>
+        <p class="muted">Saved invoices will appear here and in Transactions.</p>
+      </div>
+    }
+    @if (invoices().length) {
+      <div class="pending-totals">
+        <span>{{ invoices().length }} loaded · Pending</span>
+        @for (total of totals(); track total.currency) {
+          <strong>{{ total.amount | currency: total.currency : 'code' }}</strong>
+        }
+      </div>
+      <div class="invoice-rows">
+        @for (invoice of invoices(); track invoice.id) {
+          <article class="invoice-row">
+            <div class="invoice-vendor">
+              <strong>{{ invoice.vendor }}</strong
+              ><small
+                >{{ invoice.invoiceNumber || 'Invoice' }} ·
+                {{ invoice.invoiceDate | date: 'mediumDate' }}</small
+              >
+            </div>
+            <div class="invoice-due">
+              <small>Due date</small
+              ><span>{{
+                invoice.dueDate ? (invoice.dueDate | date: 'mediumDate') : 'Not specified'
+              }}</span>
+            </div>
+            <strong class="invoice-amount">{{
+              invoice.amount | currency: invoice.currency : 'code'
+            }}</strong>
+            <span class="pending-badge">Pending</span>
+            <div class="invoice-actions">
+              <button
+                type="button"
+                class="document-link"
+                (click)="previewInvoice.set(invoice)"
+                [attr.aria-label]="'Preview invoice from ' + invoice.vendor"
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                class="document-link"
+                (click)="deleteInvoice(invoice)"
+                [disabled]="!!deleting() || loading() || saving()"
+                [attr.aria-label]="'Delete invoice from ' + invoice.vendor"
+              >
+                {{ deleting() === invoice.id ? 'Deleting…' : 'Delete' }}
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+      @if (hasMore()) {
+        <button
+          class="button secondary"
+          (click)="load(true)"
+          [disabled]="loading() || !!deleting()"
+        >
+          Load more
+        </button>
+      }
+    }
+  </section>
+</section>
+@if (cameraOpen()) {
+  <app-invoice-camera (captured)="useFile($event)" (closed)="cameraOpen.set(false)" />
+}
+@if (previewInvoice(); as invoice) {
+  <app-invoice-preview
+    [invoiceId]="invoice.id"
+    [filename]="invoice.filename"
+    (closed)="previewInvoice.set(null)"
+  />
+}

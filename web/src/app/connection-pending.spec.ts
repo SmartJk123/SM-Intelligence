@@ -13,7 +13,7 @@ describe('Authentication-only workspace', () => {
     const fixture = TestBed.createComponent(ConnectionPending);
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).toContain('Team Member');
-    expect(fixture.nativeElement.textContent).toContain('Not connected yet');
+    expect(fixture.nativeElement.textContent).toContain('Your accounts');
     expect(fixture.nativeElement.querySelector('input')).toBeNull();
     TestBed.inject(HttpTestingController).expectNone('/api/workspace');
     TestBed.inject(HttpTestingController).expectNone('/api/dashboard');

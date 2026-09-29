@@ -1,5 +1,7 @@
 package com.smi.identity_service.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -9,16 +11,22 @@ public class RegisterRequest {
 
     @NotBlank(message = "Name is required")
     @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
+    @JsonProperty("name")
     private String name;
 
     @NotBlank(message = "Email address is required")
     @Email(message = "Email address must be valid")
+    @JsonProperty("emailAddress")
+    @JsonAlias({"email", "email_address"})
     private String emailAddress;
 
     @NotBlank(message = "Password is required")
     @Size(min = 8, max = 72, message = "Password must be at least 8 characters long")
+    @JsonProperty("password")
     private String password;
 
+    @JsonProperty("phoneNumber")
+    @JsonAlias({"phone_number", "phone", "contact_phone"})
     private String phoneNumber;
 
     @Pattern(regexp = "^(INDIVIDUAL|ORGANIZATION)$", message = "Invalid account type")
@@ -50,6 +58,16 @@ public class RegisterRequest {
 
     public void setEmailAddress(String emailAddress) {
         this.emailAddress = emailAddress;
+    }
+
+    public String getEmail() {
+        return emailAddress;
+    }
+
+    public void setEmail(String email) {
+        if (this.emailAddress == null) {
+            this.emailAddress = email;
+        }
     }
 
     public String getPassword() {

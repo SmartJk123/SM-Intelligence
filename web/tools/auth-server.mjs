@@ -121,10 +121,18 @@ async function sendDashboard(send, call, session, searchParams) {
 // Loopback development adapter. JWTs stay here; the browser receives an HttpOnly session cookie.
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const backend = new URL(options.identityUrl || process.env.IDENTITY_API_URL || 'http://localhost:8080');
+  const invoiceBackend = new URL(options.invoiceUrl || process.env.INVOICE_API_URL || backend);
+  const accountsBackend = new URL(options.accountsUrl || process.env.ACCOUNTS_API_URL || backend);
+  if (accountsBackend.protocol !== 'https:' && !(accountsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(accountsBackend.hostname)))
+    throw new Error('Accounts API requires HTTPS, except on loopback.');
+  if (invoiceBackend.protocol !== 'https:' && !(invoiceBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(invoiceBackend.hostname)))
+    throw new Error('Invoice API requires HTTPS, except on loopback.');
   if (backend.protocol !== 'https:' && !(backend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(backend.hostname)))
     throw new Error('Identity API requires HTTPS, except on loopback.');
   const requestBackend = options.fetchAuth || fetch;
   const sessions = new Map();
+  const allowedOrigins = ['http://localhost:' + webPort, 'http://127.0.0.1:' + webPort];
+  if (process.env.WEB_ORIGIN) allowedOrigins.push(new URL(process.env.WEB_ORIGIN).origin);
   const cookieName = 'sm_identity_session';
   const cookie = value => cookieName + '=' + value + '; HttpOnly; SameSite=Lax; Path=/api';
   const call = (route, init) => requestBackend(new URL(route, backend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
@@ -138,7 +146,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     res.setHeader('Content-Type', 'application/json');
     const send = (status, data) => { res.writeHead(status); res.end(JSON.stringify(data)); };
     const clear = () => res.setHeader('Set-Cookie', cookie('') + '; Max-Age=0');
-    if (req.headers.origin && !['http://localhost:' + webPort, 'http://127.0.0.1:' + webPort].includes(req.headers.origin))
+    if (req.headers.origin && !allowedOrigins.includes(req.headers.origin))
       return send(403, { error: 'Cross-origin requests are not allowed' });
     if (req.headers['sec-fetch-site'] === 'cross-site') return send(403, { error: 'Cross-site requests are not allowed' });
     for (const [id, value] of sessions) if (value.expiresAt <= Date.now()) sessions.delete(id);
@@ -196,8 +204,59 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       if (route === '/api/dashboard' && req.method === 'GET') {
         return await sendDashboard(send, call, session, url.searchParams);
       }
-      // Financial integration beyond accounts/transactions is a later team milestone.
-      // Never create temporary records.
+      if (route === '/api/accounts' && ['GET', 'POST'].includes(req.method)) {
+        let body;
+        if (req.method === 'POST') {
+          let raw = ''; let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > 16384) return send(413, { error: 'Request too large' });
+            raw += chunk;
+          }
+          try { body = JSON.stringify(JSON.parse(raw)); } catch { return send(400, { error: 'Invalid JSON' }); }
+        }
+        const response = await requestBackend(new URL(req.method === 'POST' ? '/api/accounts/manual' : '/api/accounts', accountsBackend), {
+          method: req.method, redirect: 'error', signal: AbortSignal.timeout(15000),
+          headers: { Authorization: 'Bearer ' + session.token, 'Content-Type': 'application/json' },
+          ...(body ? { body } : {})
+        });
+        if (!response.ok) return send([400, 401, 403, 409].includes(response.status) ? response.status : 503,
+          { error: response.status === 409 ? 'This account has already been added.' : 'Unable to load or save accounts. Please retry.' });
+        const publicAccount = ({ id, accountName, institution, maskedIdentifier, accountType, currency, availableBalance, creditOutstanding, accountStatus }) =>
+          ({ id, accountName, institution, maskedIdentifier, accountType, currency, availableBalance, creditOutstanding, accountStatus });
+        const result = await response.json();
+        return send(response.status, Array.isArray(result) ? result.map(publicAccount) : publicAccount(result));
+      }
+      if ((route === '/api/invoices' && ['GET', 'POST'].includes(req.method)) ||
+          (/^\/api\/invoices\/[0-9a-f-]{36}$/i.test(route) && req.method === 'DELETE') ||
+          (/^\/api\/invoices\/[0-9a-f-]{36}\/document$/i.test(route) && req.method === 'GET')) {
+        const chunks = []; let size = 0;
+        if (req.method === 'POST') {
+          if (!req.headers['content-type']?.startsWith('multipart/form-data;')) return send(415, { error: 'Upload a multipart document' });
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > 11 * 1024 * 1024) return send(413, { error: 'Choose a file up to 10 MB' });
+            chunks.push(chunk);
+          }
+        }
+        const response = await requestBackend(new URL(req.url, invoiceBackend), { method: req.method, redirect: 'error', signal: AbortSignal.timeout(20000),
+          headers: { Authorization: 'Bearer ' + session.token,
+            ...(req.method === 'POST' ? { 'Content-Type': req.headers['content-type'] } : {}) },
+          ...(req.method === 'POST' ? { body: Buffer.concat(chunks) } : {}) });
+        if (!response.ok) {
+          const messages = { 400: 'Check the invoice details and file format.', 401: 'Your session expired. Sign in again.',
+            403: 'You cannot access this invoice.', 404: 'Invoice not found.', 409: 'This document has already been saved.',
+            413: 'Choose a file up to 10 MB.' };
+          return send(messages[response.status] ? response.status : 503,
+            { error: messages[response.status] || 'Invoice service unavailable. Start the transactions service and retry.' });
+        }
+        res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (response.headers.has('content-disposition')) res.setHeader('Content-Disposition', response.headers.get('content-disposition'));
+        res.writeHead(response.status); res.end(Buffer.from(await response.arrayBuffer())); return;
+      }
+      // Financial integration beyond accounts/transactions/invoices is a later team
+      // milestone. Never create temporary records.
       return send(501, { error: 'This feature is not connected yet' });
     } catch {
       return send(503, { error: 'Identity service unavailable. Please retry.' });

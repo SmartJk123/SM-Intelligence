@@ -17,6 +17,7 @@ describe('Account journey', () => {
     login: vi.fn(),
     register: vi.fn(),
     saveSetup: vi.fn(),
+    refreshAccounts: vi.fn(),
     restoreSession: vi.fn(),
   };
   beforeEach(() => {
@@ -50,7 +51,7 @@ describe('Account journey', () => {
     expect(nav).not.toHaveBeenCalled();
     api.login.mockResolvedValueOnce(undefined);
     await a.submit();
-    expect(nav).toHaveBeenCalledWith(['/dashboard']);
+    expect(nav).toHaveBeenCalledWith(['/setup']);
   });
   it('protects direct setup access without a restored session', async () => {
     api.restoreSession.mockResolvedValue(false);
@@ -111,6 +112,30 @@ describe('Account API contract', () => {
     }),
   );
   afterEach(() => TestBed.inject(HttpTestingController).verify());
+  it('derives onboarding from saved active accounts and clears stale state on failure', async () => {
+    const api = TestBed.inject(AccountApi);
+    const http = TestBed.inject(HttpTestingController);
+    let pending = api.refreshAccounts();
+    http.expectOne('/api/accounts').flush([{id:'closed',accountStatus:'CLOSED'},{id:'active',accountStatus:'ACTIVE'}]);
+    await pending;
+    expect(api.accounts().map(account => account.id)).toEqual(['active']);
+    expect(api.setupCompleted()).toBe(true);
+    pending = api.refreshAccounts();
+    http.expectOne('/api/accounts').flush({}, {status:503,statusText:'Unavailable'});
+    await pending;
+    expect(api.setupCompleted()).toBe(false);
+    expect(api.accounts()).toEqual([]);
+    expect(api.accountsError()).not.toBe('');
+  });
+  it('requires sign-in again when the accounts service rejects the session', async () => {
+    const api = TestBed.inject(AccountApi);
+    api.authenticated.set(true);
+    const pending = api.refreshAccounts();
+    TestBed.inject(HttpTestingController).expectOne('/api/accounts').flush({}, {status:401,statusText:'Unauthorized'});
+    await pending;
+    expect(api.authenticated()).toBe(false);
+    expect(api.setupCompleted()).toBe(false);
+  });
   it('requires a valid server session before authenticating', async () => {
     const api = TestBed.inject(AccountApi);
     const pending = api.login({ email: 'test@example.com', password: 'password' });
@@ -121,7 +146,7 @@ describe('Account API contract', () => {
     await pending;
     expect(api.authenticated()).toBe(true);
   });
-  it('does not send financial data before account integration', async () => {
+  it('unlocks onboarding only after the account is persisted', async () => {
     const pending = TestBed.inject(AccountApi).saveSetup({
       bank: 'KCB',
       accountName: 'Savings',
@@ -131,9 +156,10 @@ describe('Account API contract', () => {
       balanceDate: '2026-09-09',
       currency: 'KES',
     });
-    const assertion = expect(pending).rejects.toThrow('not connected yet');
-    TestBed.inject(HttpTestingController).expectNone('/api/accounts');
-    await assertion;
+    expect(TestBed.inject(AccountApi).setupCompleted()).toBe(false);
+    TestBed.inject(HttpTestingController).expectOne('/api/accounts').flush({id:'saved',accountStatus:'ACTIVE'});
+    await pending;
+    expect(TestBed.inject(AccountApi).setupCompleted()).toBe(true);
   });
 });
 
@@ -155,10 +181,11 @@ describe('Automatic sign-in after registration', () => {
       if(success) request.flush({user:{id:'fresh',kind:'individual',setupCompleted:false}});
       else request.flush({}, {status:503,statusText:'Unavailable'});
     });
+    if (success) await vi.waitFor(() => http.expectOne('/api/accounts').flush([]));
     await pending;
     expect(auth.created()).toBe(!success);
     expect(auth.error()).toBe('');
-    if(success) expect(nav).toHaveBeenCalledWith(['/dashboard']);
+    if(success) expect(nav).toHaveBeenCalledWith(['/setup']);
     else expect(nav).not.toHaveBeenCalled();
     expect(auth.form.controls.password.value).toBe('');
     expect(auth.form.controls.confirm.value).toBe('');

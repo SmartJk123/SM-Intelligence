@@ -67,8 +67,8 @@ smartmoney:
     webhook-path: /api/v1/webhooks/stanbic
     signature-verification: ${STANBIC_SIGNATURE_VERIFICATION:true}
     # Set both once Stanbic confirms how the callback is authenticated.
-    signature-header: ${STANBIC_SIGNATURE_HEADER:}
-    signature-secret: ${STANBIC_SIGNATURE_SECRET:}
+    signature-header: ${STANBIC_SIGNATURE_HEADER:X-Stanbic-Signature}
+    signature-secret: ${STANBIC_SIGNATURE_SECRET:test-secret-key-stanbic-987}
 
   kcb:
     environment: ${KCB_ENV:SANDBOX}
