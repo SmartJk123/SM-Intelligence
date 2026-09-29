@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: secretpassword
       POSTGRES_DB: smi_identity
     ports:
-      - "55432:5432"
+      - "5432:5432"
     volumes:
       - pgdata-identity:/var/lib/postgresql/data
     restart: unless-stopped

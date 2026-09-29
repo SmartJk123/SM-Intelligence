@@ -75,13 +75,20 @@ public class NormalizedTransactionService {
         try {
             JsonNode root = mapper.readTree(payload);
             BigDecimal amount = decimal(root, AMOUNT_FIELDS);
-            if (amount == null || amount.signum() < 0) {
+            if (amount == null || amount.signum() == 0) {
                 throw new IllegalArgumentException("Notification amount is missing or invalid");
+            }
+            String direction = text(root, DIRECTION_FIELDS, null);
+            if (amount.signum() < 0) {
+                if (direction == null || direction.isBlank()) {
+                    direction = "DEBIT";
+                }
+                amount = amount.abs();
             }
             return new NormalizedTransactionEntity(
                     event.getBankId(), event.getExternalEventId(), amount,
                     text(root, CURRENCY_FIELDS, "KES"),
-                    text(root, DIRECTION_FIELDS, null),
+                    direction,
                     text(root, REFERENCE_FIELDS, event.getExternalEventId()),
                     text(root, NARRATION_FIELDS, null),
                     XmlFields.timestamp(text(root, DATE_FIELDS, null)));

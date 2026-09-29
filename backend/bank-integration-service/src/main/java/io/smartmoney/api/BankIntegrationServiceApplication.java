@@ -19,7 +19,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
         NcbaProperties.class,
         PlatformProperties.class
 })
-public class SmartMoneyApplication {
+public class BankIntegrationServiceApplication {
 
     @Bean
     public ObjectMapper objectMapper() {
@@ -29,6 +29,6 @@ public class SmartMoneyApplication {
     }
 
     public static void main(String[] args) {
-        SpringApplication.run(SmartMoneyApplication.class, args);
+        SpringApplication.run(BankIntegrationServiceApplication.class, args);
     }
 }

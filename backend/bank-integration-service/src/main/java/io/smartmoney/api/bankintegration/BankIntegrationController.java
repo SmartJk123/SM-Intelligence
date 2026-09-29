@@ -302,7 +302,7 @@ public class BankIntegrationController {
         return result;
     }
 
-    @PutMapping(value = "/{bankId}", consumes = MediaType.ALL_VALUE)
+    @PutMapping(value = {"/{bankId}", "/{bankId}/settings"}, consumes = MediaType.ALL_VALUE)
     public BankConnectionSettings save(
             @PathVariable String bankId, @RequestBody(required = false) String rawBody) {
         if (parseSettings(rawBody) == null) {
