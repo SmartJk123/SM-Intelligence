@@ -43,6 +43,12 @@ smartmoney:
     # Development only. Set to false before any shared deployment.
     permit-all: ${PERMIT_ALL:true}
 
+  # Where a linked customer's bank movements are delivered, so they show on the
+  # web dashboard. Private addresses: these services have no authentication.
+  platform-services:
+    accounts-url: ${ACCOUNTS_API_URL:http://localhost:8082}
+    transactions-url: ${TRANSACTIONS_API_URL:http://localhost:8083}
+
   stanbic:
     environment: ${STANBIC_ENV:SANDBOX}
     portal-url: https://sandbox.stanbicbank.co.ke/
