@@ -13,7 +13,7 @@ import java.util.List;
  * Read-only user listing for the admin interface, so a signup on the
  * customer-facing app is visible to admins without a separate sync step.
  *
- * TODO: admin-interface has no real authentication against this service yet,
+ * SECURITY GAP: admin-interface has no real authentication against this service yet,
  * so this endpoint is left open (see SecurityConfig). It only reads data, but
  * must be locked down once admin-interface has real admin auth.
  */

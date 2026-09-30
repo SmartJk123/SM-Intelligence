@@ -2,12 +2,10 @@ package io.smartmoney.api.bankintegration.stanbic;
 
 import io.smartmoney.api.bankintegration.BankConnectionSettings;
 import io.smartmoney.api.bankintegration.BankConnectionTest;
-import io.smartmoney.api.bankintegration.BankEnvironment;
 import io.smartmoney.api.bankintegration.NormalizedTransactionEntity;
 import io.smartmoney.api.bankintegration.NormalizedTransactionRepository;
 import io.smartmoney.api.bankintegration.StepKey;
 import io.smartmoney.api.bankintegration.StepStatus;
-import io.smartmoney.api.bankintegration.WebhookEventEntity;
 import io.smartmoney.api.bankintegration.WebhookEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
