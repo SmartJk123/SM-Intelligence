@@ -49,6 +49,13 @@ smartmoney:
     accounts-url: ${ACCOUNTS_API_URL:http://localhost:8082}
     transactions-url: ${TRANSACTIONS_API_URL:http://localhost:8083}
 
+  # Pulls NCBA notifications stored by the cPanel receiver (deploy/cpanel).
+  # Off unless both are set; the token is export_token in cPanel's ncba-config.php.
+  ncba-cpanel:
+    export-url: ${NCBA_CPANEL_EXPORT_URL:}
+    export-token: ${NCBA_CPANEL_EXPORT_TOKEN:}
+    interval: ${NCBA_CPANEL_IMPORT_INTERVAL:PT1M}
+
   stanbic:
     environment: ${STANBIC_ENV:SANDBOX}
     portal-url: https://sandbox.stanbicbank.co.ke/
