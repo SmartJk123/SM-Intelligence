@@ -11,3 +11,12 @@
  *   GET  {API_BASE_URL}/admin/stats
  */
 export const API_BASE_URL = 'http://localhost:8090/api/v1';
+
+/**
+ * Base URL of identity-service, reached through api-gateway (port 8080), not
+ * the bank-integration service above. Separate from API_BASE_URL because they
+ * are two different Spring Boot services on two different ports.
+ *
+ *   GET {IDENTITY_API_BASE_URL}/admin/users
+ */
+export const IDENTITY_API_BASE_URL = 'http://localhost:8080/api/v1';

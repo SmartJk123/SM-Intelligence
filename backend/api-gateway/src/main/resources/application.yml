@@ -20,6 +20,10 @@ spring:
               uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/api/auth/**
+            - id: identity-admin-users
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/admin/users/**
             - id: accounts-service
               uri: ${ACCOUNTS_SERVICE_URL:http://localhost:8082}
               predicates:

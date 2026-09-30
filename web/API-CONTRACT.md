@@ -27,7 +27,17 @@ Authentication responses contain `token,userId,name,emailAddress,accountType,exp
 
 ## Financial APIs
 
-Bank transactions and aggregate workspace contracts are not connected. The adapter returns 501 for unsupported authenticated requests. Invoice-backed pending activity is supported below; bank-ledger integration still needs explicit mapping and ownership enforcement.
+| Method | Path | Request / response |
+| --- | --- | --- |
+| GET | /api/dashboard?days=&bank= | Requires a session. Returns the `DashboardData` shape `web/src/app/dashboard.ts` renders: `user`, `period`, `summary`, `accounts`, `cashFlow`, `transactions`, `transactionCount`. `days` defaults to 30 (max 365). `bank` filters accounts by `institution` and is echoed back on the response. |
+
+The adapter builds this by calling `GET {IDENTITY_API_URL}/api/accounts?userId=<session user>` and, for each account, `GET {IDENTITY_API_URL}/api/transactions?accountId=<account id>` — the same accounts-service/transactions-service the gateway already routes to, no new backend service. Balances/amounts are converted from decimal to minor units (`* 100`). Only `DEPOSIT` accounts and `POSTED` transactions count toward `summary`/`cashFlow`, matching the labels already in `dashboard.ts`. `category` is a placeholder (`counterparty`, or `'Uncategorized'`) since categories-service is not wired up.
+
+This only shows real data: a user with no `Account`/`Transaction` rows sees zeros, not sample data. Accounts are created today via `POST /api/accounts` (see Persisted account onboarding, below) — nothing yet creates a `Transaction` automatically from a live bank webhook. That linkage (matching an incoming KCB/NCBA/Stanbic notification to a specific customer's own account) does not exist anywhere in the codebase yet and is a separate, larger piece of work: `bank-integration-service`'s stored transactions have no `user_id`/`account_id` column today.
+
+Invoice-backed pending activity is supported below; bank-ledger integration still needs explicit mapping and ownership enforcement. Every other authenticated route not listed anywhere in this document still returns 501, never a fake success or temporary record.
+
+**Known gap**: `accounts-service` and `transactions-service` have no authentication of their own today — anything that can reach them directly (bypassing this adapter) can read or write any `userId`'s accounts/transactions. This predates the dashboard endpoint above but matters much more now that real money flows through it; it should be closed before this goes near production.
 
 ## Invoice-backed pending activity
 

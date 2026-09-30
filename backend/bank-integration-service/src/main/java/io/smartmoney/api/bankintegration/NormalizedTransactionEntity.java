@@ -48,6 +48,22 @@ public class NormalizedTransactionEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** The bank account the movement is on, as the bank sent it. Links it to a customer. */
+    @Column(name = "account_number", length = 64)
+    private String accountNumber;
+
+    /** Set once transactions-service has the movement for the linked customer's account. */
+    @Column(name = "forwarded_at")
+    private Instant forwardedAt;
+
+    /** A demonstration movement from the admin interface. Never sent to a customer. */
+    @Column(name = "simulated", nullable = false, columnDefinition = "boolean default false")
+    private boolean simulated = false;
+
+    /** Why the last forwarding attempt failed, cleared on success. */
+    @Column(name = "forward_error", length = 500)
+    private String forwardError;
+
     protected NormalizedTransactionEntity() {
     }
 
@@ -74,4 +90,12 @@ public class NormalizedTransactionEntity {
     public String getNarration() { return narration; }
     public Instant getBookingDate() { return bookingDate; }
     public Instant getCreatedAt() { return createdAt; }
+    public String getAccountNumber() { return accountNumber; }
+    public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
+    public boolean isSimulated() { return simulated; }
+    public void setSimulated(boolean simulated) { this.simulated = simulated; }
+    public Instant getForwardedAt() { return forwardedAt; }
+    public void setForwardedAt(Instant forwardedAt) { this.forwardedAt = forwardedAt; }
+    public String getForwardError() { return forwardError; }
+    public void setForwardError(String forwardError) { this.forwardError = forwardError; }
 }

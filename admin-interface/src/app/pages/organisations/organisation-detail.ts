@@ -1,15 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import {
   BANK_ACCOUNTS,
-  ORGS,
   OrgStatus,
   Organisation,
   TRANSACTIONS,
-  USERS,
   money,
 } from '../../core/data';
 import { CsvExportService } from '../../core/csv-export.service';
 import { ToastService } from '../../core/toast.service';
+import { UserService } from '../../core/user.service';
 import { Avatar } from '../../shared/avatar';
 import { Badge } from '../../shared/badge';
 
@@ -27,6 +26,7 @@ import { Badge } from '../../shared/badge';
 export class OrganisationDetail {
   private readonly csv = inject(CsvExportService);
   private readonly toasts = inject(ToastService);
+  private readonly userDirectory = inject(UserService);
 
   readonly org = input.required<Organisation>();
   readonly closed = output<void>();
@@ -46,7 +46,7 @@ export class OrganisationDetail {
   protected readonly draftType = signal('');
 
   protected readonly users = computed(() =>
-    USERS.filter((user) => user.org === this.org().name),
+    this.userDirectory.users().filter((user) => user.org === this.org().name),
   );
   protected readonly accounts = computed(() =>
     BANK_ACCOUNTS.filter((account) => account.org === this.org().name),
@@ -70,8 +70,9 @@ export class OrganisationDetail {
   );
 
   protected readonly directoryPosition = computed(() => {
-    const index = ORGS.findIndex((item) => item.id === this.org().id);
-    return index < 0 ? 'Unknown' : `${index + 1} of ${ORGS.length}`;
+    const orgs = this.userDirectory.organisations();
+    const index = orgs.findIndex((item) => item.id === this.org().id);
+    return index < 0 ? 'Unknown' : `${index + 1} of ${orgs.length}`;
   });
 
   protected startEdit(): void {

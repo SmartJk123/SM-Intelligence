@@ -39,7 +39,11 @@ In a second terminal:
 ./backend/mvn.ps1 -pl api-gateway spring-boot:run
 ```
 
-The gateway listens on 8080 and forwards /api/auth/** to identity. Its configuration uses the Spring Cloud Gateway Server Web MVC property namespace. The account and transaction services remain unconnected pending ownership/authentication work.
+The gateway listens on 8080 and forwards /api/auth/**, /api/v1/admin/users/** (identity), /api/accounts/** (accounts-service) and /api/transactions/** (transactions-service). Its configuration uses the Spring Cloud Gateway Server Web MVC property namespace.
+
+`GET /api/v1/admin/users` on identity-service lists every active user (no password hash) — this is what makes a signup on `web/` show up in `admin-interface`'s Organisations/Users pages. It has no authentication yet (see the TODO comment next to it in `SecurityConfig.java`) because admin-interface has no real admin login against this backend yet; it only reads data, but lock it down before this is public.
+
+accounts-service and transactions-service have no Spring Security configuration at all today — anyone who can reach them directly (bypassing api-gateway/the web adapter) can read or write any `userId`'s accounts and transactions. This predates any particular feature but matters a lot once real money is involved (see `web/API-CONTRACT.md`'s `/api/dashboard` section) — prioritize closing it before production.
 
 Run `npm start` in `web/` and open http://localhost:4200. Registered users are stored in PostgreSQL; sessions in the local adapter end when it restarts.
 

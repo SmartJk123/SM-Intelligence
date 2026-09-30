@@ -34,7 +34,7 @@ export interface Bank {
 }
 
 export interface Organisation {
-  id: number;
+  id: string;
   name: string;
   type: string;
   users: number;
@@ -44,7 +44,7 @@ export interface Organisation {
 }
 
 export interface AppUser {
-  id: number;
+  id: string;
   name: string;
   email: string;
   org: string;

@@ -31,6 +31,10 @@ public class NormalizedTransactionService {
     private static final String[] XML_NARRATIVE = {
             "Narrative", "Narration", "Description", "FtCrNarration", "CrNarration"};
     private static final String[] XML_TIME = {"TransTime", "TransactionTime", "TransDate"};
+    private static final String[] XML_ACCOUNT = {"AccountNr", "AccountNumber", "AccountNo"};
+    // KCB names the credited account in creditAccountIdentifier.
+    private static final List<String> ACCOUNT_FIELDS = List.of(
+            "accountNumber", "creditAccountIdentifier", "accountNo", "account", "accountId");
 
     private final NormalizedTransactionRepository repository;
     private final ObjectMapper mapper;
@@ -85,13 +89,15 @@ public class NormalizedTransactionService {
                 }
                 amount = amount.abs();
             }
-            return new NormalizedTransactionEntity(
+            NormalizedTransactionEntity transaction = new NormalizedTransactionEntity(
                     event.getBankId(), event.getExternalEventId(), amount,
                     text(root, CURRENCY_FIELDS, "KES"),
                     direction,
                     text(root, REFERENCE_FIELDS, event.getExternalEventId()),
                     text(root, NARRATION_FIELDS, null),
                     XmlFields.timestamp(text(root, DATE_FIELDS, null)));
+            transaction.setAccountNumber(normalizeAccountNumber(text(root, ACCOUNT_FIELDS, null)));
+            return transaction;
         } catch (IllegalArgumentException error) {
             throw error;
         } catch (Exception error) {
@@ -109,7 +115,7 @@ public class NormalizedTransactionService {
             throw new IllegalArgumentException("Notification amount is missing or invalid");
         }
         String direction = amount.signum() < 0 ? "Debit" : "Credit";
-        return new NormalizedTransactionEntity(
+        NormalizedTransactionEntity transaction = new NormalizedTransactionEntity(
                 event.getBankId(),
                 event.getExternalEventId(),
                 amount.abs(),
@@ -118,6 +124,20 @@ public class NormalizedTransactionService {
                 orDefault(XmlFields.first(fields, XML_REFERENCE), event.getExternalEventId()),
                 XmlFields.first(fields, XML_NARRATIVE),
                 XmlFields.timestamp(XmlFields.first(fields, XML_TIME)));
+        transaction.setAccountNumber(normalizeAccountNumber(XmlFields.first(fields, XML_ACCOUNT)));
+        return transaction;
+    }
+
+    /**
+     * The form account numbers are stored and matched in: spaces and dashes
+     * removed, so "1004 906 164" and "1004906164" link to the same customer.
+     */
+    public static String normalizeAccountNumber(String value) {
+        if (value == null) {
+            return null;
+        }
+        String cleaned = value.replaceAll("[\\s-]", "");
+        return cleaned.isEmpty() ? null : cleaned;
     }
 
     private static BigDecimal parse(String value) {

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -126,6 +127,11 @@ public class UserService {
     @Transactional(readOnly = true)
     public Optional<User> findById(UUID userId) {
         return userRepository.findById(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<User> listActiveUsers() {
+        return userRepository.findByDeletedAtIsNullOrderByCreatedAtDesc();
     }
 
     private String normalizeAndValidatePhoneNumber(String phoneNumber) {

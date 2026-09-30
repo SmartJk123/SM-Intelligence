@@ -1,5 +1,6 @@
 package io.smartmoney.api.bankintegration;
 
+import io.smartmoney.api.accountlink.AccountLinkService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -23,11 +24,14 @@ public class WebhookIngestionService {
 
     private final WebhookEventRepository repository;
     private final NormalizedTransactionService transactions;
+    private final AccountLinkService accountLinks;
 
     public WebhookIngestionService(
-            WebhookEventRepository repository, NormalizedTransactionService transactions) {
+            WebhookEventRepository repository, NormalizedTransactionService transactions,
+            AccountLinkService accountLinks) {
         this.repository = repository;
         this.transactions = transactions;
+        this.accountLinks = accountLinks;
     }
 
     @Transactional
@@ -94,7 +98,8 @@ public class WebhookIngestionService {
     public void process(Long eventId) {
         repository.findById(eventId).ifPresent(event -> {
             try {
-                transactions.normalizeAndSave(event);
+                NormalizedTransactionEntity movement = transactions.normalizeAndSave(event);
+                accountLinks.deliver(movement);
                 event.setProcessingStatus("PROCESSED");
                 event.setProcessedAt(Instant.now());
             } catch (Exception error) {
