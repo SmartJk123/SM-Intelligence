@@ -1,8 +1,9 @@
 // First-time account setup component.
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { BankLogo } from './bank-logo';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AccountApi, AccountDetails } from './account-api';
 
 @Component({
@@ -26,8 +27,8 @@ import { AccountApi, AccountDetails } from './account-api';
         @if (saved()) {
           <div class="success">
             <span class="success-icon">✓</span>
-            <h2>Your bank account is ready</h2>
-            <p>Your account details have been saved.</p>
+            <h2>Your account is saved</h2>
+            <p>Your manual balance snapshot is ready. Live bank syncing is not connected.</p>
             <div class="account-summary">
               <app-bank-logo [bank]="summary().bank" />
               <div>
@@ -43,7 +44,11 @@ import { AccountApi, AccountDetails } from './account-api';
           </div>
         } @else {
           <h2>Add your bank account</h2>
-          <p class="muted">Add your first bank account. You can add more after setup.</p>
+          <p class="muted">Save at least one account to unlock your dashboard. Enter a manual balance snapshot; this does not connect to your bank.</p>
+          @if (api.accountsError()) {
+            <p role="alert" class="alert">{{ api.accountsError() }}</p>
+            <button type="button" class="button secondary" (click)="retryAccounts()">Retry loading accounts</button>
+          }
           <form [formGroup]="form" (ngSubmit)="save()" novalidate>
             <fieldset class="bank-options">
               <legend>Select bank</legend>
@@ -147,7 +152,8 @@ import { AccountApi, AccountDetails } from './account-api';
 // Validates bank/account details before sending them to AccountApi.
 export class Setup {
   private fb = inject(FormBuilder);
-  private api = inject(AccountApi);
+  readonly api = inject(AccountApi);
+  private router = inject(Router);
   readonly today = new Date().toLocaleDateString('en-CA');
   readonly banks = ['KCB', 'Equity', 'NCBA', 'Stanbic'];
   readonly saved = signal(false);
@@ -156,7 +162,7 @@ export class Setup {
   readonly summary = signal({ bank: '', name: '', lastFour: '', type: 'debit' });
   readonly form = this.fb.nonNullable.group({
     bank: ['KCB', Validators.required],
-    accountName: [this.defaultName('KCB'), [Validators.required, Validators.pattern(/.*\S.*/)]],
+    accountName: [this.defaultName('KCB'), [Validators.required, Validators.maxLength(150), Validators.pattern(/.*\S.*/)]],
     accountNumber: ['', [Validators.required, Validators.pattern(/^\d{4,34}$/)]],
     cardType: ['debit' as 'debit' | 'credit'],
     balance: [
@@ -167,6 +173,10 @@ export class Setup {
   });
   defaultName(bank: string) {
     return bank + (this.api.kind() === 'organization' ? ' Business Account' : ' Personal Account');
+  }
+  async retryAccounts() {
+    await this.api.refreshAccounts();
+    if (this.api.setupCompleted()) await this.router.navigate(['/dashboard']);
   }
   chooseBank(bank: string) {
     if (!this.form.controls.accountName.dirty)
@@ -213,8 +223,13 @@ export class Setup {
       });
       this.form.controls.accountNumber.reset('');
       this.saved.set(true);
-    } catch {
-      this.error.set('We could not save your account. Please try again. Your details remain here.');
+    } catch (error) {
+      this.error.set(error instanceof HttpErrorResponse && error.status === 409
+        ? 'This account is already saved. Reload your accounts to continue.'
+        : 'We could not save your account. Please try again. Your details remain here.');
+      if (error instanceof HttpErrorResponse && error.status === 409) {
+        this.api.accountsError.set('This account is already saved. Retry loading accounts to continue.');
+      }
     } finally {
       this.pending.set(false);
     }

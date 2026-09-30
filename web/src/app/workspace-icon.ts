@@ -2,6 +2,7 @@
 import { Component, input } from '@angular/core';
 
 const paths: Record<string,string> = {
+  invoices: 'M5 3h10l4 4v14H5z M14 3v5h5 M8 12h8 M8 16h5',
   'content-budget': 'M3 9h18v12H3z M7 9V5h10v4 M9 5V2h6v3 M3 14h18 M9 17h6 M12 11v6',
   'content-attention': 'M12 3l10 18H2z M12 9v5 M12 17h.1',
   'content-forecast': 'M3 6h18v15H3z M7 3v6 M17 3v6 M3 11h18 M6 18l4-4 4 2 4-3 M15 13h3v3',
