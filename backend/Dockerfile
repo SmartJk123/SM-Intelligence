@@ -16,6 +16,7 @@ COPY investments-service/pom.xml investments-service/
 COPY forecasts-service/pom.xml forecasts-service/
 COPY notifications-service/pom.xml notifications-service/
 COPY audit-service/pom.xml audit-service/
+COPY bank-integration-service/pom.xml bank-integration-service/
 
 # Cache Maven dependencies
 RUN mvn dependency:go-offline -B || true
@@ -23,15 +24,15 @@ RUN mvn dependency:go-offline -B || true
 # Copy the full source trees
 COPY . .
 
-# Which service to build (passed as build argument: e.g. identity-service)
-ARG SERVICE
+# Which service to build (default: bank-integration-service)
+ARG SERVICE=bank-integration-service
 RUN mvn clean package -pl ${SERVICE} -am -DskipTests
 
 # Stage 2: Production JRE image
 FROM eclipse-temurin:25-jre
 WORKDIR /app
 
-ARG SERVICE
+ARG SERVICE=bank-integration-service
 COPY --from=builder /workspace/${SERVICE}/target/*.jar app.jar
 
 # Run as non-root user
