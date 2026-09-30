@@ -16,6 +16,69 @@ async function fixture(fetchAuth) {
 }
 const input = { name: ' Team Member ', email: 'MEMBER@example.invalid', phone: ' +254700000000 ', password: 'ValidPassword123!', kind: 'organization' };
 
+test('accounts proxy uses the verified session and returns persisted, masked records', async () => {
+  let saved = []; const token = jwt();
+  const fx = await fixture(async (url, init) => {
+    if (url.pathname.endsWith('/me')) return Response.json(profile);
+    if (url.pathname.endsWith('/login')) return Response.json({ token, userId });
+    assert.equal(init.headers.Authorization, 'Bearer ' + token);
+    assert.equal(url.search, '');
+    if (init.method === 'POST') {
+      assert.equal(url.pathname, '/api/accounts/manual');
+      const value = JSON.parse(init.body);
+      assert.equal(value.accountNumber, '12345678');
+      saved = [{id:userId, userId, providerAccountId:'private-fingerprint', accountName:value.accountName,
+        institution:'KCB', maskedIdentifier:'•••• 5678', accountType:'DEPOSIT', currency:'KES',
+        availableBalance:10, creditOutstanding:0, accountStatus:'ACTIVE'}];
+      return Response.json(saved[0], {status:201});
+    }
+    return Response.json(saved);
+  });
+  try {
+    assert.equal((await fx.call('/api/accounts')).status, 401);
+    const login = await fx.call('/api/auth/login', input); const cookie = login.cookie.split(';')[0];
+    assert.deepEqual((await fx.call('/api/accounts', null, cookie)).body, []);
+    const result = await fx.call('/api/accounts', {accountName:'Savings', accountNumber:'12345678'}, cookie);
+    assert.equal(result.status, 201);
+    assert.equal(result.body.providerAccountId, undefined);
+    assert.equal(result.body.userId, undefined);
+    assert.equal((await fx.call('/api/accounts?userId=someone-else', null, cookie)).body[0].id, userId);
+  } finally { await fx.close(); }
+});
+
+test('invoice proxy requires a session and forwards the verified token, multipart body and document response', async () => {
+  const token = jwt(); let uploadBody;
+  const fx = await fixture(async (url, init) => {
+    if (url.pathname.endsWith('/me')) return Response.json(profile);
+    if (url.pathname.endsWith('/login')) return Response.json({ token, userId });
+    assert.equal(init.headers.Authorization, 'Bearer ' + token);
+    if (init.method === 'DELETE') {
+      assert.equal(url.pathname, '/api/invoices/' + userId);
+      return new Response(null, {status: 204});
+    }
+    if (init.method === 'POST') { uploadBody = init.body; return Response.json({ status: 'PENDING' }, { status: 201 }); }
+    if (url.pathname.endsWith('/document')) return new Response('%PDF-test', { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="invoice.pdf"' } });
+    return Response.json([]);
+  });
+  try {
+    assert.equal((await fx.call('/api/invoices')).status, 401);
+    const login = await fx.call('/api/auth/login', input);
+    const cookie = login.cookie.split(';')[0];
+    assert.deepEqual((await fx.call('/api/invoices', null, cookie)).body, []);
+    const form = new FormData(); form.append('file', new Blob(['%PDF-test'], { type: 'application/pdf' }), 'invoice.pdf');
+    const base = 'http://127.0.0.1:' + fx.server.address().port;
+    assert.equal((await fetch(base + '/api/invoices/' + userId, { method: 'DELETE' })).status, 401);
+    assert.equal((await fetch(base + '/api/invoices/' + userId, { method: 'DELETE', headers: { Cookie: cookie, Origin: 'https://untrusted.example' } })).status, 403);
+    const deletion = await fetch(base + '/api/invoices/' + userId, {method: 'DELETE', headers: {Cookie: cookie}});
+    assert.equal(deletion.status, 204);
+    assert.equal(await deletion.text(), '');
+    const response = await fetch(base + '/api/invoices', { method: 'POST', headers: { Cookie: cookie }, body: form });
+    assert.equal(response.status, 201); assert.ok(uploadBody.includes(Buffer.from('%PDF-test')));
+    const doc = await fetch(base + '/api/invoices/' + userId + '/document', { headers: { Cookie: cookie } });
+    assert.equal(doc.headers.get('content-type'), 'application/pdf'); assert.equal(await doc.text(), '%PDF-test');
+  } finally { await fx.close(); }
+});
+
 test('maps the real identity contract, validates /me, restores profile and never creates financial records', async () => {
   const calls = [];
   const fx = await fixture(async (url, init) => {
@@ -40,7 +103,6 @@ test('maps the real identity contract, validates /me, restores profile and never
     assert.ok(result.cookie.includes('HttpOnly'));
     const cookie = result.cookie.split(';')[0];
     assert.equal((await fx.call('/api/auth/session', null, cookie)).body.user.name, profile.name);
-    assert.equal((await fx.call('/api/accounts', { accountName: 'No temporary account' }, cookie)).status, 501);
     assert.equal((await fx.call('/api/workspace', null, cookie)).status, 501);
     assert.equal((await fx.call('/api/auth/login', { email: input.email, password: 'wrong' })).status, 401);
     assert.equal((await fx.call('/api/auth/logout', {}, cookie, 'https://untrusted.example')).status, 403);
@@ -76,5 +138,61 @@ test('session refresh rejects a revoked backend token', async () => {
     const result = await fx.call('/api/auth/session', null, login.cookie.split(';')[0]);
     assert.equal(result.status,401);
     assert.ok(result.cookie.includes('Max-Age=0'));
+  } finally { await fx.close(); }
+});
+
+const accountId = '87654321-4321-4321-8321-abcdef123456';
+
+test('builds the Financial Overview from accounts-service and transactions-service', async () => {
+  const fx = await fixture(async (url) => {
+    if (url.pathname.endsWith('/me')) return Response.json(profile);
+    if (url.pathname === '/api/auth/login') return Response.json({ token: jwt(), userId });
+    if (url.pathname === '/api/accounts') {
+      assert.equal(url.searchParams.get('userId'), userId);
+      return Response.json([{
+        id: accountId, institution: 'KCB', accountName: 'Everyday', maskedIdentifier: '••1234',
+        accountType: 'DEPOSIT', availableBalance: '1000.00', creditOutstanding: '0.00',
+      }]);
+    }
+    if (url.pathname === '/api/transactions') {
+      assert.equal(url.searchParams.get('accountId'), accountId);
+      return Response.json([{
+        id: 'tx-1', accountId, amount: '250.00', transactionType: 'CREDIT', status: 'POSTED',
+        // A fixed point safely in the past: sendDashboard captures `to = new Date()`
+        // before this mock ever runs, so a transactionDate of "right now" can
+        // flakily land a few ms after `to` and get excluded from the period.
+        description: 'Salary', counterparty: 'Employer', transactionDate: new Date(Date.now() - 60000).toISOString(),
+      }]);
+    }
+    throw new Error('unexpected call to ' + url.pathname);
+  });
+  try {
+    const login = await fx.call('/api/auth/login', input);
+    const cookie = login.cookie.split(';')[0];
+    const result = await fx.call('/api/dashboard?days=30', null, cookie);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.source, 'live');
+    assert.equal(result.body.accounts.length, 1);
+    assert.equal(result.body.accounts[0].availableBalanceMinor, 100000);
+    assert.equal(result.body.summary.moneyInMinor, 25000);
+    assert.equal(result.body.summary.moneyOutMinor, 0);
+    assert.equal(result.body.transactions[0].description, 'Salary');
+    assert.equal(result.body.transactionCount, 1);
+  } finally { await fx.close(); }
+});
+
+test('dashboard requires a session and never invents data when downstream is unreachable', async () => {
+  const anon = await fixture(async () => { throw new Error('should not be called'); });
+  try { assert.equal((await anon.call('/api/dashboard')).status, 401); } finally { await anon.close(); }
+
+  const fx = await fixture(async (url) => {
+    if (url.pathname.endsWith('/me')) return Response.json(profile);
+    if (url.pathname === '/api/auth/login') return Response.json({ token: jwt(), userId });
+    throw new Error('offline');
+  });
+  try {
+    const login = await fx.call('/api/auth/login', input);
+    const cookie = login.cookie.split(';')[0];
+    assert.equal((await fx.call('/api/dashboard', null, cookie)).status, 503);
   } finally { await fx.close(); }
 });
