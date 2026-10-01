@@ -32,6 +32,8 @@ export interface BankHealth {
   notificationsTotal: number;
   /** Notifications delivered since midnight UTC. */
   notificationsToday: number;
+  /** True when this repository implements the bank at all. */
+  connectorImplemented: boolean;
   checkedAt: string | null;
 }
 

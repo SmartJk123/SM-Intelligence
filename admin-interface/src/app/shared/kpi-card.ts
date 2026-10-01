@@ -17,10 +17,10 @@ const ACCENTS: Record<AccentColor, AccentTokens> = {
 };
 
 const DEFAULT_ICONS: Record<AccentColor, string> = {
-  blue: '◈',
-  green: '◉',
-  gold: '⬡',
-  red: '⚠',
+  blue: 'analytics',
+  green: 'check_circle',
+  gold: 'hexagon',
+  red: 'warning',
 };
 
 /**
@@ -47,10 +47,10 @@ const DEFAULT_ICONS: Record<AccentColor, string> = {
           <app-action-menu [items]="menuItems()" (chosen)="menuAction.emit($event)" />
         } @else if (icon()) {
           <span
-            class="icon-tile w-8 h-8 text-[13px]"
+            class="icon-tile w-8 h-8"
             [style.background]="accent().soft"
             [style.color]="accent().ink"
-          >{{ glyph() }}</span>
+          ><span class="icon icon-sm">{{ glyph() }}</span></span>
         }
       </div>
 
@@ -61,8 +61,8 @@ const DEFAULT_ICONS: Record<AccentColor, string> = {
       @if (trend() || sub()) {
         <div class="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px]">
           @if (trend()) {
-            <span class="font-semibold" [style.color]="trendColor()">
-              {{ trendUp() ? '↑' : '↓' }} {{ trend() }}
+            <span class="font-semibold inline-flex items-center gap-0.5" [style.color]="trendColor()">
+              <span class="icon icon-sm">{{ trendUp() ? 'arrow_upward' : 'arrow_downward' }}</span> {{ trend() }}
             </span>
           }
           @if (sub()) {

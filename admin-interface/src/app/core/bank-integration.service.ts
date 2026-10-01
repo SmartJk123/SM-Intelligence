@@ -311,6 +311,7 @@ function fallbackHealth(bankId: string): BankHealth {
     errorsLast24h: 0,
     notificationsTotal: 0,
     notificationsToday: 0,
+    connectorImplemented: false,
     checkedAt: null,
   };
 }

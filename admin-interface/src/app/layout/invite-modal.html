@@ -11,7 +11,7 @@
             An invite link with login credentials will be sent via email.
           </p>
         </div>
-        <button type="button" (click)="closed.emit()" class="text-xl leading-none" style="color: var(--text-3)">✕</button>
+        <button type="button" (click)="closed.emit()" style="color: var(--text-3)"><span class="icon icon-lg">close</span></button>
       </div>
 
       <div class="space-y-3">
@@ -105,7 +105,7 @@
         <div
           class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"
           style="background: var(--green-soft); color: var(--green)"
-        >✓</div>
+        ><span class="icon icon-lg">check</span></div>
         <h3 class="text-base font-bold mb-1 font-display" style="color: var(--text-1)">Invite Sent!</h3>
         <p class="text-[13px] mb-4" style="color: var(--text-2)">
           An invitation email has been sent to <strong>{{ email() }}</strong> with a temporary username and password.

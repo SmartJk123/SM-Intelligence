@@ -236,11 +236,11 @@ export class BankIntegrations {
       return;
     }
     if (outcomes.length === 0) {
-      this.toasts.show(
-        'Not supported yet',
-        'warning',
-        `${bank.name} registration is not implemented.`,
-      );
+      const message =
+        bank.id === 'ncba'
+          ? `${bank.name} has no registration API. Give them the webhook address from the settings panel in writing instead.`
+          : `${bank.name} registration is not implemented.`;
+      this.toasts.show(bank.id === 'ncba' ? 'No registration API' : 'Not supported yet', 'warning', message);
       return;
     }
     const accepted = outcomes.filter((outcome) => outcome.accepted);

@@ -42,13 +42,13 @@ export class Settings {
   private readonly avatarInput = viewChild<ElementRef<HTMLInputElement>>('avatarInput');
 
   protected readonly sections = [
-    { id: 'General', icon: '⊡' },
-    { id: 'Admin Profile', icon: '◉' },
-    { id: 'Security', icon: '🔒' },
-    { id: 'Roles & Permissions', icon: '◈' },
-    { id: 'Notifications', icon: '◎' },
-    { id: 'Bank Integration Settings', icon: '⬡' },
-    { id: 'System Configuration', icon: '⚙' },
+    { id: 'General', icon: 'dashboard' },
+    { id: 'Admin Profile', icon: 'person' },
+    { id: 'Security', icon: 'lock' },
+    { id: 'Roles & Permissions', icon: 'admin_panel_settings' },
+    { id: 'Notifications', icon: 'notifications' },
+    { id: 'Bank Integration Settings', icon: 'account_balance' },
+    { id: 'System Configuration', icon: 'settings' },
   ];
 
   protected readonly active = signal('General');

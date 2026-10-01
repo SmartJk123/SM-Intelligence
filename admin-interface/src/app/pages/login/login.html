@@ -110,7 +110,7 @@
                   (click)="showPassword.set(!showPassword())"
                   class="absolute right-3 top-1/2 -translate-y-1/2 text-blue-300 text-sm"
                 >
-                  {{ showPassword() ? '🙈' : '👁' }}
+                  <span class="icon icon-sm">{{ showPassword() ? 'visibility_off' : 'visibility' }}</span>
                 </button>
               </div>
             </div>
@@ -147,8 +147,8 @@
             </button>
           </form>
 
-          <p class="text-[12px] text-center text-blue-300/60">
-            🔒 Access restricted to &#64;smartmoney.io domain accounts only.
+          <p class="text-[12px] text-center text-blue-300/60 flex items-center justify-center gap-1">
+            <span class="icon icon-sm">lock</span> Access restricted to &#64;smartmoney.io domain accounts only.
           </p>
         </div>
       }

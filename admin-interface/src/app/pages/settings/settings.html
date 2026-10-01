@@ -13,7 +13,7 @@
         [style.background]="active() === section.id ? 'var(--primary)' : 'transparent'"
         [style.color]="active() === section.id ? '#fff' : 'var(--text-2)'"
       >
-        <span class="text-sm w-4 text-center leading-none">{{ section.icon }}</span>
+        <span class="icon w-5 text-center">{{ section.icon }}</span>
         {{ section.id }}
       </button>
     }
@@ -195,7 +195,7 @@
               class="flex items-center gap-3 p-4 rounded-xl mb-4"
               style="background: var(--green-soft); border: 1px solid var(--green)"
             >
-              <span style="color: var(--green)">✓</span>
+              <span class="icon" style="color: var(--green)">check_circle</span>
               <p class="text-[13px] font-medium" style="color: var(--green)">2FA is currently enabled for this account</p>
             </div>
             <app-toggle label="Require 2FA for all admin logins" [defaultChecked]="true" />
@@ -301,7 +301,7 @@
                     [style.borderColor]="hasPermission(role, permission) ? 'var(--green)' : 'var(--border)'"
                     [style.color]="hasPermission(role, permission) ? 'var(--green)' : 'var(--text-3)'"
                   >
-                    {{ hasPermission(role, permission) ? '✓' : '○' }} {{ permission }}
+                    <span class="icon icon-sm">{{ hasPermission(role, permission) ? 'check' : 'radio_button_unchecked' }}</span> {{ permission }}
                   </span>
                 }
               </div>

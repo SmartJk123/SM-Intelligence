@@ -128,10 +128,10 @@ export class Dashboard {
   });
 
   protected readonly quickActions: QuickAction[] = [
-    { id: 'banks', label: 'Banks', icon: '⬡', bg: 'var(--primary-soft)', fg: 'var(--primary-ink)' },
-    { id: 'reconcile', label: 'Reconcile', icon: '⊕', bg: 'var(--green-soft)', fg: 'var(--green-ink)' },
-    { id: 'notifications', label: 'Alerts', icon: '◎', bg: 'var(--gold-soft)', fg: 'var(--gold-ink)' },
-    { id: 'reports', label: 'Reports', icon: '▦', bg: 'var(--violet-soft)', fg: 'var(--violet-ink)' },
+    { id: 'banks', label: 'Banks', icon: 'account_balance', bg: 'var(--primary-soft)', fg: 'var(--primary-ink)' },
+    { id: 'reconcile', label: 'Reconcile', icon: 'rule', bg: 'var(--green-soft)', fg: 'var(--green-ink)' },
+    { id: 'notifications', label: 'Alerts', icon: 'notifications', bg: 'var(--gold-soft)', fg: 'var(--gold-ink)' },
+    { id: 'reports', label: 'Reports', icon: 'grid_view', bg: 'var(--violet-soft)', fg: 'var(--violet-ink)' },
   ];
 
   protected receivedTime(event: PlatformEvent): string {

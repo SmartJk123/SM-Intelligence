@@ -9,7 +9,7 @@
     aria-label="Open navigation"
     class="lg:hidden w-10 h-10 rounded-full flex items-center justify-center border flex-shrink-0"
     style="border-color: var(--border); color: var(--text-2)"
-  >☰</button>
+  ><span class="icon">menu</span></button>
 
   <!-- Page title -->
   <div class="flex-1 min-w-0">
@@ -44,7 +44,7 @@
     class="w-10 h-10 rounded-full flex items-center justify-center border flex-shrink-0 transition-all hover:opacity-80"
     style="border-color: var(--border); color: var(--text-2); background: var(--surface)"
   >
-    {{ theme() === 'dark' ? '☀' : '☾' }}
+    <span class="icon icon-lg">{{ theme() === 'dark' ? 'light_mode' : 'dark_mode' }}</span>
   </button>
 
   <!-- Notifications -->
@@ -56,7 +56,7 @@
       class="relative w-10 h-10 rounded-full flex items-center justify-center border transition-all hover:opacity-80"
       style="border-color: var(--border); color: var(--text-2); background: var(--surface)"
     >
-      <span class="text-[15px]">🔔</span>
+      <span class="icon">notifications</span>
       @if (unread() > 0) {
         <span
           class="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
@@ -93,7 +93,7 @@
         </span>
         <span class="block text-[11px] truncate" style="color: var(--text-3)">{{ profile.role() }}</span>
       </span>
-      <span class="text-[10px]" style="color: var(--text-3)">▾</span>
+      <span class="icon icon-sm" style="color: var(--text-3)">expand_more</span>
     </button>
 
     @if (showProfileMenu()) {
