@@ -1,8 +1,9 @@
 // Authenticated workspace layout and navigation shared by all customer-facing finance pages.
 import { WorkspaceIcon } from './workspace-icon';
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AccountApi } from './account-api';
+import { LiveUpdates } from './live-updates';
 
 // Single source of truth for authenticated navigation labels and routes.
 export const workspaceLinks = [
@@ -81,8 +82,8 @@ export const workspaceLinks = [
         </nav>
         <div>
           <span class="ws-currency">KES</span
-          ><a routerLink="/notifications" aria-label="Open notifications"
-            >Notifications <app-workspace-icon name="notifications" /></a
+          ><a routerLink="/notifications" class="ws-notif-link" aria-label="Open notifications" (click)="live.markAllRead()"
+            >Notifications <app-workspace-icon name="notifications" />@if (live.unreadCount(); as count) {<span class="ws-notif-badge">{{ count > 9 ? '9+' : count }}</span>}</a
           ><a class="ws-avatar" routerLink="/settings" [attr.title]="api.displayName() || 'Profile and settings'" aria-label="Open profile and settings">{{ api.initials() }}</a>
         </div>
       </header>
@@ -111,13 +112,20 @@ export const workspaceLinks = [
   </div>`,
 })
 
-export class WorkspaceShell {
+export class WorkspaceShell implements OnInit, OnDestroy {
   readonly links = workspaceLinks;
   readonly api = inject(AccountApi);
+  readonly live = inject(LiveUpdates);
   private router = inject(Router);
   readonly menu = signal(false);
   readonly pending = signal(false);
   readonly error = signal('');
+  ngOnInit() {
+    this.live.connect();
+  }
+  ngOnDestroy() {
+    this.live.disconnect();
+  }
   closeMenu() {
     this.menu.set(false);
     document.getElementById('ws-menu-trigger')?.focus();
@@ -125,6 +133,7 @@ export class WorkspaceShell {
   async logout() {
     this.pending.set(true);
     try {
+      this.live.disconnect();
       await this.api.logout();
       await this.router.navigateByUrl('/login');
     } catch {

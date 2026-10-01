@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { WebSocketServer } from 'ws';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const toMinor = (amount) => Math.round(Number(amount) * 100);
@@ -288,5 +289,74 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       return send(503, { error: 'Identity service unavailable. Please retry.' });
     }
   });
+  // Live balance and transaction updates, so money in/out and the topbar
+  // notification badge appear without the customer refreshing the page.
+  // Polls rather than being pushed by bank-integration-service directly,
+  // so this adapter needs no new inbound route from the backend to work.
+  const wss = new WebSocketServer({ noServer: true });
+  const socketsByUser = new Map();
+  const seenTransactionsByUser = new Map();
+  server.on('upgrade', (req, socket, head) => {
+    const url = new URL(req.url, 'http://localhost');
+    if (url.pathname !== '/api/ws') { socket.destroy(); return; }
+    if (req.headers.origin && !allowedOrigins.includes(req.headers.origin)) { socket.destroy(); return; }
+    const sessionId = req.headers.cookie?.split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
+    const session = sessions.get(sessionId);
+    if (!session || session.expiresAt <= Date.now()) { socket.destroy(); return; }
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      ws.userId = session.userId;
+      ws.token = session.token;
+      let sockets = socketsByUser.get(session.userId);
+      if (!sockets) { sockets = new Set(); socketsByUser.set(session.userId, sockets); }
+      sockets.add(ws);
+      ws.on('close', () => {
+        sockets.delete(ws);
+        if (sockets.size === 0) { socketsByUser.delete(session.userId); seenTransactionsByUser.delete(session.userId); }
+      });
+    });
+  });
+
+  async function pollForUpdates() {
+    for (const [userId, sockets] of socketsByUser) {
+      if (sockets.size === 0) continue;
+      const token = sockets.values().next().value.token;
+      try {
+        const accountsResponse = await call('/api/accounts?userId=' + encodeURIComponent(userId), {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!accountsResponse.ok) continue;
+        const accounts = await accountsResponse.json();
+        const firstPoll = !seenTransactionsByUser.has(userId);
+        const seen = seenTransactionsByUser.get(userId) ?? new Set();
+        seenTransactionsByUser.set(userId, seen);
+        for (const account of accounts) {
+          const txResponse = await call('/api/transactions?accountId=' + encodeURIComponent(account.id));
+          if (!txResponse.ok) continue;
+          const transactions = await txResponse.json();
+          for (const tx of transactions) {
+            if (seen.has(tx.id)) continue;
+            seen.add(tx.id);
+            // The backlog on first connect is not "new": only notify for a
+            // transaction that arrives while this socket is actually open.
+            if (firstPoll) continue;
+            const message = JSON.stringify({
+              type: 'transaction',
+              accountId: account.id,
+              direction: tx.transactionType,
+              amountMinor: toMinor(tx.amount),
+              description: tx.counterparty || tx.description || 'Transaction',
+              date: tx.transactionDate,
+            });
+            for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(message);
+          }
+        }
+      } catch {
+        // Try again on the next tick; a single failed poll should not drop the connection.
+      }
+    }
+  }
+  const pollTimer = setInterval(pollForUpdates, 8000);
+  server.on('close', () => clearInterval(pollTimer));
+
   return server.listen(port, '127.0.0.1');
 }

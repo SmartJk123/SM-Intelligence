@@ -1,12 +1,13 @@
 // Customer financial overview.
 import { WorkspaceIcon } from './workspace-icon';
 import { CategoryChart, FinanceChart } from './finance-chart';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 import { BankLogo } from './bank-logo';
 import { AccountApi } from './account-api';
+import { LiveUpdates } from './live-updates';
 import { RouterLink } from '@angular/router';
 
 interface Account {
@@ -312,8 +313,15 @@ export class Dashboard {
     this.bank.set(bank);
     void this.load();
   }
+  private readonly live = inject(LiveUpdates);
   constructor() {
     void this.load();
+    // A transaction arriving for this customer while the page is open means
+    // the figures on screen are stale; reload rather than wait for a manual refresh.
+    effect(() => {
+      if (this.live.lastUpdate() === null) return;
+      void this.load();
+    });
   }
   async load() {
     this.loading.set(true);
