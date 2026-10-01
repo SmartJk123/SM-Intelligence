@@ -123,6 +123,80 @@ async function sendDashboard(send, call, session, searchParams) {
   });
 }
 
+/**
+ * Month-over-month spending trends. A separate endpoint from the dashboard
+ * because that one caps its transaction list at 12 rows for a quick recent
+ * list; trends need every posted debit across the whole window to total
+ * correctly.
+ */
+async function sendAnalytics(send, call, session, searchParams) {
+  const months = Math.min(24, Math.max(1, parseInt(searchParams.get('months') ?? '6', 10) || 6));
+  const to = new Date();
+  const from = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth() - (months - 1), 1));
+
+  const accountsResponse = await call('/api/accounts?userId=' + encodeURIComponent(session.userId), {
+    headers: { Authorization: 'Bearer ' + session.token },
+  });
+  if (!accountsResponse.ok) return send(503, { error: 'Accounts service unavailable' });
+  const accounts = await accountsResponse.json();
+
+  const perAccountTx = await Promise.all(
+    accounts.map(async (account) => {
+      const response = await call('/api/transactions?accountId=' + encodeURIComponent(account.id));
+      return response.ok ? response.json() : [];
+    }),
+  );
+  const inPeriod = perAccountTx.flat().filter((tx) => {
+    const date = new Date(tx.transactionDate);
+    return date >= from && date <= to;
+  });
+
+  const depositAccountIds = new Set(accounts.filter((a) => a.accountType === 'DEPOSIT').map((a) => a.id));
+  const isPostedDebit = (tx) =>
+    tx.status === 'POSTED' && tx.transactionType === 'DEBIT' && depositAccountIds.has(tx.accountId);
+
+  // Transactions are stored in UTC but booked in East Africa Time (+3). A
+  // plain UTC month extraction misfiles anything booked in the first three
+  // hours of a month into the previous one (midnight EAT on the 1st is
+  // 21:00 UTC on the last day before it), so shift before reading the month.
+  const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
+  const monthKey = (date) => new Date(date.getTime() + EAT_OFFSET_MS).toISOString().slice(0, 7);
+  const monthKeys = [];
+  for (let m = new Date(from); m <= to; m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1))) {
+    monthKeys.push(monthKey(m));
+  }
+
+  const totalsByMonth = new Map(monthKeys.map((key) => [key, 0]));
+  const categoryTotals = new Map();
+  const categoryByMonth = new Map();
+  for (const tx of inPeriod) {
+    if (!isPostedDebit(tx)) continue;
+    const key = monthKey(new Date(tx.transactionDate));
+    const minor = toMinor(tx.amount);
+    totalsByMonth.set(key, (totalsByMonth.get(key) ?? 0) + minor);
+    const category = tx.description || 'Uncategorized';
+    categoryTotals.set(category, (categoryTotals.get(category) ?? 0) + minor);
+    if (!categoryByMonth.has(category)) categoryByMonth.set(category, new Map(monthKeys.map((k) => [k, 0])));
+    const perMonth = categoryByMonth.get(category);
+    perMonth.set(key, (perMonth.get(key) ?? 0) + minor);
+  }
+
+  return send(200, {
+    source: 'live',
+    currency: 'KES',
+    period: { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), months },
+    monthlySpending: monthKeys.map((key) => ({ month: key, spendingMinor: totalsByMonth.get(key) })),
+    categories: [...categoryTotals.entries()]
+      .map(([category, value]) => ({ category, value }))
+      .sort((a, b) => b.value - a.value),
+    categoryTrend: [...categoryByMonth.entries()].map(([category, perMonth]) => ({
+      category,
+      monthly: monthKeys.map((key) => perMonth.get(key) ?? 0),
+    })),
+    transactionCount: inPeriod.filter(isPostedDebit).length,
+  });
+}
+
 // Loopback development adapter. JWTs stay here; the browser receives an HttpOnly session cookie.
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const backend = new URL(options.identityUrl || process.env.IDENTITY_API_URL || 'http://localhost:8080');
@@ -215,6 +289,9 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       if (!session) return send(401, { error: 'Sign in required' });
       if (route === '/api/dashboard' && req.method === 'GET') {
         return await sendDashboard(send, call, session, url.searchParams);
+      }
+      if (route === '/api/analytics' && req.method === 'GET') {
+        return await sendAnalytics(send, call, session, url.searchParams);
       }
       if (route === '/api/accounts' && ['GET', 'POST'].includes(req.method)) {
         let body; let parsedBody;
