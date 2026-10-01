@@ -176,9 +176,17 @@ public class AccountLinkService {
                 throw new IllegalStateException("The amount is zero, which transactions-service does not accept");
             }
             Instant bookedAt = movement.getBookingDate() != null ? movement.getBookingDate() : movement.getCreatedAt();
-            platform.recordTransaction(link.getAccountId(), movement.getAmount(), movement.getCurrency(), type,
+            PlatformServicesClient.Recorded recorded = platform.recordTransaction(link.getAccountId(),
+                    movement.getAmount(), movement.getCurrency(), type,
                     link.getBankId() + ":" + movement.getReference(), movement.getNarration(), bookedAt,
                     counterparty(movement));
+            // Only a movement recorded for the first time should move the balance:
+            // one already present was counted when it first arrived, and moving it
+            // again on a retry would count the same money twice.
+            if (recorded == PlatformServicesClient.Recorded.CREATED) {
+                BigDecimal delta = "DEBIT".equals(type) ? movement.getAmount().negate() : movement.getAmount();
+                platform.adjustBalance(link.getAccountId(), delta);
+            }
             movement.setForwardedAt(Instant.now());
             movement.setForwardError(null);
         } catch (Exception error) {

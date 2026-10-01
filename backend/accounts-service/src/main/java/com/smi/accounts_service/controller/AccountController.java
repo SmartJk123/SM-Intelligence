@@ -1,6 +1,7 @@
 package com.smi.accounts_service.controller;
 
 import com.smi.accounts_service.dto.AccountResponse;
+import com.smi.accounts_service.dto.AdjustBalanceRequest;
 import com.smi.accounts_service.dto.CreateAccountRequest;
 import com.smi.accounts_service.dto.UpdateBalanceRequest;
 import com.smi.accounts_service.dto.UpdateStatusRequest;
@@ -91,6 +92,25 @@ public class AccountController {
         return ResponseEntity.ok(updated);
     }
 }
+
+    /**
+     * Moves the balance by a posted transaction's amount instead of replacing it,
+     * so a linked bank account's balance tracks real activity. Only
+     * bank-integration-service calls this, proven by the internal token, since
+     * nobody else should be able to move a balance without a matching transaction.
+     */
+    @RequestMapping(value = "/{id}/balance/adjust", method = RequestMethod.PATCH)
+    public ResponseEntity<AccountResponse> adjustBalance(
+            @PathVariable UUID id,
+            @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
+            @Valid @RequestBody AdjustBalanceRequest request) {
+        if (!identity.isInternalService(internalToken)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only a trusted internal service may adjust a balance directly");
+        }
+        AccountResponse updated = accountService.adjustBalance(id, request.getDelta());
+        return ResponseEntity.ok(updated);
+    }
 
     @RequestMapping(value = "/{id}/status", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<AccountResponse> updateStatus(

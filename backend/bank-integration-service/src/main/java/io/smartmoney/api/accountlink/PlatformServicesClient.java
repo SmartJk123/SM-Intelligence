@@ -2,6 +2,8 @@ package io.smartmoney.api.accountlink;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,6 +32,8 @@ import java.util.Optional;
  */
 @Component
 public class PlatformServicesClient {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformServicesClient.class);
 
     /** The outcome of recording a movement. A duplicate is success: it is already there. */
     public enum Recorded { CREATED, ALREADY_PRESENT }
@@ -127,6 +131,25 @@ public class PlatformServicesClient {
             }
             throw new IllegalStateException("transactions-service refused the movement: HTTP "
                     + error.getStatusCode().value() + " " + error.getResponseBodyAsString());
+        }
+    }
+
+    /**
+     * Moves the account's balance by delta (negative for a debit). Called only
+     * after the transaction itself is safely recorded, so this never throws: a
+     * hiccup here would otherwise mark an already-successful delivery as
+     * failed and retry it, double-recording the transaction on transactions-service
+     * being the far worse outcome. A balance that falls behind is a smaller,
+     * recoverable problem than that.
+     */
+    public void adjustBalance(String accountId, BigDecimal delta) {
+        try {
+            accounts.patch().uri("/api/accounts/{id}/balance/adjust", accountId)
+                    .contentType(MediaType.APPLICATION_JSON).header("X-Internal-Token", internalServiceToken)
+                    .body(Map.of("delta", delta))
+                    .retrieve().toBodilessEntity();
+        } catch (RestClientException error) {
+            log.warn("Could not adjust the balance for account {} by {}: {}", accountId, delta, error.getMessage());
         }
     }
 
