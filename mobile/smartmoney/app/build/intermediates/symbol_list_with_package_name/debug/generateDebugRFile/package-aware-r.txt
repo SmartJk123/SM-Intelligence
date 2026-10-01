@@ -1,5 +1,6 @@
 com.example.smartmoney
 color black
+color brand_dark_green
 color icon_background
 color purple_200
 color purple_500
@@ -7,20 +8,24 @@ color purple_700
 color teal_200
 color teal_700
 color white
+drawable app_logo
 drawable equity
 drawable ic_energy_logo
 drawable ic_launcher_background
 drawable ic_launcher_foreground
 drawable kcb
+drawable logo_composite_original
+drawable logo_left
+drawable logo_right
 drawable ncba
 drawable stanbic
-drawable system
 drawable system_logo
+drawable wallpaper_overlap
 mipmap ic_launcher
 mipmap ic_launcher_round
-mipmap system
 string app_name
 style Theme_Energy
 style Theme_Energy_Starting
 xml backup_rules
 xml data_extraction_rules
+xml file_paths

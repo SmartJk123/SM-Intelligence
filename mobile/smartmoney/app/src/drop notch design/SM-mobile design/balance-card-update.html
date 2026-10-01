@@ -1,0 +1,71 @@
+<style>
+#sm-mobile{--sm-income:light-dark(#137343,#71e2a8);--sm-expense:light-dark(#b52e43,#ff9dab)}
+#sm-mobile .balance-shell{background:var(--sm-blue);padding:15px 13px 0;border-radius:29px;position:relative;margin-bottom:34px}
+#sm-mobile .balance-inner{padding:19px 17px 20px;background:light-dark(#eaf0ff,#1c2c50);border-radius:23px;color:var(--sm-text)}
+#sm-mobile .balance-top{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+#sm-mobile .balance-top .scope-badge{font-size:10px;letter-spacing:.5px;color:var(--sm-muted);text-transform:uppercase}
+#sm-mobile .balance-value{display:flex;align-items:center;gap:9px;margin:14px 0 7px}
+#sm-mobile .balance-value h1{margin:0;font-size:32px;letter-spacing:-1.3px;white-space:nowrap}
+#sm-mobile .balance-value h1 .currency{display:block;font-size:11px;letter-spacing:1px;color:var(--sm-muted);margin-bottom:5px}
+#sm-mobile .balance-value h1 .fraction{font-size:22px;color:var(--sm-muted)}
+#sm-mobile .balance-value button{margin-top:13px;width:36px;height:36px;border-radius:12px;background:light-dark(#d8e3ff,#2c4067);display:grid;place-items:center}
+#sm-mobile .balance-value svg{width:16px;height:16px}
+#sm-mobile .balance-period{font-size:11px;color:var(--sm-muted);margin:0 0 15px}
+#sm-mobile .balance-flows{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+#sm-mobile .balance-flows>div{border-radius:13px;padding:11px 9px;background:light-dark(#f8faff,#14223d)}
+#sm-mobile .balance-flows small{font-size:11px;color:inherit}
+#sm-mobile .balance-flows strong{font-size:16px;font-weight:600;display:block;margin-top:4px}
+#sm-mobile .balance-flows .cash-in{color:var(--sm-income)}#sm-mobile .balance-flows .cash-out{color:var(--sm-expense)}
+#sm-mobile .balance-inner .sm-actions{margin-top:20px;gap:5px}#sm-mobile .balance-inner .sm-actions button{color:var(--sm-text);font-size:11px}
+#sm-mobile .balance-inner .sm-actions button span{background:#152955;color:#edf2ff;width:46px;height:46px;border:0;border-radius:15px}
+#sm-mobile .bank-filter-toggle{display:flex;align-items:center;justify-content:center;gap:9px;margin:0 auto;min-height:47px;min-width:155px;font-size:12px;color:white;position:relative;z-index:1}
+#sm-mobile .bank-filter-toggle::after{content:'';position:absolute;background:var(--sm-blue);width:52px;height:34px;border-radius:0 0 30px 30px;bottom:-14px;left:calc(50% - 26px);z-index:-1}
+#sm-mobile .bank-filter-toggle svg{width:17px;height:17px;transition:transform .15s}#sm-mobile .bank-filter-toggle[aria-expanded=true] svg{transform:rotate(180deg)}
+#sm-mobile .bank-filter-list{background:var(--sm-surface);border:1px solid var(--sm-line);border-radius:18px;padding:6px;margin:7px 0 0;position:absolute;top:100%;left:13px;right:13px;z-index:3;box-shadow:0 14px 30px #0b174430}
+#sm-mobile .bank-filter-list button{display:flex;align-items:center;justify-content:space-between;min-height:44px;width:100%;padding:10px 12px;border-radius:11px;font-size:13px}
+#sm-mobile .bank-filter-list button[aria-pressed=true]{background:var(--sm-soft);color:var(--sm-chartblue)}
+#sm-mobile .bank-filter-list small{font-size:10px}#sm-mobile .bank-filter-list button span:last-child{font-size:12px}
+#sm-mobile .sm-flow-totals>div:first-child,#sm-mobile .sm-flow-totals>div:first-child small{color:var(--sm-income)}
+#sm-mobile .sm-flow-totals>div:last-child,#sm-mobile .sm-flow-totals>div:last-child small{color:var(--sm-expense)}
+#sm-mobile .sm-key.in{background:var(--sm-income)}#sm-mobile .sm-key.out{background:var(--sm-expense)}
+#sm-mobile #sm-chart-in{stroke:var(--sm-income)}#sm-mobile #sm-chart-out{stroke:var(--sm-expense)}
+#sm-mobile .summary-flows>div:first-child{color:#adf3c7}#sm-mobile .summary-flows>div:last-child{color:#ffd1d7}
+#sm-mobile .summary-flows>div:first-child small,#sm-mobile .summary-flows>div:last-child small{color:inherit}
+@media(max-width:360px){#sm-mobile .balance-inner{padding:16px 12px}#sm-mobile .balance-shell{padding:11px 9px 0}#sm-mobile .balance-value h1{font-size:29px}#sm-mobile .balance-flows strong{font-size:14px}#sm-mobile .balance-inner .sm-actions button{font-size:10px}}
+@media(prefers-reduced-motion:reduce){#sm-mobile .bank-filter-toggle svg{transition:none}}
+</style>
+<template id="filtered-balance-template">
+ <section class="balance-shell" aria-label="Cash summary by bank">
+  <div class="balance-inner">
+   <div class="balance-top"><span>Available cash</span><span class="scope-badge">All banks</span></div>
+   <div class="balance-value"><h1><span class="currency">KES</span><span id="filtered-cash">284,650<span class="fraction">.00</span></span></h1><button id="filtered-privacy" aria-label="Hide summary amounts" aria-pressed="false"><i data-lucide="eye" aria-hidden="true"></i></button></div>
+   <p class="balance-period">4 linked accounts · This month</p>
+   <div class="balance-flows" aria-live="polite"><div class="cash-in"><small>↙ Money in</small><strong id="filtered-in">+125,000</strong></div><div class="cash-out"><small>↗ Money out</small><strong id="filtered-out">−48,350</strong></div></div>
+   <div class="sm-actions" id="filtered-actions"></div>
+  </div>
+  <button class="bank-filter-toggle" aria-expanded="false" aria-controls="balance-bank-filters"><span>All banks</span><i data-lucide="chevron-down" aria-hidden="true"></i></button>
+  <div id="balance-bank-filters" class="bank-filter-list" role="group" aria-label="Filter cash summary by bank" hidden>
+   <button data-balance-bank="All banks" aria-pressed="true"><span>All banks<small>Combined overview</small></span><span>✓</span></button>
+   <button data-balance-bank="KCB" aria-pressed="false"><span>KCB</span><span></span></button>
+   <button data-balance-bank="NCBA" aria-pressed="false"><span>NCBA</span><span></span></button>
+   <button data-balance-bank="Stanbic" aria-pressed="false"><span>Stanbic</span><span></span></button>
+   <button data-balance-bank="Equity" aria-pressed="false"><span>Equity</span><span></span></button>
+  </div>
+ </section>
+</template>
+<script>
+(()=>{
+const root=document.getElementById('sm-mobile'),q=s=>root.querySelector(s),old=q('.sm-slider');
+const actions=q('.sm-hero .sm-actions');const fragment=document.getElementById('filtered-balance-template').content.cloneNode(true);
+old.before(fragment);q('#filtered-actions').replaceWith(actions);old.remove();q('.slide-controls').remove();
+const data={'All banks':[284650,125000,48350],KCB:[142500,85000,25000],NCBA:[86150,20000,10000],Stanbic:[36000,15000,6500],Equity:[20000,5000,6850]};let selected='All banks',privateMode=false;
+const toggle=q('.bank-filter-toggle'),list=q('#balance-bank-filters');
+function close(){list.hidden=true;toggle.setAttribute('aria-expanded','false')}
+toggle.onclick=()=>{list.hidden=!list.hidden;toggle.setAttribute('aria-expanded',String(!list.hidden))};
+function update(){const [cash,moneyIn,moneyOut]=data[selected],fmt=n=>n.toLocaleString('en-KE');q('#filtered-cash').innerHTML=privateMode?'••••••':fmt(cash)+'<span class="fraction">.00</span>';q('#filtered-in').textContent=privateMode?'••••':'+'+fmt(moneyIn);q('#filtered-out').textContent=privateMode?'••••':'−'+fmt(moneyOut);q('.scope-badge').textContent=selected;q('.balance-period').textContent=(selected==='All banks'?'4 linked accounts':selected+' account')+' · This month';toggle.querySelector('span').textContent=selected;list.querySelectorAll('button').forEach(b=>{const active=b.dataset.balanceBank===selected;b.setAttribute('aria-pressed',String(active));b.lastElementChild.textContent=active?'✓':''})}
+list.querySelectorAll('button').forEach(b=>b.onclick=()=>{selected=b.dataset.balanceBank;update();close();toggle.focus()});
+q('#filtered-privacy').onclick=()=>{privateMode=!privateMode;q('#filtered-privacy').setAttribute('aria-pressed',String(privateMode));q('#filtered-privacy').setAttribute('aria-label',privateMode?'Show summary amounts':'Hide summary amounts');update()};
+root.addEventListener('click',e=>{if(!e.target.closest('.balance-shell'))close()});root.addEventListener('keydown',e=>{if(e.key==='Escape'&&!list.hidden){close();toggle.focus()}});
+if(globalThis.lucide)lucide.createIcons({attrs:{width:18,height:18}});update();
+})();
+</script>

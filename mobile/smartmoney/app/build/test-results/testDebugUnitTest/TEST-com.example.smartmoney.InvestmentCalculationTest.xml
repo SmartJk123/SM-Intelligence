@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.smartmoney.InvestmentCalculationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-21T07:26:09.437Z" hostname="friday" time="0.03">
+<testsuite name="com.example.smartmoney.InvestmentCalculationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-30T08:16:16.846Z" hostname="friday" time="0.007">
   <properties/>
-  <testcase name="flags_upcoming_maturity_when_maturity_date_is_within_90_days" classname="com.example.smartmoney.InvestmentCalculationTest" time="0.026"/>
+  <testcase name="flags_upcoming_maturity_when_maturity_date_is_within_90_days" classname="com.example.smartmoney.InvestmentCalculationTest" time="0.006"/>
   <testcase name="computes_portfolio_valuation_when_all_valuations_are_recorded" classname="com.example.smartmoney.InvestmentCalculationTest" time="0.0"/>
-  <testcase name="evaluates_portfolio_valuation_as_null_when_any_holding_valuation_is_unknown" classname="com.example.smartmoney.InvestmentCalculationTest" time="0.003"/>
+  <testcase name="evaluates_portfolio_valuation_as_null_when_any_holding_valuation_is_unknown" classname="com.example.smartmoney.InvestmentCalculationTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

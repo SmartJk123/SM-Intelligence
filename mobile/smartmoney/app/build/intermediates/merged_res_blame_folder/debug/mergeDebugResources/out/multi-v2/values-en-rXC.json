@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.smartmoney.app-mergeDebugResources-48:/values-en-rXC/values-en-rXC.xml",
+            "outputFile": "com.example.smartmoney.app-mergeDebugResources-51:/values-en-rXC/values-en-rXC.xml",
             "map": [
                 {
                     "source": "/home/frank/.gradle/caches/9.6.0/transforms/20feef53db92a8b6892aeb531345d075/transformed/foundation/res/values-en-rXC/values-en-rXC.xml",

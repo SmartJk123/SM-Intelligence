@@ -1,0 +1,15 @@
+-- Seed: 003_transactions.sql
+-- Sample transactions for local testing (requires existing public.accounts record)
+
+-- Example:
+-- INSERT INTO public.transactions (
+--     id, account_id, amount, transaction_type, timestamp, description, provider_transaction_id
+-- ) VALUES (
+--     '22222222-2222-2222-2222-222222222222',
+--     '11111111-1111-1111-1111-111111111111',
+--     500.0000,
+--     'CREDIT',
+--     NOW() - INTERVAL '1 day',
+--     'Tokens Purchase via M-PESA',
+--     'MPESA-QA12345678'
+-- ) ON CONFLICT (id) DO NOTHING;

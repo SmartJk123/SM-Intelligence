@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.smartmoney.BudgetCalculationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-21T07:26:09.383Z" hostname="friday" time="0.031">
+<testsuite name="com.example.smartmoney.BudgetCalculationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-30T08:16:16.824Z" hostname="friday" time="0.014">
   <properties/>
-  <testcase name="evaluates_budget_status_as_within_budget_when_under_threshold" classname="com.example.smartmoney.BudgetCalculationTest" time="0.021"/>
-  <testcase name="evaluates_budget_status_as_approaching_limit_when_threshold_reached" classname="com.example.smartmoney.BudgetCalculationTest" time="0.003"/>
-  <testcase name="evaluates_budget_status_as_over_budget_when_spent_exceeds_allocated" classname="com.example.smartmoney.BudgetCalculationTest" time="0.004"/>
+  <testcase name="evaluates_budget_status_as_within_budget_when_under_threshold" classname="com.example.smartmoney.BudgetCalculationTest" time="0.012"/>
+  <testcase name="evaluates_budget_status_as_approaching_limit_when_threshold_reached" classname="com.example.smartmoney.BudgetCalculationTest" time="0.001"/>
+  <testcase name="evaluates_budget_status_as_over_budget_when_spent_exceeds_allocated" classname="com.example.smartmoney.BudgetCalculationTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

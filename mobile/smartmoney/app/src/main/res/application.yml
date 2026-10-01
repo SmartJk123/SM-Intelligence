@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sm_intelligence
+    username: postgres
+    password: @niggasinparis254# # Use your local password
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      # Automatically generates the 'users' table from your User entity
+      ddl-auto: update
+    show-sql: true # Visibility checkpoint: logs SQL queries in your console
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true

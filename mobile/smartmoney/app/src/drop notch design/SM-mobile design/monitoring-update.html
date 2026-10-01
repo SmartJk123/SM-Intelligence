@@ -1,0 +1,17 @@
+<style>
+#sm-mobile .bank-filter-toggle{min-width:44px;width:44px;height:44px;min-height:44px;padding:0;gap:0}
+#sm-mobile .bank-filter-toggle>span{display:none}
+#sm-mobile .bank-filter-toggle svg{width:21px;height:21px}
+#sm-mobile .balance-pages{margin-top:9px;gap:10px}
+#sm-mobile .balance-inner{padding-bottom:23px}
+#sm-mobile .balance-period{min-height:18px}
+#sm-mobile .monitoring-note{font-size:10px;color:var(--sm-muted);margin:15px 0 0;text-align:center}
+</style>
+<script>
+(()=>{const root=document.getElementById('sm-mobile');root.querySelectorAll('.sm-actions').forEach(n=>n.remove());
+root.querySelectorAll('.balance-inner').forEach(n=>{const note=document.createElement('p');note.className='monitoring-note';note.textContent='Monitoring linked bank balances';n.append(note)});
+const toggle=root.querySelector('.bank-filter-toggle');toggle.setAttribute('aria-label','Filter by bank');
+// The exported page remains usable if its optional icon library is unavailable.
+const arrow=toggle.querySelector('i[data-lucide]');if(arrow){arrow.textContent='⌄';arrow.style.fontStyle='normal';arrow.style.fontSize='24px'}
+})();
+</script>

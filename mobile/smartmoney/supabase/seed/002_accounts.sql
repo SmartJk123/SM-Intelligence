@@ -1,0 +1,20 @@
+-- Seed: 002_accounts.sql
+-- Sample accounts for local testing (requires existing public.users record)
+
+-- Example:
+-- INSERT INTO public.accounts (
+--     id, user_id, account_id, account_name, institution, account_type,
+--     masked_identifier, currency, ledger_balance, available_balance, data_source
+-- ) VALUES (
+--     '11111111-1111-1111-1111-111111111111',
+--     '00000000-0000-0000-0000-000000000001',
+--     'ACC-KENYA-POWER-001',
+--     'Prepaid Electricity Meter',
+--     'Kenya Power',
+--     'UTILITY_PREPAID',
+--     '***4589',
+--     'KES',
+--     1500.0000,
+--     1500.0000,
+--     'MANUAL'
+-- ) ON CONFLICT (id) DO NOTHING;

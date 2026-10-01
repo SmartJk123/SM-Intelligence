@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.smartmoney.app-mergeDebugResources-48:/values-v30/values-v30.xml",
+            "outputFile": "com.example.smartmoney.app-mergeDebugResources-51:/values-v30/values-v30.xml",
             "map": [
                 {
                     "source": "/home/frank/.gradle/caches/9.6.0/transforms/5146fe800fd527017f1c12dc94ab5673/transformed/material3/res/values-v30/values-v30.xml",
