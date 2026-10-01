@@ -247,7 +247,7 @@ interface DashboardData {
                 <tbody>
                   @for (tx of d.transactions; track tx.id) {
                     <tr>
-                      <td>{{ tx.date | date: 'd MMM y' : 'UTC' }}</td>
+                      <td>{{ tx.date | date: 'd MMM y' : 'UTC' }}<small>{{ tx.date | date: 'HH:mm' : 'UTC' }}</small></td>
                       <td>
                         <strong>{{ tx.description }}</strong
                         ><small>{{ tx.category }}</small>

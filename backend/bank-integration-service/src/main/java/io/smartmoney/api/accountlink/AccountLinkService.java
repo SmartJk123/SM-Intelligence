@@ -177,7 +177,8 @@ public class AccountLinkService {
             }
             Instant bookedAt = movement.getBookingDate() != null ? movement.getBookingDate() : movement.getCreatedAt();
             platform.recordTransaction(link.getAccountId(), movement.getAmount(), movement.getCurrency(), type,
-                    link.getBankId() + ":" + movement.getReference(), movement.getNarration(), bookedAt);
+                    link.getBankId() + ":" + movement.getReference(), movement.getNarration(), bookedAt,
+                    counterparty(movement));
             movement.setForwardedAt(Instant.now());
             movement.setForwardError(null);
         } catch (Exception error) {
@@ -187,6 +188,16 @@ public class AccountLinkService {
                     movement.getBankId(), movement.getReference(), message);
         }
         transactions.save(movement);
+    }
+
+    /** Who sent or received the money, as the bank named them, with their number if given. */
+    private static String counterparty(NormalizedTransactionEntity movement) {
+        String name = movement.getCounterpartyName();
+        String phone = movement.getCounterpartyPhone();
+        if (name == null || name.isBlank()) {
+            return phone;
+        }
+        return phone == null || phone.isBlank() ? name : name + " (" + phone + ")";
     }
 
     /** Credit or debit from the direction the bank gave, in whatever spelling it used. */

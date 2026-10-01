@@ -87,7 +87,7 @@ class AccountLinkTests {
         awaitStored("LINK-BEFORE-" + account);
         assertThat(movements.findFirstByBankIdAndExternalEventId("stanbic", "LINK-BEFORE-" + account).get()
                 .getAccountNumber()).isEqualTo(account);
-        verify(platform, never()).recordTransaction(any(), any(), any(), any(), any(), any(), any());
+        verify(platform, never()).recordTransaction(any(), any(), any(), any(), any(), any(), any(), any());
 
         // Linking delivers it.
         String body = mvc.perform(post("/api/v1/admin/account-links")
@@ -101,12 +101,12 @@ class AccountLinkTests {
                 .andReturn().getResponse().getContentAsString();
         long linkId = json.readTree(body).get("id").asLong();
         verify(platform).recordTransaction(eq("acc-1"), eq(new BigDecimal("2500.0000")), eq("KES"), eq("CREDIT"),
-                eq("stanbic:LINK-BEFORE-" + account), any(), any(Instant.class));
+                eq("stanbic:LINK-BEFORE-" + account), any(), any(Instant.class), any());
 
         // Arrives after: delivered as it is processed.
         notify("LINK-AFTER-" + account, account, "300.00");
         verify(platform, timeout(5000)).recordTransaction(eq("acc-1"), any(), any(), eq("CREDIT"),
-                eq("stanbic:LINK-AFTER-" + account), any(), any());
+                eq("stanbic:LINK-AFTER-" + account), any(), any(), any());
 
         // The same account cannot be linked twice.
         mvc.perform(post("/api/v1/admin/account-links")
@@ -130,7 +130,7 @@ class AccountLinkTests {
         String userId = UUID.randomUUID().toString();
         when(platform.ensureAccount(any(), any(), eq(account), any())).thenReturn("acc-2");
         doThrow(new IllegalStateException("transactions-service is down"))
-                .when(platform).recordTransaction(eq("acc-2"), any(), any(), any(), any(), any(), any());
+                .when(platform).recordTransaction(eq("acc-2"), any(), any(), any(), any(), any(), any(), any());
 
         notify("OUTAGE-" + account, account, "100.00");
         awaitStored("OUTAGE-" + account);
@@ -149,7 +149,7 @@ class AccountLinkTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pendingDeliveries").value(0));
         verify(platform).recordTransaction(eq("acc-2"), any(), any(), eq("CREDIT"), eq("stanbic:OUTAGE-" + account),
-                any(), any());
+                any(), any(), any());
     }
 
     @Test

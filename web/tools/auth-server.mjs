@@ -78,10 +78,12 @@ async function sendDashboard(send, call, session, searchParams) {
     .map((tx) => ({
       id: tx.id,
       accountId: tx.accountId,
-      description: tx.description || tx.counterparty || 'Transaction',
-      // Placeholder: categories-service is not wired up yet, so the
-      // counterparty stands in for a real category name.
-      category: tx.counterparty || 'Uncategorized',
+      // The bank's counterparty (who sent or received the money) is the
+      // headline; its own narrative/reference is the detail line beneath it.
+      description: tx.counterparty || tx.description || 'Transaction',
+      // Placeholder: categories-service is not wired up yet, so the bank's
+      // narrative stands in for a real category name.
+      category: tx.description || 'Uncategorized',
       direction: tx.transactionType,
       amountMinor: toMinor(tx.amount),
       status: tx.status,
