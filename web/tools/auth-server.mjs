@@ -197,6 +197,60 @@ async function sendAnalytics(send, call, session, searchParams) {
   });
 }
 
+/**
+ * Budget limits plus how much of each has actually been spent this calendar
+ * month. budgets-service only stores the limit; this combines it with the
+ * same posted-debit totals the dashboard and analytics use, so "spent" always
+ * means the same thing everywhere in the app.
+ */
+async function sendBudgets(send, call, callBudgets, session) {
+  const budgetsResponse = await callBudgets('/api/budgets?userId=' + encodeURIComponent(session.userId));
+  if (!budgetsResponse.ok) return send(503, { error: 'Budgets service unavailable' });
+  const budgets = await budgetsResponse.json();
+
+  const accountsResponse = await call('/api/accounts?userId=' + encodeURIComponent(session.userId), {
+    headers: { Authorization: 'Bearer ' + session.token },
+  });
+  if (!accountsResponse.ok) return send(503, { error: 'Accounts service unavailable' });
+  const accounts = await accountsResponse.json();
+  const depositAccountIds = new Set(accounts.filter((a) => a.accountType === 'DEPOSIT').map((a) => a.id));
+
+  const to = new Date();
+  const monthStart = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
+  const perAccountTx = await Promise.all(
+    accounts.map(async (account) => {
+      const response = await call('/api/transactions?accountId=' + encodeURIComponent(account.id));
+      return response.ok ? response.json() : [];
+    }),
+  );
+  const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
+  const thisMonth = perAccountTx.flat().filter((tx) => {
+    if (tx.status !== 'POSTED' || tx.transactionType !== 'DEBIT' || !depositAccountIds.has(tx.accountId)) return false;
+    const booked = new Date(new Date(tx.transactionDate).getTime() + EAT_OFFSET_MS);
+    return booked >= monthStart;
+  });
+  const spentByCategory = new Map();
+  for (const tx of thisMonth) {
+    const category = tx.description || 'Uncategorized';
+    spentByCategory.set(category, (spentByCategory.get(category) ?? 0) + toMinor(tx.amount));
+  }
+
+  return send(200, {
+    budgets: budgets.map((b) => {
+      const spentMinor = spentByCategory.get(b.category) ?? 0;
+      const limitMinor = toMinor(b.monthlyLimit);
+      return {
+        id: b.id,
+        category: b.category,
+        monthlyLimitMinor: limitMinor,
+        spentMinor,
+        percentUsed: limitMinor > 0 ? Math.round((spentMinor / limitMinor) * 100) : 0,
+        alertThresholdPercentage: Number(b.alertThresholdPercentage ?? 85),
+      };
+    }),
+  });
+}
+
 // Loopback development adapter. JWTs stay here; the browser receives an HttpOnly session cookie.
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const backend = new URL(options.identityUrl || process.env.IDENTITY_API_URL || 'http://localhost:8080');
@@ -211,6 +265,9 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const bankIntegrationBackend = new URL(options.bankIntegrationUrl || process.env.BANK_INTEGRATION_API_URL || 'http://localhost:8090');
   if (bankIntegrationBackend.protocol !== 'https:' && !(bankIntegrationBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(bankIntegrationBackend.hostname)))
     throw new Error('Bank integration API requires HTTPS, except on loopback.');
+  const budgetsBackend = new URL(options.budgetsUrl || process.env.BUDGETS_API_URL || 'http://localhost:8085');
+  if (budgetsBackend.protocol !== 'https:' && !(budgetsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(budgetsBackend.hostname)))
+    throw new Error('Budgets API requires HTTPS, except on loopback.');
   if (invoiceBackend.protocol !== 'https:' && !(invoiceBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(invoiceBackend.hostname)))
     throw new Error('Invoice API requires HTTPS, except on loopback.');
   if (backend.protocol !== 'https:' && !(backend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(backend.hostname)))
@@ -222,6 +279,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const cookieName = 'sm_identity_session';
   const cookie = value => cookieName + '=' + value + '; HttpOnly; SameSite=Lax; Path=/api';
   const call = (route, init) => requestBackend(new URL(route, backend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
+  const callBudgets = (route, init) => requestBackend(new URL(route, budgetsBackend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
   const publicUser = profile => ({ id: profile.id, name: profile.name, email: profile.emailAddress,
     kind: profile.accountType === 'ORGANIZATION' ? 'organization' : 'individual', setupCompleted: false });
   const validProfile = profile => profile && typeof profile.id === 'string' && /^[0-9a-f-]{36}$/i.test(profile.id)
@@ -292,6 +350,39 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       }
       if (route === '/api/analytics' && req.method === 'GET') {
         return await sendAnalytics(send, call, session, url.searchParams);
+      }
+      if (route === '/api/budgets' && req.method === 'GET') {
+        return await sendBudgets(send, call, callBudgets, session);
+      }
+      if (route === '/api/budgets' && req.method === 'POST') {
+        let raw = ''; let size = 0;
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > 4096) return send(413, { error: 'Request too large' });
+          raw += chunk;
+        }
+        let body;
+        try { body = JSON.parse(raw); } catch { return send(400, { error: 'Invalid JSON' }); }
+        if (typeof body?.category !== 'string' || !body.category.trim())
+          return send(400, { error: 'Enter a category' });
+        const limit = Number(body?.monthlyLimit);
+        if (!Number.isFinite(limit) || limit < 0) return send(400, { error: 'Enter a monthly limit of 0 or more' });
+        const response = await callBudgets('/api/budgets', {
+          method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: session.userId, category: body.category.trim(), monthlyLimit: limit }),
+        });
+        if (!response.ok) return send(response.status === 409 ? 409 : 503,
+          { error: response.status === 409 ? 'A budget for this category already exists.' : 'Unable to save the budget. Please retry.' });
+        return send(201, await response.json());
+      }
+      if (/^\/api\/budgets\/[0-9a-f-]{36}$/i.test(route) && req.method === 'DELETE') {
+        const id = route.split('/').pop();
+        const response = await callBudgets('/api/budgets/' + encodeURIComponent(id), {
+          method: 'DELETE', redirect: 'error', signal: AbortSignal.timeout(15000),
+        });
+        if (!response.ok && response.status !== 404) return send(503, { error: 'Unable to remove the budget. Please retry.' });
+        return send(204, null);
       }
       if (route === '/api/accounts' && ['GET', 'POST'].includes(req.method)) {
         let body; let parsedBody;
