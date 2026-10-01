@@ -79,3 +79,15 @@ dist/
 *.trace.db
 data/
 **/data/
+
+# ============================================================
+# Mobile & Android build outputs & local workstation configs
+# ============================================================
+.gradle/
+**/.gradle/
+build/
+**/build/
+local.properties
+**/local.properties
+*.apk
+*.aab

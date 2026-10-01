@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -79,16 +80,12 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccountsByUserId(UUID userId, String status) {
-        List<Account> accounts;
         if (userId == null) {
-            if (status != null && !status.isBlank()) {
-                accounts = accountRepository.findAll().stream()
-                    .filter(a -> a.getAccountStatus().equalsIgnoreCase(status.trim()))
-                    .collect(Collectors.toList());
-            } else {
-                accounts = accountRepository.findAll();
-            }
-        } else if (status != null && !status.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        List<Account> accounts;
+        if (status != null && !status.isBlank()) {
             accounts = accountRepository.findByUserIdAndAccountStatus(userId, status.toUpperCase());
         } else {
             accounts = accountRepository.findByUserId(userId);
