@@ -15,7 +15,7 @@ import { ToastService, ToastTone } from '../core/toast.service';
             class="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0 mt-0.5"
             [style.background]="toneBackground(toast.tone)"
             [style.color]="toneColor(toast.tone)"
-          >{{ toneIcon(toast.tone) }}</span>
+          ><span class="icon icon-sm">{{ toneIcon(toast.tone) }}</span></span>
           <div class="flex-1 min-w-0">
             <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ toast.title }}</p>
             @if (toast.detail) {
@@ -28,7 +28,7 @@ import { ToastService, ToastTone } from '../core/toast.service';
             aria-label="Dismiss"
             class="text-[13px] leading-none flex-shrink-0 mt-0.5"
             style="color: var(--text-3)"
-          >✕</button>
+          ><span class="icon icon-sm">close</span></button>
         </div>
       }
     </div>
@@ -45,9 +45,9 @@ export class ToastOutlet {
 
   protected toneIcon(tone: ToastTone): string {
     if (tone === 'success') {
-      return '✓';
+      return 'check';
     }
-    return tone === 'danger' ? '✕' : tone === 'warning' ? '!' : 'i';
+    return tone === 'danger' ? 'close' : tone === 'warning' ? 'priority_high' : 'info';
   }
 
   protected toneColor(tone: ToastTone): string {

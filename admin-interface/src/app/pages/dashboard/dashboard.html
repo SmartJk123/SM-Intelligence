@@ -60,7 +60,7 @@
             class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
             style="border-color: var(--border); color: var(--text-2)"
           >
-            <span>↻</span> Refresh
+            <span class="icon icon-sm">refresh</span> Refresh
           </button>
         </div>
 
@@ -232,10 +232,10 @@
               style="border-color: var(--border)"
             >
               <span
-                class="icon-tile w-10 h-10 text-[15px]"
+                class="icon-tile w-10 h-10"
                 [style.background]="action.bg"
                 [style.color]="action.fg"
-              >{{ action.icon }}</span>
+              ><span class="icon">{{ action.icon }}</span></span>
               <span class="text-[11px] font-medium text-center leading-tight" style="color: var(--text-2)">
                 {{ action.label }}
               </span>

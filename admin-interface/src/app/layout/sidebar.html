@@ -39,7 +39,7 @@
             (mouseleave)="isActive(item.id) ? null : hoverOut($event)"
             (click)="closed.emit()"
           >
-            <span class="w-4 text-center leading-none text-[15px] opacity-90">{{ item.icon }}</span>
+            <span class="icon w-5 text-center opacity-90">{{ item.icon }}</span>
             <span class="flex-1">{{ item.label }}</span>
             @if (item.id === 'notifications' && unread() > 0) {
               <span
@@ -64,7 +64,7 @@
       (mouseleave)="hoverOut($event)"
       (click)="closed.emit()"
     >
-      <span class="w-4 text-center leading-none text-[15px]">◎</span>
+      <span class="icon w-5 text-center">help</span>
       Help and support
     </a>
     <button

@@ -43,9 +43,9 @@ export const routes: Routes = [
       { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'invoices', title: 'Invoices | SM-Intelligence', loadComponent: () => import('./invoices').then(m => m.Invoices) },
       { path: 'transactions', title: 'Transactions | SM-Intelligence', data: { page: 'transactions' }, loadComponent: () => import('./invoices').then(m => m.Invoices) },
+      { path: 'cashflow', title: 'Cash Flow | SM-Intelligence', loadComponent: () => import('./cash-flow').then((m) => m.CashFlow) },
       ...[
         { page: 'accounts', title: 'Accounts' },
-        { page: 'cashflow', title: 'Cash Flow' },
         { page: 'budgets', title: 'Budgets' },
         { page: 'investments', title: 'Investments' },
         { page: 'analysis', title: 'Analytics' },

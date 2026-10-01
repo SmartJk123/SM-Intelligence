@@ -43,6 +43,11 @@ export class UserService {
 
   readonly users = () => this.usersState().map(toAppUser);
 
+  /** The full record behind a user id, for places that need more than the table row shows. */
+  summary(id: string): UserSummary | undefined {
+    return this.usersState().find((user) => user.id === id);
+  }
+
   readonly organisations = () => {
     const groups = new Map<string, UserSummary[]>();
     for (const user of this.usersState()) {

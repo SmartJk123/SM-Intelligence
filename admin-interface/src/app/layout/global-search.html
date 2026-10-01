@@ -10,9 +10,9 @@
   [style.color]="'var(--text-1)'"
 />
 <span
-  class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[14px] pointer-events-none"
+  class="icon icon-sm absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
   style="color: var(--text-3)"
->⌕</span>
+>search</span>
 
 @if (open() && results().length > 0) {
   <div
@@ -27,9 +27,9 @@
         style="border-color: var(--border)"
       >
         <span
-          class="icon-tile w-7 h-7 text-[12px]"
+          class="icon-tile w-7 h-7"
           style="background: var(--primary-soft); color: var(--primary-ink)"
-        >{{ result.icon }}</span>
+        ><span class="icon icon-sm">{{ result.icon }}</span></span>
         <span class="flex-1 min-w-0">
           <span class="block text-[12.5px] font-semibold truncate" style="color: var(--text-1)">{{ result.label }}</span>
           <span class="block text-[11px] truncate mt-0.5" style="color: var(--text-3)">
