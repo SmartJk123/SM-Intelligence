@@ -1,16 +1,18 @@
 package io.smartmoney.api.accountlink;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
@@ -20,8 +22,11 @@ import java.util.Optional;
 /**
  * Calls accounts-service and transactions-service, which hold what the
  * customer's web dashboard shows. They run on the same private network as
- * this service and have no authentication of their own, so they must never be
- * exposed publicly.
+ * this service, so they must never be exposed publicly. accounts-service
+ * requires every caller to be a signed-in user except this one: it trusts
+ * INTERNAL_SERVICE_TOKEN as proof this is bank-integration-service linking or
+ * closing a customer's account on their behalf, since there is no user
+ * sitting at a browser to hold a session token for that action.
  */
 @Component
 public class PlatformServicesClient {
@@ -31,15 +36,23 @@ public class PlatformServicesClient {
 
     private final RestClient accounts;
     private final RestClient transactions;
+    private final String internalServiceToken;
+    private final ObjectMapper mapper;
 
     public PlatformServicesClient(
             @Value("${smartmoney.platform-services.accounts-url:http://localhost:8082}") String accountsUrl,
-            @Value("${smartmoney.platform-services.transactions-url:http://localhost:8083}") String transactionsUrl) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(15000);
+            @Value("${smartmoney.platform-services.transactions-url:http://localhost:8083}") String transactionsUrl,
+            @Value("${INTERNAL_SERVICE_TOKEN:}") String internalServiceToken,
+            ObjectMapper mapper) {
+        // HttpURLConnection (SimpleClientHttpRequestFactory) cannot send PATCH at
+        // all, which setStatus() needs to activate or close a customer's account.
+        var factory = new JdkClientHttpRequestFactory(
+                java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
+        factory.setReadTimeout(Duration.ofSeconds(15));
         this.accounts = RestClient.builder().baseUrl(accountsUrl).requestFactory(factory).build();
         this.transactions = RestClient.builder().baseUrl(transactionsUrl).requestFactory(factory).build();
+        this.internalServiceToken = internalServiceToken;
+        this.mapper = mapper;
     }
 
     /**
@@ -58,10 +71,11 @@ public class PlatformServicesClient {
         body.put("currency", "KES");
         body.put("dataSource", "BANK_API");
         try {
-            JsonNode created = accounts.post().uri("/api/accounts")
-                    .contentType(MediaType.APPLICATION_JSON).body(body)
-                    .retrieve().body(JsonNode.class);
-            return created.path("id").asText();
+            String raw = accounts.post().uri("/api/accounts")
+                    .contentType(MediaType.APPLICATION_JSON).header("X-Internal-Token", internalServiceToken)
+                    .body(body)
+                    .retrieve().body(String.class);
+            return mapper.readTree(raw).path("id").asText();
         } catch (RestClientResponseException error) {
             if (error.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
                 throw unavailable("accounts-service refused the account: " + error.getStatusCode().value());
@@ -73,6 +87,8 @@ public class PlatformServicesClient {
             return existing;
         } catch (RestClientException error) {
             throw unavailable("accounts-service cannot be reached");
+        } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+            throw unavailable("accounts-service returned a response that could not be read");
         }
     }
 
@@ -115,8 +131,15 @@ public class PlatformServicesClient {
     }
 
     private Optional<String> findAccount(String userId, String institution, String accountNumber) {
-        JsonNode list = accounts.get().uri(uri -> uri.path("/api/accounts").queryParam("userId", userId).build())
-                .retrieve().body(JsonNode.class);
+        String raw = accounts.get().uri(uri -> uri.path("/api/accounts").queryParam("userId", userId).build())
+                .header("X-Internal-Token", internalServiceToken)
+                .retrieve().body(String.class);
+        JsonNode list;
+        try {
+            list = raw == null ? null : mapper.readTree(raw);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+            throw unavailable("accounts-service returned a response that could not be read");
+        }
         if (list == null) {
             return Optional.empty();
         }
@@ -131,7 +154,8 @@ public class PlatformServicesClient {
 
     private void setStatus(String accountId, String status) {
         accounts.patch().uri("/api/accounts/{id}/status", accountId)
-                .contentType(MediaType.APPLICATION_JSON).body(Map.of("accountStatus", status))
+                .contentType(MediaType.APPLICATION_JSON).header("X-Internal-Token", internalServiceToken)
+                .body(Map.of("accountStatus", status))
                 .retrieve().toBodilessEntity();
     }
 

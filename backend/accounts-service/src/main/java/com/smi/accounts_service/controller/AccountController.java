@@ -36,8 +36,13 @@ public class AccountController {
     }
 
     @PostMapping
-    public ResponseEntity<AccountResponse> createAccount(@RequestHeader(value="Authorization", required=false) String authorization, @Valid @RequestBody CreateAccountRequest request) {
-        request.setUserId(identity.owner(authorization));
+    public ResponseEntity<AccountResponse> createAccount(
+            @RequestHeader(value="Authorization", required=false) String authorization,
+            @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
+            @Valid @RequestBody CreateAccountRequest request) {
+        if (!identity.isInternalService(internalToken)) {
+            request.setUserId(identity.owner(authorization));
+        }
         AccountResponse created = accountService.createAccount(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -45,8 +50,11 @@ public class AccountController {
     @GetMapping
     public ResponseEntity<List<AccountResponse>> getAccounts(
             @RequestHeader(value="Authorization", required=false) String authorization,
+            @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
+            @RequestParam(required = false) String userId,
             @RequestParam(required = false) String status) {
-        List<AccountResponse> accounts = accountService.getAccountsByUserId(identity.owner(authorization), status);
+        UUID owner = identity.isInternalService(internalToken) ? UUID.fromString(userId) : identity.owner(authorization);
+        List<AccountResponse> accounts = accountService.getAccountsByUserId(owner, status);
         return ResponseEntity.ok(accounts);
     }
 
@@ -88,15 +96,21 @@ public class AccountController {
     public ResponseEntity<AccountResponse> updateStatus(
         @PathVariable String id,
         @RequestHeader(value="Authorization", required=false) String authorization,
+        @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
         @Valid @RequestBody UpdateStatusRequest request) {
-        
+        boolean internal = identity.isInternalService(internalToken);
+
     try {
         UUID uuid = UUID.fromString(id);
-        accountService.getAccountById(uuid, identity.owner(authorization));
+        if (!internal) {
+            accountService.getAccountById(uuid, identity.owner(authorization));
+        }
         AccountResponse updated = accountService.updateStatus(uuid, request);
         return ResponseEntity.ok(updated);
     } catch (IllegalArgumentException e) {
-        accountService.getAccountById(id, identity.owner(authorization));
+        if (!internal) {
+            accountService.getAccountById(id, identity.owner(authorization));
+        }
         AccountResponse updated = accountService.updateStatus(id, request);
         return ResponseEntity.ok(updated);
     }
