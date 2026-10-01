@@ -66,7 +66,7 @@ interface DashboardData {
       </header>
       <div class="dashboard-toolbar">
         <span>{{
-          api.kind() === 'organization' ? 'Organization overview' : 'Personal overview'
+          api.kind() === 'organization' ? 'Company overview' : 'Personal overview'
         }}</span>
         <label class="overview-bank">Bank
           <select [value]="bank()" (change)="changeBank($any($event.target).value)" [disabled]="loading()">

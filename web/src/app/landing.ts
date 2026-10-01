@@ -77,7 +77,7 @@ import { BankLogo } from './bank-logo';
         <article>
           <span>01</span>
           <h3>Create your account</h3>
-          <p>Choose an Individual or Organization profile and add your details.</p>
+          <p>Choose an Individual or Company profile and add your details.</p>
         </article>
         <article>
           <span>02</span>
