@@ -52,6 +52,13 @@ public class NormalizedTransactionEntity {
     @Column(name = "account_number", length = 64)
     private String accountNumber;
 
+    /** Who the money came from (credit) or went to (debit), when the bank says. */
+    @Column(name = "counterparty_name", length = 160)
+    private String counterpartyName;
+
+    @Column(name = "counterparty_phone", length = 40)
+    private String counterpartyPhone;
+
     /** Set once transactions-service has the movement for the linked customer's account. */
     @Column(name = "forwarded_at")
     private Instant forwardedAt;
@@ -92,6 +99,10 @@ public class NormalizedTransactionEntity {
     public Instant getCreatedAt() { return createdAt; }
     public String getAccountNumber() { return accountNumber; }
     public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
+    public String getCounterpartyName() { return counterpartyName; }
+    public void setCounterpartyName(String counterpartyName) { this.counterpartyName = counterpartyName; }
+    public String getCounterpartyPhone() { return counterpartyPhone; }
+    public void setCounterpartyPhone(String counterpartyPhone) { this.counterpartyPhone = counterpartyPhone; }
     public boolean isSimulated() { return simulated; }
     public void setSimulated(boolean simulated) { this.simulated = simulated; }
     public Instant getForwardedAt() { return forwardedAt; }

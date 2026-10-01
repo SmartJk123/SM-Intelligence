@@ -86,7 +86,8 @@ public class PlatformServicesClient {
     }
 
     public Recorded recordTransaction(String accountId, BigDecimal amount, String currency, String type,
-                                      String providerReference, String description, Instant bookedAt) {
+                                      String providerReference, String description, Instant bookedAt,
+                                      String counterparty) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("accountId", accountId);
         body.put("amount", amount);
@@ -96,6 +97,9 @@ public class PlatformServicesClient {
         body.put("providerReference", providerReference);
         body.put("description", description);
         body.put("transactionDate", bookedAt.atOffset(ZoneOffset.UTC).toString());
+        if (counterparty != null && !counterparty.isBlank()) {
+            body.put("counterparty", counterparty);
+        }
         try {
             transactions.post().uri("/api/transactions")
                     .contentType(MediaType.APPLICATION_JSON).body(body)

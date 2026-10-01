@@ -20,6 +20,10 @@ public class NormalizedTransactionService {
             "transactionReference", "transactionRef", "reference", "transactionID", "transactionId");
     private static final List<String> NARRATION_FIELDS = List.of("narration", "description", "remarks");
     private static final List<String> DATE_FIELDS = List.of("bookingDate", "transactionDate", "valueDate");
+    private static final List<String> COUNTERPARTY_NAME_FIELDS = List.of(
+            "customerName", "payerName", "senderName", "payeeName", "name");
+    private static final List<String> COUNTERPARTY_PHONE_FIELDS = List.of(
+            "phoneNr", "phoneNumber", "mobileNo", "msisdn");
 
     // XML aliases, which is the shape NCBA posts. The specification fixes the
     // element names, and the aliases cover the renames banks make between
@@ -32,6 +36,8 @@ public class NormalizedTransactionService {
             "Narrative", "Narration", "Description", "FtCrNarration", "CrNarration"};
     private static final String[] XML_TIME = {"TransTime", "TransactionTime", "TransDate"};
     private static final String[] XML_ACCOUNT = {"AccountNr", "AccountNumber", "AccountNo"};
+    private static final String[] XML_CUSTOMER_NAME = {"CustomerName", "PayerName", "SenderName", "Name"};
+    private static final String[] XML_PHONE = {"PhoneNr", "PhoneNumber", "MobileNo", "MSISDN"};
     // KCB names the credited account in creditAccountIdentifier.
     private static final List<String> ACCOUNT_FIELDS = List.of(
             "accountNumber", "creditAccountIdentifier", "accountNo", "account", "accountId");
@@ -97,6 +103,8 @@ public class NormalizedTransactionService {
                     text(root, NARRATION_FIELDS, null),
                     XmlFields.timestamp(text(root, DATE_FIELDS, null)));
             transaction.setAccountNumber(normalizeAccountNumber(text(root, ACCOUNT_FIELDS, null)));
+            transaction.setCounterpartyName(text(root, COUNTERPARTY_NAME_FIELDS, null));
+            transaction.setCounterpartyPhone(text(root, COUNTERPARTY_PHONE_FIELDS, null));
             return transaction;
         } catch (IllegalArgumentException error) {
             throw error;
@@ -125,6 +133,8 @@ public class NormalizedTransactionService {
                 XmlFields.first(fields, XML_NARRATIVE),
                 XmlFields.timestamp(XmlFields.first(fields, XML_TIME)));
         transaction.setAccountNumber(normalizeAccountNumber(XmlFields.first(fields, XML_ACCOUNT)));
+        transaction.setCounterpartyName(XmlFields.first(fields, XML_CUSTOMER_NAME));
+        transaction.setCounterpartyPhone(XmlFields.first(fields, XML_PHONE));
         return transaction;
     }
 

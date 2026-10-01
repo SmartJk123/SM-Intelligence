@@ -176,7 +176,8 @@ test('builds the Financial Overview from accounts-service and transactions-servi
     assert.equal(result.body.accounts[0].availableBalanceMinor, 100000);
     assert.equal(result.body.summary.moneyInMinor, 25000);
     assert.equal(result.body.summary.moneyOutMinor, 0);
-    assert.equal(result.body.transactions[0].description, 'Salary');
+    assert.equal(result.body.transactions[0].description, 'Employer');
+    assert.equal(result.body.transactions[0].category, 'Salary');
     assert.equal(result.body.transactionCount, 1);
   } finally { await fx.close(); }
 });
