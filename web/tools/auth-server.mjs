@@ -20,7 +20,9 @@ async function sendDashboard(send, call, session, searchParams) {
   if (!meResponse.ok) return send(503, { error: 'Identity service unavailable' });
   const profile = await meResponse.json();
 
-  const accountsResponse = await call('/api/accounts?userId=' + encodeURIComponent(session.userId));
+  const accountsResponse = await call('/api/accounts?userId=' + encodeURIComponent(session.userId), {
+    headers: { Authorization: 'Bearer ' + session.token },
+  });
   if (!accountsResponse.ok) return send(503, { error: 'Accounts service unavailable' });
   let accounts = await accountsResponse.json();
   if (bank) accounts = accounts.filter((a) => (a.institution ?? '').toLowerCase() === bank.toLowerCase());
