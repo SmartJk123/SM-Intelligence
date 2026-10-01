@@ -40,16 +40,16 @@ class UserServiceTest {
 
         User savedUser = new User(name, email, hashedPassword);
 
-        when(passwordEncoder.encode("rawPassword123")).thenReturn(hashedPassword);
+        when(passwordEncoder.encode(rawPassword)).thenReturn(hashedPassword);
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
-        User actualUser = userService.createUser("Jane Doe", "jane@example.com", "rawPassword123");
+        User actualUser = userService.createUser(name, email, rawPassword);
 
         assertNotNull(actualUser);
         assertEquals("jane@example.com", actualUser.getEmailAddress());
         assertNull(actualUser.getPhoneNumber());
 
-        verify(passwordEncoder, times(1)).encode("rawPassword123");
+        verify(passwordEncoder, times(1)).encode(rawPassword);
         verify(userRepository, times(1)).save(any(User.class));
     }
 
