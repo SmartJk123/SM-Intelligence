@@ -30,7 +30,8 @@ import java.util.Map;
 @RequestMapping("/api/v1/admin/account-links")
 public class AccountLinkController {
 
-    public record LinkRequest(String bankId, String accountNumber, String userId, String accountName) {
+    public record LinkRequest(String bankId, String accountNumber, String userId, String accountName,
+                              String accountId) {
     }
 
     public record LinkView(Long id, String bankId, String accountNumber, String userId, String accountId,
@@ -51,7 +52,7 @@ public class AccountLinkController {
     @PostMapping
     public ResponseEntity<LinkView> link(@RequestBody LinkRequest request, Authentication admin) {
         AccountLinkEntity link = service.link(request.bankId(), request.accountNumber(), request.userId(),
-                request.accountName(), admin == null ? null : String.valueOf(admin.getPrincipal()));
+                request.accountName(), admin == null ? null : String.valueOf(admin.getPrincipal()), request.accountId());
         return ResponseEntity.status(HttpStatus.CREATED).body(view(link));
     }
 

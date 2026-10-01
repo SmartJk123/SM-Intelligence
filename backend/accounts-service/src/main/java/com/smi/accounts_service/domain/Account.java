@@ -10,10 +10,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-import org.hibernate.annotations.JdbcTypeCode;
-
 import java.math.BigDecimal;
-import java.sql.Types;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
