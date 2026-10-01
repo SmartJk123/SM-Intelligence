@@ -79,6 +79,7 @@ public class BankIntegrationHealthService {
                 failures,
                 notifications,
                 today,
+                connector != null,
                 lastTest);
     }
 

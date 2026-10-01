@@ -22,5 +22,7 @@ public record IntegrationHealth(
         long errorsLast24h,
         long notificationsTotal,
         long notificationsToday,
+        /** True when this repository implements the bank at all (pull connector or push receiver). */
+        boolean connectorImplemented,
         Instant checkedAt) {
 }
