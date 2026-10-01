@@ -75,6 +75,21 @@ public class AccountLinkService {
 
     public AccountLinkEntity link(String bankId, String accountNumber, String userId, String accountName,
                                   String adminId) {
+        return link(bankId, accountNumber, userId, accountName, adminId, null);
+    }
+
+    /**
+     * @param existingAccountId When the caller already holds an accounts-service
+     *                          account for this customer (for example, one they
+     *                          created themselves during onboarding), pass its id
+     *                          here to link to it directly instead of creating a
+     *                          new one. Needed because a customer's self-entered
+     *                          account is stored under a hashed fingerprint, not
+     *                          the plain account number ensureAccount matches on,
+     *                          so the two would otherwise never reconcile.
+     */
+    public AccountLinkEntity link(String bankId, String accountNumber, String userId, String accountName,
+                                  String adminId, String existingAccountId) {
         String bank = bankId == null ? "" : bankId.trim().toLowerCase();
         String institution = INSTITUTIONS.get(bank);
         if (institution == null) {
@@ -104,7 +119,9 @@ public class AccountLinkService {
                     : "This account is already linked to another customer. Remove that link first.");
         }
 
-        String accountId = platform.ensureAccount(userId.trim(), institution, number, name);
+        String accountId = existingAccountId == null || existingAccountId.isBlank()
+                ? platform.ensureAccount(userId.trim(), institution, number, name)
+                : existingAccountId.trim();
         AccountLinkEntity saved = links.save(
                 new AccountLinkEntity(bank, number, userId.trim(), accountId, name, adminId));
         log.info("Linked {} account ending {} to user {}", bank, last4(number), saved.getUserId());
