@@ -53,4 +53,7 @@ public interface WebhookEventRepository extends JpaRepository<WebhookEventEntity
 
     /** The demonstration account. Selected by the flag, never by a reference. */
     List<WebhookEventEntity> findTop100BySimulatedTrueOrderByReceivedAtDesc();
+
+    /** All recent webhook events, both live and simulated. */
+    List<WebhookEventEntity> findTop100ByOrderByReceivedAtDesc();
 }
