@@ -5,6 +5,17 @@ import { WebSocketServer } from 'ws';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const toMinor = (amount) => Math.round(Number(amount) * 100);
 
+// A bank's narrative is sometimes just an account or reference number (common
+// for a self-transfer), which reads as a bug rather than a name. Swap that
+// case for the bank's name instead of showing digits where a sender name is
+// expected.
+function describedNarrative(narrative, institution) {
+  const text = (narrative ?? '').trim();
+  if (!text) return institution ? institution + ' transaction' : 'Transaction';
+  if (/^\d{5,}$/.test(text)) return institution ? institution + ' transfer' : 'Bank transfer';
+  return text;
+}
+
 /**
  * Builds the Financial Overview data from accounts-service and
  * transactions-service, through the same gateway `call` already used for
@@ -76,20 +87,25 @@ async function sendDashboard(send, call, session, searchParams) {
     .slice()
     .sort((a, b) => new Date(b.transactionDate) - new Date(a.transactionDate))
     .slice(0, 12)
-    .map((tx) => ({
-      id: tx.id,
-      accountId: tx.accountId,
-      // The bank's counterparty (who sent or received the money) is the
-      // headline; its own narrative/reference is the detail line beneath it.
-      description: tx.counterparty || tx.description || 'Transaction',
-      // Placeholder: categories-service is not wired up yet, so the bank's
-      // narrative stands in for a real category name.
-      category: tx.description || 'Uncategorized',
-      direction: tx.transactionType,
-      amountMinor: toMinor(tx.amount),
-      status: tx.status,
-      date: tx.transactionDate,
-    }));
+    .map((tx) => {
+      const institution = accounts.find((a) => a.id === tx.accountId)?.institution;
+      return {
+        id: tx.id,
+        accountId: tx.accountId,
+        // The bank's counterparty (who sent or received the money) is the
+        // headline; its own narrative/reference is the detail line beneath it.
+        // A bare reference/account number is not a name, so it falls back to
+        // the bank instead of showing digits where a person expects a name.
+        description: tx.counterparty || describedNarrative(tx.description, institution),
+        // Placeholder: categories-service is not wired up yet, so the bank's
+        // narrative stands in for a real category name.
+        category: tx.description || 'Uncategorized',
+        direction: tx.transactionType,
+        amountMinor: toMinor(tx.amount),
+        status: tx.status,
+        date: tx.transactionDate,
+      };
+    });
 
   return send(200, {
     ...(bank ? { bank } : {}),
@@ -512,7 +528,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
               accountId: account.id,
               direction: tx.transactionType,
               amountMinor: toMinor(tx.amount),
-              description: tx.counterparty || tx.description || 'Transaction',
+              description: tx.counterparty || describedNarrative(tx.description, account.institution),
               date: tx.transactionDate,
             });
             for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(message);

@@ -253,7 +253,12 @@ interface DashboardData {
                         <strong>{{ tx.description }}</strong
                         ><small>{{ tx.category }}</small>
                       </td>
-                      <td>{{ accountName(tx.accountId) }}</td>
+                      <td>
+                        <span class="transaction-account">
+                          <app-bank-logo [bank]="accountBank(tx.accountId)" />
+                          <small>{{ accountMasked(tx.accountId) }}</small>
+                        </span>
+                      </td>
                       <td>
                         <span
                           [attr.data-status]="tx.status"
@@ -382,5 +387,11 @@ export class Dashboard {
   }
   accountName(id: string) {
     return this.data()?.accounts.find((a) => a.id === id)?.accountName ?? 'Account';
+  }
+  accountBank(id: string) {
+    return this.data()?.accounts.find((a) => a.id === id)?.bank ?? '';
+  }
+  accountMasked(id: string) {
+    return this.data()?.accounts.find((a) => a.id === id)?.maskedIdentifier ?? '—';
   }
 }
