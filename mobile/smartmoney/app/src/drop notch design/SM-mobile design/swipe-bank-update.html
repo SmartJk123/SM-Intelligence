@@ -1,0 +1,30 @@
+<style>
+#sm-mobile .balance-carousel{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:23px;overscroll-behavior-x:contain;touch-action:pan-y}
+#sm-mobile .balance-carousel::-webkit-scrollbar{display:none}
+#sm-mobile .balance-carousel>.balance-inner{flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always}
+#sm-mobile .balance-pages{display:flex;justify-content:center;gap:8px;margin-top:6px}
+#sm-mobile .balance-pages button{font-size:11px;color:#dce5ff;padding:9px 12px;min-height:38px;border-radius:14px}
+#sm-mobile .balance-pages button[aria-pressed=true]{background:#ffffff20;color:#fff}
+#sm-mobile .bank-filter-toggle{min-height:39px}
+</style>
+<script>
+(()=>{
+const root=document.getElementById('sm-mobile'),q=s=>root.querySelector(s),shell=q('.balance-shell'),bankCard=q('.balance-inner'),totalCard=bankCard.cloneNode(true);
+totalCard.querySelectorAll('[id]').forEach(n=>n.id+='-total');totalCard.setAttribute('aria-label','Total cash across all banks');bankCard.setAttribute('aria-label','Selected bank cash summary');
+const originalActions=bankCard.querySelectorAll('.sm-actions button');totalCard.querySelectorAll('.sm-actions button').forEach((b,i)=>b.onclick=originalActions[i].onclick);
+const carousel=document.createElement('div');carousel.className='balance-carousel';carousel.setAttribute('aria-label','Swipe between total cash and selected bank');bankCard.before(carousel);carousel.append(totalCard,bankCard);
+const pages=document.createElement('div');pages.className='balance-pages';pages.innerHTML='<button aria-pressed="true" aria-label="Show total cash card">1 · Total cash</button><button aria-pressed="false" aria-label="Show selected bank card">2 · KCB</button>';carousel.after(pages);
+const toggle=q('.bank-filter-toggle'),list=q('#balance-bank-filters'),buttons=pages.querySelectorAll('button');const amounts={KCB:[142500,85000,25000],NCBA:[86150,20000,10000],Stanbic:[36000,15000,6500],Equity:[20000,5000,6850]};let selected='KCB',active=0,hidden=false;
+function paintAmounts(card,values){const numbers=card.querySelectorAll('.balance-flows strong');card.querySelector('.balance-value h1>span:last-child').innerHTML=hidden?'••••••':values[0].toLocaleString('en-KE')+'<span class="fraction">.00</span>';numbers[0].textContent=hidden?'••••':'+'+values[1].toLocaleString('en-KE');numbers[1].textContent=hidden?'••••':'−'+values[2].toLocaleString('en-KE');const privacy=card.querySelector('.balance-value button');privacy.setAttribute('aria-pressed',String(hidden));privacy.setAttribute('aria-label',hidden?'Show summary amounts':'Hide summary amounts')}
+function paint(){paintAmounts(totalCard,[284650,125000,48350]);paintAmounts(bankCard,amounts[selected]);bankCard.querySelector('.scope-badge').textContent=selected;bankCard.querySelector('.balance-period').textContent=selected+' account · This month';buttons[1].textContent='2 · '+selected;buttons.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===active)));toggle.querySelector('span').textContent=active?selected:'All banks';list.querySelectorAll('button').forEach(b=>{const chosen=b.dataset.balanceBank===(active?selected:'All banks');b.setAttribute('aria-pressed',String(chosen));b.lastElementChild.textContent=chosen?'✓':''});totalCard.inert=active!==0;bankCard.inert=active!==1}
+function slide(index){active=index;paint();carousel.scrollTo({left:index*(carousel.clientWidth+12),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})}
+buttons[0].onclick=()=>slide(0);buttons[1].onclick=()=>slide(1);
+let gesture=null;carousel.addEventListener('touchstart',e=>{const t=e.touches[0];gesture={x:t.clientX,y:t.clientY,index:Math.round(carousel.scrollLeft/(carousel.clientWidth+12))}},{passive:true});carousel.addEventListener('touchend',e=>{if(!gesture)return;const t=e.changedTouches[0],dx=t.clientX-gesture.x,dy=t.clientY-gesture.y;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.3)slide(Math.max(0,Math.min(1,gesture.index+(dx<0?1:-1))));gesture=null},{passive:true});carousel.addEventListener('touchcancel',()=>gesture=null,{passive:true});
+list.querySelectorAll('button').forEach(b=>b.onclick=()=>{const bank=b.dataset.balanceBank;if(bank!=='All banks')selected=bank;list.hidden=true;toggle.setAttribute('aria-expanded','false');slide(bank==='All banks'?0:1);toggle.focus({preventScroll:true});const main=root.querySelector('main');main.scrollTo({top:main.scrollTop+shell.getBoundingClientRect().top-main.getBoundingClientRect().top-12,behavior:'instant'})});
+carousel.addEventListener('scroll',()=>{const index=Math.round(carousel.scrollLeft/(carousel.clientWidth+12));if(index!==active){active=index;paint()}});
+let lastWidth=0;new ResizeObserver(()=>{if(carousel.clientWidth&&carousel.clientWidth!==lastWidth){lastWidth=carousel.clientWidth;carousel.scrollTo({left:active*(lastWidth+12),behavior:'instant'})}}).observe(carousel);
+[totalCard,bankCard].forEach(card=>card.querySelector('.balance-value button').onclick=()=>{hidden=!hidden;paint()});paint();
+})();
+</script>
+
+

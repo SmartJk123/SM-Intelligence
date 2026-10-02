@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.smartmoney.SerializationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-21T07:26:09.677Z" hostname="friday" time="0.016">
-  <properties/>
-  <testcase name="accountDto_serializes_and_deserializes_cleanly" classname="com.example.smartmoney.SerializationTest" time="0.01"/>
-  <testcase name="userDto_round_trip" classname="com.example.smartmoney.SerializationTest" time="0.002"/>
-  <testcase name="transactionDto_deserializes_from_numeric_and_string_amounts" classname="com.example.smartmoney.SerializationTest" time="0.004"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

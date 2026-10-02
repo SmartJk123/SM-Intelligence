@@ -1,0 +1,39 @@
+name: CI Quality Gate
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/**'
+
+jobs:
+  backend-gate:
+    name: Build, Test & Docker Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25 (Eclipse Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Compile and Run All Microservice Tests
+        run: |
+          cd backend
+          chmod +x mvnw
+          ./mvnw clean test --batch-mode
+
+      - name: Verify Multi-Stage Dockerfile Build
+        run: |
+          docker build -t smi-test-build backend/
