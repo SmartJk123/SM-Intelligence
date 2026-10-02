@@ -13,15 +13,21 @@ public class AuthResponse {
     private String emailAddress;
     private String phoneNumber;
     private String accountType;
+    /** USER or PLATFORM_ADMIN, so the admin interface can refuse a customer account. */
+    private String role;
 
     public AuthResponse() {
     }
 
     public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String accountType) {
-        this(token, expiresIn, userId, name, emailAddress, null, accountType);
+        this(token, expiresIn, userId, name, emailAddress, null, accountType, null);
     }
 
     public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String phoneNumber, String accountType) {
+        this(token, expiresIn, userId, name, emailAddress, phoneNumber, accountType, null);
+    }
+
+    public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String phoneNumber, String accountType, String role) {
         this.token = token;
         this.tokenType = "Bearer";
         this.expiresIn = expiresIn;
@@ -30,6 +36,7 @@ public class AuthResponse {
         this.emailAddress = emailAddress;
         this.phoneNumber = phoneNumber;
         this.accountType = accountType;
+        this.role = role;
     }
 
     public String getToken() {
@@ -117,5 +124,13 @@ public class AuthResponse {
 
     public void setAccountType(String accountType) {
         this.accountType = accountType;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 }

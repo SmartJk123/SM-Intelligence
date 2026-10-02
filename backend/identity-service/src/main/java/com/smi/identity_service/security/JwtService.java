@@ -35,6 +35,7 @@ public class JwtService {
                 .claim("email", user.getEmailAddress())
                 .claim("accountType", user.getAccountType())
                 .claim("name", user.getName())
+                .claim("role", user.getRole())
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(signingKey)

@@ -2,6 +2,7 @@ package com.smi.identity_service.service;
 
 import com.smi.identity_service.domain.User;
 import com.smi.identity_service.repository.UserRepository;
+import com.smi.identity_service.security.AdminAccounts;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +28,9 @@ class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private AdminAccounts adminAccounts;
+
     @InjectMocks
     private UserService userService;
 
@@ -46,11 +50,17 @@ class UserServiceTest {
         User actualUser = userService.createUser(name, email, rawPassword);
 
         assertNotNull(actualUser);
-        assertEquals("jane@example.com", actualUser.getEmailAddress());
+        assertEquals(email, actualUser.getEmailAddress());
         assertNull(actualUser.getPhoneNumber());
 
         verify(passwordEncoder, times(1)).encode(rawPassword);
-        verify(userRepository, times(1)).save(any(User.class));
+
+        // The raw password must never reach the store, only its hash. The other
+        // test in this class already asserted this; without it the variable was
+        // declared and then ignored, which is the warning this replaces.
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertEquals(hashedPassword, userCaptor.getValue().getPasswordHash());
     }
 
     @Test
