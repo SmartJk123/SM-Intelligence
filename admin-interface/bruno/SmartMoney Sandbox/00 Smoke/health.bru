@@ -1,0 +1,28 @@
+meta {
+  name: Health
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/actuator/health
+  body: none
+  auth: none
+}
+
+docs {
+  Run this first. If it fails the service is not running and every other
+  request in this collection will fail in the same way.
+
+  Start it with backend\run-local.ps1 and leave that window open.
+}
+
+tests {
+  test("service answers with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("overall status is UP", function() {
+    expect(res.getBody().status).to.equal("UP");
+  });
+}

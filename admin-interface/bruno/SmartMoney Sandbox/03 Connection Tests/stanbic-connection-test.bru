@@ -1,0 +1,31 @@
+meta {
+  name: Stanbic connection test
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/stanbic/test
+  body: none
+  auth: none
+}
+
+docs {
+  Runs the four connection steps and stores the outcome.
+
+  The endpoint accepts an empty body and any content type. A 415 response here
+  means the service is running an older build in which the endpoint demanded a
+  content type header.
+}
+
+tests {
+  test("connection test returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("every step is reported with a status", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("steps");
+    expect(body.steps.length).to.be.above(0);
+  });
+}

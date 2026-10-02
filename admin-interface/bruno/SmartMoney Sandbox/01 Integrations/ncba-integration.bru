@@ -1,0 +1,33 @@
+meta {
+  name: NCBA integration detail
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/ncba
+  body: none
+  auth: none
+}
+
+docs {
+  One bank only. The values behind the tiles on the NCBA detail drawer.
+
+  notificationsTotal counts the notifications NCBA has delivered, which stay at
+  zero until the bank is given an address they can reach and a hash that
+  verifies.
+}
+
+tests {
+  test("NCBA detail returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the response belongs to NCBA and carries measured counts", function() {
+    const body = res.getBody();
+    expect(body.bankId).to.equal("ncba");
+    expect(body).to.have.property("notificationsTotal");
+    expect(body).to.have.property("notificationsToday");
+    expect(body).to.have.property("errorsLast24h");
+  });
+}

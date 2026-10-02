@@ -1,0 +1,27 @@
+meta {
+  name: Stanbic notification URL
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/stanbic/webhook-url
+  body: none
+  auth: none
+}
+
+docs {
+  The address to give Stanbic, plus the masked account number the service is
+  configured for.
+}
+
+tests {
+  test("webhook URL returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the address points at the Stanbic endpoint", function() {
+    const body = res.getBody();
+    expect(body.webhookUrl).to.include("/api/v1/webhooks/stanbic");
+  });
+}

@@ -1,0 +1,11 @@
+meta {
+  name: KCB Webhook Probe
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{bankIntegrationBaseUrl}}/api/v1/webhooks/kcb
+  body: none
+  auth: none
+}

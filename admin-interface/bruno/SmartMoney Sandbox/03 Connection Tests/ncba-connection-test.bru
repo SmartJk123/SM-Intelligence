@@ -1,0 +1,48 @@
+meta {
+  name: NCBA connection test
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/ncba/test
+  body: none
+  auth: none
+}
+
+docs {
+  Runs the four NCBA steps: the endpoint credentials, the notification channel,
+  the notification address, and signature verification.
+
+  There is nothing to call at NCBA, so this cannot prove the integration by
+  asking them anything. It proves what this service has been given: the three
+  endpoint credentials are loaded, the account to watch is set, the callback
+  address resolves, and a notification that arrives will be verified.
+
+  ok is false when a step failed, and the step detail names what to fix. A
+  stopped tunnel fails the notification address step, which is the failure worth
+  understanding because the old hostname never comes back.
+}
+
+tests {
+  test("connection test returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("all four steps are reported with a status", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("steps");
+    expect(body.steps.length).to.equal(4);
+    body.steps.forEach(function(step) {
+      expect(step).to.have.property("key");
+      expect(step).to.have.property("status");
+    });
+  });
+
+  test("the step keys are the ones the interface reads", function() {
+    const keys = res.getBody().steps.map(function(step) { return step.key; });
+    expect(keys).to.include("token");
+    expect(keys).to.include("webhook-registration");
+    expect(keys).to.include("signature-verification");
+  });
+}

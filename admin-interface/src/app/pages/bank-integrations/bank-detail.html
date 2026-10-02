@@ -1,0 +1,182 @@
+<div
+  class="fixed inset-0 z-50 flex justify-end animate-fade-in"
+  style="background: rgba(16, 19, 34, .45)"
+  (click)="closed.emit()"
+>
+  <aside
+    class="w-full max-w-[620px] h-full flex flex-col animate-fade-up"
+    style="background: var(--surface); box-shadow: var(--shadow-lg)"
+    (click)="$event.stopPropagation()"
+  >
+    <!-- Header -->
+    <div
+      class="flex items-start gap-3 px-5 py-4 border-b flex-shrink-0"
+      style="border-color: var(--border)"
+    >
+      <app-bank-logo [src]="bank().logo" [name]="bank().name" size="md" />
+      <div class="flex-1 min-w-0">
+        <p class="text-[16px] font-bold font-display truncate" style="color: var(--text-1)">
+          {{ bank().full }}
+        </p>
+        <div class="flex flex-wrap items-center gap-2 mt-1.5">
+          <app-badge [status]="health().apiStatus" />
+          <app-badge [status]="health().webhookStatus" />
+          <span
+            class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg"
+            style="background: var(--surface-3); color: var(--text-2)"
+          >{{ health().environment }}</span>
+        </div>
+      </div>
+      <button
+        type="button"
+        (click)="closed.emit()"
+        aria-label="Close details"
+        class="w-8 h-8 rounded-lg flex items-center justify-center border flex-shrink-0 transition-all hover:opacity-80"
+        style="border-color: var(--border); color: var(--text-2)"
+      ><span class="icon icon-sm">close</span></button>
+    </div>
+
+    <!-- Body -->
+    <div class="flex-1 min-h-0 overflow-auto px-5 py-4 space-y-4">
+
+      <!-- Headline figures for this bank -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        @for (tile of tiles(); track tile.label) {
+          <div class="rounded-2xl p-3" style="background: var(--surface-2)">
+            <p class="eyebrow">{{ tile.label }}</p>
+            <p
+              class="text-[17px] font-bold font-display tabular mt-1"
+              [style.color]="toneColor(tile.tone)"
+            >{{ tile.value }}</p>
+          </div>
+        }
+      </div>
+
+      <!-- What a bank with no configuration needs to hear first -->
+      @if (!signatureEnabled()) {
+        <div
+          class="rounded-2xl border px-4 py-3"
+          style="border-color: var(--border); background: var(--gold-soft)"
+        >
+          <p class="text-[12.5px]" style="color: var(--gold-ink)">
+            Signature verification is switched off for this bank, so notifications are stored
+            without confirming they came from the bank.
+          </p>
+        </div>
+      }
+
+      <!-- Notification endpoint -->
+      <div class="rounded-2xl p-4" style="background: var(--surface-2)">
+        <p class="eyebrow">Notification endpoint for {{ bank().name }}</p>
+        <p class="text-[12px] mt-1" style="color: var(--text-3)">
+          This is the address to register with the bank. A GET returns a readable confirmation.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-2 mt-2.5">
+          <input
+            type="text"
+            readonly
+            [value]="webhookUrl() || 'Not reported by the backend'"
+            class="flex-1 px-3.5 py-2.5 text-[12.5px] rounded-xl border focus:outline-none font-mono"
+            style="background: var(--surface); border-color: var(--border); color: var(--text-1)"
+          />
+          <app-copy-button [value]="webhookUrl()" label="Copy URL" />
+        </div>
+        @if (webhookWarning(); as warning) {
+          <p class="text-[11.5px] mt-2.5 leading-relaxed" style="color: var(--gold-ink)">
+            {{ warning }}
+          </p>
+        }
+        @if (webhook()?.accountNumber; as account) {
+          <p class="text-[11.5px] mt-1.5" style="color: var(--text-3)">
+            Account on file: <span style="color: var(--text-2)">{{ account }}</span>
+          </p>
+        }
+      </div>
+
+      <!-- Detail sections -->
+      @for (section of sections(); track section.title) {
+        <div class="rounded-2xl p-4" style="background: var(--surface-2)">
+          <p class="eyebrow">{{ section.title }}</p>
+          @if (section.hint) {
+            <p class="text-[11.5px] mt-1 leading-relaxed" style="color: var(--text-3)">
+              {{ section.hint }}
+            </p>
+          }
+          <div class="mt-2">
+            @for (row of section.rows; track row.label) {
+              <div
+                class="flex items-start justify-between gap-4 py-2 border-b last:border-0"
+                style="border-color: var(--border)"
+              >
+                <span class="text-[12px] flex-shrink-0 pt-0.5" style="color: var(--text-3)">
+                  {{ row.label }}
+                </span>
+                <span
+                  class="text-[12.5px] font-semibold text-right break-all"
+                  [style.color]="toneColor(row.tone)"
+                >{{ row.value }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Last connection test -->
+      <div class="rounded-2xl p-4" style="background: var(--surface-2)">
+        <p class="eyebrow">Connection test</p>
+        @if (testSummary(); as summary) {
+          <p class="text-[12.5px] mt-1" style="color: var(--text-2)">{{ summary }}</p>
+        } @else {
+          <p class="text-[12.5px] mt-1" style="color: var(--text-3)">
+            Not run in this session. The test asks the backend to reach the bank and reports each
+            step.
+          </p>
+        }
+        @if (result(); as test) {
+          <div class="mt-3">
+            <app-connection-steps [result]="test" />
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div
+      class="flex flex-wrap items-center gap-2 px-5 py-4 border-t flex-shrink-0"
+      style="border-color: var(--border); background: var(--surface-2)"
+    >
+      <button
+        type="button"
+        (click)="test.emit()"
+        [disabled]="testing()"
+        class="flex items-center gap-2 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90 disabled:opacity-60"
+        style="background: var(--primary); color: #fff"
+      >
+        @if (testing()) {
+          <span
+            class="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"
+          ></span>
+          Testing
+        } @else {
+          Test connection
+        }
+      </button>
+      <button
+        type="button"
+        (click)="register.emit()"
+        class="text-[12.5px] font-semibold px-4 py-2 rounded-full border transition-all hover:opacity-80"
+        style="border-color: var(--border-strong); color: var(--text-2)"
+      >
+        Register callback URL
+      </button>
+      <button
+        type="button"
+        (click)="openSettings.emit()"
+        class="text-[12.5px] font-semibold px-4 py-2 rounded-full border transition-all hover:opacity-80"
+        style="border-color: var(--border-strong); color: var(--text-2)"
+      >
+        Integration settings
+      </button>
+    </div>
+  </aside>
+</div>

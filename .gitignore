@@ -56,6 +56,12 @@ Thumbs.db
 .env
 .env.local
 
+# Filled-in cPanel deployment configs contain real bank secrets (NCBA secret
+# key, DB password, etc.). Only the .sample.php template is meant to be
+# tracked.
+**/deploy/**/smi-private/*.php
+!**/deploy/**/smi-private/*.sample.php
+
 # ============================================================
 # Node / Frontend dependencies (if built at root)
 # ============================================================
@@ -67,3 +73,21 @@ dist/
 
 # Project-local Java/tool downloads
 .tools/
+
+# Embedded database files
+*.mv.db
+*.trace.db
+data/
+**/data/
+
+# ============================================================
+# Mobile & Android build outputs & local workstation configs
+# ============================================================
+.gradle/
+**/.gradle/
+build/
+**/build/
+local.properties
+**/local.properties
+*.apk
+*.aab

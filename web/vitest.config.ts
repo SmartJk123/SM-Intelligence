@@ -1,3 +1,3 @@
 import { defineConfig } from 'vitest/config';
-// Worker threads avoid slow child-process startup on Windows development machines.
-export default defineConfig({ test: { pool: 'threads', maxWorkers: 1 } });
+// A separate process avoids thread-worker startup timeouts on Windows.
+export default defineConfig({ test: { pool: 'forks', maxWorkers: 1 } });

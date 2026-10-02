@@ -1,0 +1,17 @@
+<resources>
+
+    <style name="Theme.Energy" parent="android:style/Theme.Material.Light.NoActionBar">
+        ...
+    </style>
+
+    <style name="Theme.Energy.Starting" parent="Theme.SplashScreen">
+
+        <item name="windowSplashScreenBackground">#263228</item>
+
+        <item name="postSplashScreenTheme">
+            @style/Theme.Energy
+        </item>
+
+    </style>
+
+</resources>

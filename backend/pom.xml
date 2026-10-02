@@ -34,6 +34,7 @@
         <module>forecasts-service</module>
         <module>notifications-service</module>
         <module>audit-service</module>
+        <module>bank-integration-service</module>
     </modules>
 
     <dependencyManagement>

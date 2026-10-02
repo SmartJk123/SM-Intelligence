@@ -1,0 +1,55 @@
+<!-- Header -->
+<div class="flex items-center justify-between px-4 py-3 border-b" style="border-color: var(--border)">
+  <p class="text-sm font-bold font-display" style="color: var(--text-1)">Notifications</p>
+  @if (unread() > 0) {
+    <span class="text-[12px] font-bold px-2.5 py-0.5 rounded-full" style="background: var(--red); color: #fff">
+      {{ unread() }} new
+    </span>
+  } @else {
+    <span class="text-[12px] font-medium" style="color: var(--text-3)">All read</span>
+  }
+</div>
+
+<!-- Items, each fully clickable -->
+<div>
+  @for (notification of items(); track notification.id) {
+    <button
+      type="button"
+      (click)="openNotification(notification)"
+      class="w-full flex items-start gap-3 px-4 py-3 border-b text-left transition-all hover:opacity-90 active:scale-[.99]"
+      [style.borderColor]="'var(--border)'"
+      [style.background]="itemBackground(notification)"
+    >
+      <div
+        class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
+        [style.background]="severityColors[notification.severity]"
+      ></div>
+      <div class="flex-1 min-w-0">
+        <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ notification.title }}</p>
+        <p class="text-[12px] mt-0.5 leading-relaxed line-clamp-2" style="color: var(--text-2)">
+          {{ notification.desc }}
+        </p>
+        <div class="flex items-center gap-2 mt-1">
+          <span
+            class="text-[11px] font-medium px-1.5 py-0.5 rounded"
+            [style.background]="severityColors[notification.severity] + '22'"
+            [style.color]="severityColors[notification.severity]"
+          >{{ notification.severity }}</span>
+          <span class="text-[11px]" style="color: var(--text-3)">{{ notification.time }}</span>
+        </div>
+      </div>
+    </button>
+  }
+</div>
+
+<!-- Footer -->
+<div class="px-4 py-2.5">
+  <button
+    type="button"
+    (click)="onViewAll()"
+    class="text-[13px] font-semibold w-full text-center py-1.5 rounded-xl transition-all hover:opacity-80"
+    style="color: var(--primary); background: var(--primary-soft)"
+  >
+    View all notifications →
+  </button>
+</div>

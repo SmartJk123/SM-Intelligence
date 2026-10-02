@@ -4,6 +4,7 @@ import com.smi.identity_service.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,4 +33,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * Checks if an active user exists with the given phone number.
      */
     boolean existsByPhoneNumber(String phoneNumber);
+
+    /**
+     * Every active (non-deleted) user, newest first. Used by the admin listing.
+     */
+    List<User> findByDeletedAtIsNullOrderByCreatedAtDesc();
 }

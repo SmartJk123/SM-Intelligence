@@ -1,5 +1,6 @@
 package com.smi.identity_service.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 
 public class AuthResponse {
@@ -10,19 +11,32 @@ public class AuthResponse {
     private UUID userId;
     private String name;
     private String emailAddress;
+    private String phoneNumber;
     private String accountType;
+    /** USER or PLATFORM_ADMIN, so the admin interface can refuse a customer account. */
+    private String role;
 
     public AuthResponse() {
     }
 
     public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String accountType) {
+        this(token, expiresIn, userId, name, emailAddress, null, accountType, null);
+    }
+
+    public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String phoneNumber, String accountType) {
+        this(token, expiresIn, userId, name, emailAddress, phoneNumber, accountType, null);
+    }
+
+    public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String phoneNumber, String accountType, String role) {
         this.token = token;
         this.tokenType = "Bearer";
         this.expiresIn = expiresIn;
         this.userId = userId;
         this.name = name;
         this.emailAddress = emailAddress;
+        this.phoneNumber = phoneNumber;
         this.accountType = accountType;
+        this.role = role;
     }
 
     public String getToken() {
@@ -49,12 +63,22 @@ public class AuthResponse {
         this.expiresIn = expiresIn;
     }
 
+    @JsonProperty("userId")
     public UUID getUserId() {
         return userId;
     }
 
     public void setUserId(UUID userId) {
         this.userId = userId;
+    }
+
+    @JsonProperty("id")
+    public UUID getId() {
+        return userId;
+    }
+
+    public void setId(UUID id) {
+        this.userId = id;
     }
 
     public String getName() {
@@ -65,6 +89,7 @@ public class AuthResponse {
         this.name = name;
     }
 
+    @JsonProperty("emailAddress")
     public String getEmailAddress() {
         return emailAddress;
     }
@@ -73,11 +98,39 @@ public class AuthResponse {
         this.emailAddress = emailAddress;
     }
 
+    @JsonProperty("email")
+    public String getEmail() {
+        return emailAddress;
+    }
+
+    public void setEmail(String email) {
+        if (this.emailAddress == null) {
+            this.emailAddress = email;
+        }
+    }
+
+    @JsonProperty("phoneNumber")
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
     public String getAccountType() {
         return accountType;
     }
 
     public void setAccountType(String accountType) {
         this.accountType = accountType;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 }

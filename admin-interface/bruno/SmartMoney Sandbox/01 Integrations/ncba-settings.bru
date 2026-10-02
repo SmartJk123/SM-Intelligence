@@ -1,0 +1,35 @@
+meta {
+  name: NCBA settings
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/ncba/settings
+  body: none
+  auth: none
+}
+
+docs {
+  The settings the admin interface edits, including the signature verification
+  switch.
+
+  That switch is what the NCBA endpoint obeys. Turning it off in the interface
+  stops the HashVal check, which is useful for a first delivery test and wrong
+  for production. The environment variable only seeds the value before anything
+  has been saved.
+}
+
+tests {
+  test("settings return with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the editable settings are present for NCBA", function() {
+    const body = res.getBody();
+    expect(body.bankId).to.equal("ncba");
+    expect(body).to.have.property("signatureVerification");
+    expect(body).to.have.property("automaticRetry");
+    expect(body).to.have.property("apiTimeoutSeconds");
+  });
+}

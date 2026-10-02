@@ -20,7 +20,9 @@ async function sendDashboard(send, call, session, searchParams) {
   if (!meResponse.ok) return send(503, { error: 'Identity service unavailable' });
   const profile = await meResponse.json();
 
-  const accountsResponse = await call('/api/accounts?userId=' + encodeURIComponent(session.userId));
+  const accountsResponse = await call('/api/accounts?userId=' + encodeURIComponent(session.userId), {
+    headers: { Authorization: 'Bearer ' + session.token },
+  });
   if (!accountsResponse.ok) return send(503, { error: 'Accounts service unavailable' });
   let accounts = await accountsResponse.json();
   if (bank) accounts = accounts.filter((a) => (a.institution ?? '').toLowerCase() === bank.toLowerCase());
@@ -76,10 +78,12 @@ async function sendDashboard(send, call, session, searchParams) {
     .map((tx) => ({
       id: tx.id,
       accountId: tx.accountId,
-      description: tx.description || tx.counterparty || 'Transaction',
-      // Placeholder: categories-service is not wired up yet, so the
-      // counterparty stands in for a real category name.
-      category: tx.counterparty || 'Uncategorized',
+      // The bank's counterparty (who sent or received the money) is the
+      // headline; its own narrative/reference is the detail line beneath it.
+      description: tx.counterparty || tx.description || 'Transaction',
+      // Placeholder: categories-service is not wired up yet, so the bank's
+      // narrative stands in for a real category name.
+      category: tx.description || 'Uncategorized',
       direction: tx.transactionType,
       amountMinor: toMinor(tx.amount),
       status: tx.status,
@@ -125,6 +129,13 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const accountsBackend = new URL(options.accountsUrl || process.env.ACCOUNTS_API_URL || backend);
   if (accountsBackend.protocol !== 'https:' && !(accountsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(accountsBackend.hostname)))
     throw new Error('Accounts API requires HTTPS, except on loopback.');
+  // Where a newly created account is registered so a matching bank notification
+  // (by bank + account number) reaches this customer's dashboard. Best-effort:
+  // the account is already saved by the time this is called, so a failure here
+  // is logged and swallowed rather than failing the account creation itself.
+  const bankIntegrationBackend = new URL(options.bankIntegrationUrl || process.env.BANK_INTEGRATION_API_URL || 'http://localhost:8090');
+  if (bankIntegrationBackend.protocol !== 'https:' && !(bankIntegrationBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(bankIntegrationBackend.hostname)))
+    throw new Error('Bank integration API requires HTTPS, except on loopback.');
   if (invoiceBackend.protocol !== 'https:' && !(invoiceBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(invoiceBackend.hostname)))
     throw new Error('Invoice API requires HTTPS, except on loopback.');
   if (backend.protocol !== 'https:' && !(backend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(backend.hostname)))
@@ -205,7 +216,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         return await sendDashboard(send, call, session, url.searchParams);
       }
       if (route === '/api/accounts' && ['GET', 'POST'].includes(req.method)) {
-        let body;
+        let body; let parsedBody;
         if (req.method === 'POST') {
           let raw = ''; let size = 0;
           for await (const chunk of req) {
@@ -213,7 +224,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
             if (size > 16384) return send(413, { error: 'Request too large' });
             raw += chunk;
           }
-          try { body = JSON.stringify(JSON.parse(raw)); } catch { return send(400, { error: 'Invalid JSON' }); }
+          try { parsedBody = JSON.parse(raw); body = JSON.stringify(parsedBody); } catch { return send(400, { error: 'Invalid JSON' }); }
         }
         const response = await requestBackend(new URL(req.method === 'POST' ? '/api/accounts/manual' : '/api/accounts', accountsBackend), {
           method: req.method, redirect: 'error', signal: AbortSignal.timeout(15000),
@@ -225,6 +236,21 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         const publicAccount = ({ id, accountName, institution, maskedIdentifier, accountType, currency, availableBalance, creditOutstanding, accountStatus }) =>
           ({ id, accountName, institution, maskedIdentifier, accountType, currency, availableBalance, creditOutstanding, accountStatus });
         const result = await response.json();
+        // Registers the account so a bank notification for this bank + account number
+        // reaches this customer's dashboard. The account is already saved above, so a
+        // failure here is logged rather than reported as the account save failing.
+        if (req.method === 'POST' && parsedBody?.bank && parsedBody?.accountNumber && result?.id) {
+          requestBackend(new URL('/api/v1/admin/account-links', bankIntegrationBackend), {
+            method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bankId: parsedBody.bank, accountNumber: parsedBody.accountNumber,
+              userId: session.userId, accountName: parsedBody.accountName, accountId: result.id,
+            }),
+          }).then(linkResponse => {
+            if (!linkResponse.ok) console.error('Could not register the account link:', linkResponse.status);
+          }).catch(error => console.error('Could not register the account link:', error.message));
+        }
         return send(response.status, Array.isArray(result) ? result.map(publicAccount) : publicAccount(result));
       }
       if ((route === '/api/invoices' && ['GET', 'POST'].includes(req.method)) ||

@@ -1,0 +1,131 @@
+<header
+  class="h-[76px] flex items-center gap-2 sm:gap-3 px-4 lg:px-7 flex-shrink-0 border-b"
+  style="border-color: var(--border)"
+>
+  <!-- Mobile navigation -->
+  <button
+    type="button"
+    (click)="menuToggle.emit()"
+    aria-label="Open navigation"
+    class="lg:hidden w-10 h-10 rounded-full flex items-center justify-center border flex-shrink-0"
+    style="border-color: var(--border); color: var(--text-2)"
+  ><span class="icon">menu</span></button>
+
+  <!-- Page title -->
+  <div class="flex-1 min-w-0">
+    <h1 class="text-[20px] lg:text-[22px] font-bold font-display leading-tight truncate" style="color: var(--text-1)">
+      {{ meta().title }}
+    </h1>
+    <p class="text-[12.5px] truncate hidden sm:block mt-0.5" style="color: var(--text-3)">
+      {{ meta().subtitle }}
+    </p>
+  </div>
+
+  <!-- Search -->
+  <app-global-search />
+
+  <!-- Platform status -->
+  <div
+    class="hidden xl:flex items-center gap-2 px-3.5 py-2 rounded-full flex-shrink-0"
+    style="background: var(--green-soft)"
+  >
+    <span
+      class="w-1.5 h-1.5 rounded-full"
+      style="background: var(--green); animation: pulse-ring 2s infinite"
+    ></span>
+    <span class="text-[11.5px] font-semibold" style="color: var(--green-ink)">Operational</span>
+  </div>
+
+  <!-- Theme -->
+  <button
+    type="button"
+    (click)="themeToggle.emit()"
+    [attr.aria-label]="theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+    class="w-10 h-10 rounded-full flex items-center justify-center border flex-shrink-0 transition-all hover:opacity-80"
+    style="border-color: var(--border); color: var(--text-2); background: var(--surface)"
+  >
+    <span class="icon icon-lg">{{ theme() === 'dark' ? 'light_mode' : 'dark_mode' }}</span>
+  </button>
+
+  <!-- Notifications -->
+  <div class="relative flex-shrink-0">
+    <button
+      type="button"
+      (click)="toggleNotifications()"
+      aria-label="Notifications"
+      class="relative w-10 h-10 rounded-full flex items-center justify-center border transition-all hover:opacity-80"
+      style="border-color: var(--border); color: var(--text-2); background: var(--surface)"
+    >
+      <span class="icon">notifications</span>
+      @if (unread() > 0) {
+        <span
+          class="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
+          style="background: var(--red); border: 2px solid var(--surface)"
+        >{{ unread() }}</span>
+      }
+    </button>
+    @if (showNotifications()) {
+      <app-notif-dropdown (viewAll)="viewAllNotifications()" (closed)="closeNotifications()" />
+    }
+  </div>
+
+  <!-- Profile -->
+  <div class="relative flex-shrink-0">
+    <button
+      type="button"
+      (click)="toggleProfileMenu()"
+      class="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1.5 rounded-full border transition-all hover:opacity-90"
+      style="border-color: var(--border); background: var(--surface)"
+    >
+      <span
+        class="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold flex-shrink-0 overflow-hidden"
+        style="background: linear-gradient(135deg, var(--primary), #3f5fd0)"
+      >
+        @if (profile.avatar(); as avatarUrl) {
+          <img [src]="avatarUrl" alt="Administrator profile" class="w-full h-full object-cover" />
+        } @else {
+          {{ profile.initials() }}
+        }
+      </span>
+      <span class="hidden md:block text-left max-w-[140px]">
+        <span class="block text-[12.5px] font-semibold truncate" style="color: var(--text-1)">
+          {{ profile.fullName() }}
+        </span>
+        <span class="block text-[11px] truncate" style="color: var(--text-3)">{{ profile.role() }}</span>
+      </span>
+      <span class="icon icon-sm" style="color: var(--text-3)">expand_more</span>
+    </button>
+
+    @if (showProfileMenu()) {
+      <div
+        class="absolute right-0 top-full mt-2 z-50 w-[236px] panel py-1.5 animate-slide-down"
+        style="box-shadow: var(--shadow-lg)"
+      >
+        <div class="px-3.5 py-2.5">
+          <p class="text-[13px] font-semibold truncate" style="color: var(--text-1)">{{ profile.fullName() }}</p>
+          <p class="text-[11.5px] truncate" style="color: var(--text-3)">{{ profile.email() }}</p>
+        </div>
+        <div class="h-px my-1" style="background: var(--border)"></div>
+        <button
+          type="button"
+          (click)="openProfile()"
+          class="w-full text-left px-3.5 py-2.5 text-[12.5px] font-medium transition-all hover:opacity-80"
+          style="color: var(--text-1)"
+        >Admin profile</button>
+        <button
+          type="button"
+          (click)="openSettings()"
+          class="w-full text-left px-3.5 py-2.5 text-[12.5px] font-medium transition-all hover:opacity-80"
+          style="color: var(--text-1)"
+        >Platform settings</button>
+        <div class="h-px my-1" style="background: var(--border)"></div>
+        <button
+          type="button"
+          (click)="requestLogout()"
+          class="w-full text-left px-3.5 py-2.5 text-[12.5px] font-semibold transition-all hover:opacity-80"
+          style="color: var(--red-ink)"
+        >Log out</button>
+      </div>
+    }
+  </div>
+</header>

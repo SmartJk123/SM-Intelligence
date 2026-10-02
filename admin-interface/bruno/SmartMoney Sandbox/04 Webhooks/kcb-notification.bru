@@ -1,0 +1,55 @@
+meta {
+  name: KCB notification
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/webhooks/kcb
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+}
+
+body:json {
+  {
+    "transactionID": "KCB-TRIAL-{{$guid}}",
+    "statusCode": "0",
+    "amount": 1500.00,
+    "currency": "KES",
+    "creditDebitIndicator": "Credit",
+    "narration": "Bruno trial notification"
+  }
+}
+
+docs {
+  This body is not signed, which is the point of the request. KCB signs the
+  request body with SHA256withRSA in a Signature header, so an unsigned post is
+  the negative test.
+
+  A 200 means the KCB public key is not configured and the service accepted the
+  notification unchecked. A 401 means the key is armed and an unsigned body was
+  correctly refused. The acknowledgement shape on a 200 is fixed by the BUNI
+  specification.
+
+  To post a notification that is actually signed, use
+  backend\tools\send-kcb-notification.ps1, which signs with the rehearsal key.
+}
+
+tests {
+  test("the notification is accepted or refused, never a server error", function() {
+    expect([200, 401]).to.include(res.getStatus());
+  });
+
+  test("the BUNI acknowledgement shape is used when accepted", function() {
+    if (res.getStatus() === 200) {
+      const body = res.getBody();
+      expect(body).to.have.property("transactionID");
+      expect(body.statusCode).to.equal("0");
+      expect(body.statusMessage).to.equal("Notification received successfully");
+    }
+  });
+}

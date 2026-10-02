@@ -22,12 +22,30 @@
             "assets": [
               {
                 "glob": "**/*",
+                "input": "node_modules/pdfjs-dist/standard_fonts",
+                "output": "/ocr/pdf-fonts"
+              },
+              {
+                "glob": "worker.min.js",
+                "input": "node_modules/tesseract.js/dist",
+                "output": "/ocr"
+              },
+              {
+                "glob": "*.wasm*",
+                "input": "node_modules/tesseract.js-core",
+                "output": "/ocr/core"
+              },
+              {
+                "glob": "pdf.worker.min.mjs",
+                "input": "node_modules/pdfjs-dist/build",
+                "output": "/ocr"
+              },
+              {
+                "glob": "**/*",
                 "input": "public"
               }
             ],
-            "styles": [
-              "src/styles.css"
-            ]
+            "styles": ["src/styles.css"]
           },
           "configurations": {
             "production": {

@@ -1,0 +1,32 @@
+meta {
+  name: KCB notification URL
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/bank-integrations/kcb/webhook-url
+  body: none
+  auth: none
+}
+
+docs {
+  This is the address to register with the bank. It is built from
+  PUBLIC_BASE_URL, so it reports the tunnel address while testing and the real
+  hostname once the service is deployed.
+
+  publiclyReachable is false when PUBLIC_BASE_URL still points at localhost.
+  A bank cannot deliver to a localhost address.
+}
+
+tests {
+  test("webhook URL returns with 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("the address points at the KCB endpoint", function() {
+    const body = res.getBody();
+    expect(body.webhookUrl).to.include("/api/v1/webhooks/kcb");
+    expect(body).to.have.property("publiclyReachable");
+  });
+}

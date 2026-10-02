@@ -1,0 +1,144 @@
+<div class="flex-1 overflow-auto p-4 lg:p-6 space-y-4">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <app-kpi-card
+      label="All"
+      [value]="total()"
+      color="blue"
+      delay="delay-50"
+      action="all"
+      (selected)="applyCardAction($event)"
+    />
+    <app-kpi-card
+      label="Unread"
+      [value]="unread()"
+      sub="Click to filter"
+      color="green"
+      delay="delay-100"
+      action="unread"
+      (selected)="applyCardAction($event)"
+    />
+    <app-kpi-card
+      label="Critical"
+      [value]="critical()"
+      sub="Click to filter"
+      color="red"
+      delay="delay-150"
+      action="critical"
+      (selected)="applyCardAction($event)"
+    />
+    <app-kpi-card
+      label="Warnings"
+      [value]="warnings()"
+      sub="Click to filter"
+      color="gold"
+      delay="delay-200"
+      action="warning"
+      (selected)="applyCardAction($event)"
+    />
+  </div>
+
+  <app-surface-card class="overflow-hidden" animDelay="delay-200">
+    <!-- Filter bar -->
+    <div
+      class="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-3 border-b"
+      style="border-color: var(--border)"
+    >
+      <div class="flex gap-1">
+        @for (option of readFilters; track option) {
+          <button
+            type="button"
+            (click)="readFilter.set(option)"
+            class="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all"
+            [style.background]="readFilter() === option ? 'var(--primary)' : 'var(--surface-2)'"
+            [style.color]="readFilter() === option ? '#fff' : 'var(--text-2)'"
+          >
+            {{ option }}
+          </button>
+        }
+      </div>
+
+      <div class="flex flex-wrap gap-1">
+        @for (severity of severityFilters; track severity) {
+          <button
+            type="button"
+            (click)="severityFilter.set(severity)"
+            class="px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-all border"
+            [style.background]="severityFilter() === severity ? 'var(--surface)' : 'transparent'"
+            [style.color]="severityFilter() === severity ? 'var(--text-1)' : 'var(--text-3)'"
+            [style.borderColor]="severityFilter() === severity ? 'var(--border)' : 'transparent'"
+          >
+            {{ severity }}
+          </button>
+        }
+      </div>
+
+      <button
+        type="button"
+        (click)="markAllRead()"
+        [disabled]="unread() === 0"
+        class="ml-auto text-[12px] font-semibold disabled:opacity-40"
+        style="color: var(--primary)"
+      >
+        Mark all as read
+      </button>
+    </div>
+
+    <!-- List -->
+    <div>
+      @for (notification of shown(); track notification.id) {
+        <button
+          type="button"
+          (click)="open(notification)"
+          class="w-full text-left flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 px-3 sm:px-4 py-4 border-b last:border-0 transition-all hover:opacity-80"
+          style="border-color: var(--border)"
+          [style.background]="notification.read ? 'transparent' : 'var(--primary-soft)'"
+        >
+          <div class="flex items-start gap-3 flex-1 min-w-0">
+            <div
+              class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
+              [style.background]="severityColors[notification.severity]"
+            ></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <app-badge [status]="notification.severity" />
+                <span class="text-[11px] uppercase tracking-wider" style="color: var(--text-3)">
+                  {{ notification.cat }}
+                </span>
+                @if (!notification.read) {
+                  <span
+                    class="text-[11px] font-semibold px-1.5 py-0.5 rounded"
+                    style="background: var(--primary); color: #fff"
+                  >New</span>
+                }
+              </div>
+              <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ notification.title }}</p>
+              <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--text-2)">
+                {{ notification.desc }}
+              </p>
+            </div>
+          </div>
+
+          <div
+            class="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1 flex-shrink-0 pl-6 sm:pl-0"
+          >
+            <span class="text-[12px] whitespace-nowrap" style="color: var(--text-3)">{{ notification.time }}</span>
+            <span class="text-[12px] font-semibold whitespace-nowrap" style="color: var(--primary)">
+              {{ destination(notification.cat) }}
+            </span>
+          </div>
+        </button>
+      } @empty {
+        <div class="px-4 py-12 text-center">
+          <div
+            class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center text-lg"
+            style="background: var(--surface-2); color: var(--text-3)"
+          ><span class="icon icon-lg">notifications</span></div>
+          <p class="text-sm font-semibold" style="color: var(--text-1)">No notifications to show</p>
+          <p class="text-[12px] mt-1" style="color: var(--text-3)">
+            Adjust the filters above to see more notifications.
+          </p>
+        </div>
+      }
+    </div>
+  </app-surface-card>
+</div>

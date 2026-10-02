@@ -5,6 +5,7 @@ import com.smi.identity_service.dto.AuthResponse;
 import com.smi.identity_service.dto.LoginRequest;
 import com.smi.identity_service.dto.RegisterRequest;
 import com.smi.identity_service.dto.UserProfileResponse;
+import com.smi.identity_service.exception.AccountSuspendedException;
 import com.smi.identity_service.exception.InvalidCredentialsException;
 import com.smi.identity_service.security.JwtService;
 import com.smi.identity_service.service.UserService;
@@ -43,7 +44,9 @@ public class AuthController {
                 user.getId(),
                 user.getName(),
                 user.getEmailAddress(),
-                user.getAccountType()
+                user.getPhoneNumber(),
+                user.getAccountType(),
+                user.getRole()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -60,7 +63,9 @@ public class AuthController {
                 user.getId(),
                 user.getName(),
                 user.getEmailAddress(),
-                user.getAccountType()
+                user.getPhoneNumber(),
+                user.getAccountType(),
+                user.getRole()
         );
 
         return ResponseEntity.ok(response);
@@ -83,6 +88,10 @@ public class AuthController {
         User user = userService.findById(userId)
                 .filter(candidate -> candidate.getDeletedAt() == null)
                 .orElseThrow(() -> new InvalidCredentialsException("User associated with token not found"));
+        // A suspension takes effect on the next request, not when the token expires.
+        if (user.isSuspended()) {
+            throw new AccountSuspendedException();
+        }
 
         return ResponseEntity.ok(UserProfileResponse.fromUser(user));
     }

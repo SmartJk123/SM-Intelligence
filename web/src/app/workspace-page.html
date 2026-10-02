@@ -26,12 +26,6 @@ Sections render conditionally from WorkspacePage.page.
   @if (loading()) {
     <div class="ws-empty" role="status">Loading your workspace…</div>
   } @else if (data(); as d) {
-    @if (d.source === 'local') { <p class="sample-label">Local workspace · Financial records reset when the development server restarts.</p> }
-    @if (d.source === 'sample') {
-      <p class="sample-label">
-        Sample data · Local development · Changes reset when the mock API restarts
-      </p>
-    }
     @if (!['settings', 'notifications', 'investments'].includes(page)) {
       <div class="ws-scope">
         <label
@@ -530,7 +524,7 @@ Sections render conditionally from WorkspacePage.page.
             <h3><app-workspace-icon name="content-forecast" /> Forecast coverage</h3>
             <p class="ws-muted">
               A reliable forecast requires recurring obligations and complete transaction history.
-              No forecast or health score is inferred from partial sample records.
+              No forecast or health score is inferred from incomplete records.
             </p>
           </article>
         </div>

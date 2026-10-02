@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -27,20 +28,41 @@ public class AccountService {
     }
 
     public AccountResponse createAccount(CreateAccountRequest request) {
-        if (accountRepository.existsByInstitutionAndProviderAccountId(request.getInstitution(), request.getProviderAccountId())) {
+        UUID effectiveUserId = request.getUserId() != null 
+            ? request.getUserId() 
+            : UUID.fromString("00000000-0000-0000-0000-000000000001");
+        String effectiveInstitution = (request.getInstitution() != null && !request.getInstitution().isBlank())
+            ? request.getInstitution().trim()
+            : "Default Bank";
+        String effectiveAccountType = request.getAccountType() != null
+            ? request.getAccountType().trim().toUpperCase()
+            : "DEPOSIT";
+        if (effectiveAccountType.equals("DEBIT") || effectiveAccountType.equals("SAVINGS") || effectiveAccountType.equals("CHECKING")) {
+            effectiveAccountType = "DEPOSIT";
+        }
+        String effectiveAccountName = (request.getAccountName() != null && !request.getAccountName().isBlank())
+            ? request.getAccountName().trim()
+            : effectiveInstitution + " Account";
+        String effectiveMaskedId = request.getMaskedIdentifier();
+        if (effectiveMaskedId == null || effectiveMaskedId.isBlank()) {
+            String provId = request.getProviderAccountId() != null ? request.getProviderAccountId().trim() : "";
+            effectiveMaskedId = provId.length() > 4 ? "**** " + provId.substring(provId.length() - 4) : "**** " + provId;
+        }
+
+        if (accountRepository.existsByInstitutionAndProviderAccountId(effectiveInstitution, request.getProviderAccountId())) {
             throw new DuplicateAccountException(
                 String.format("Account with institution '%s' and provider account ID '%s' already exists",
-                    request.getInstitution(), request.getProviderAccountId())
+                    effectiveInstitution, request.getProviderAccountId())
             );
         }
 
         Account account = new Account(
-            request.getUserId(),
+            effectiveUserId,
             request.getProviderAccountId(),
-            request.getAccountName(),
-            request.getInstitution(),
-            request.getAccountType(),
-            request.getMaskedIdentifier(),
+            effectiveAccountName,
+            effectiveInstitution,
+            effectiveAccountType,
+            effectiveMaskedId,
             request.getCurrency(),
             request.getInitialBalance()
         );
@@ -58,6 +80,10 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccountsByUserId(UUID userId, String status) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+
         List<Account> accounts;
         if (status != null && !status.isBlank()) {
             accounts = accountRepository.findByUserIdAndAccountStatus(userId, status.toUpperCase());
@@ -71,21 +97,41 @@ public class AccountService {
     }
 
     @Transactional(readOnly = true)
+    public Account findAccountByIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new AccountNotFoundException("Account identifier cannot be empty");
+        }
+        try {
+            UUID uuid = UUID.fromString(identifier.trim());
+            return accountRepository.findById(uuid)
+                .or(() -> accountRepository.findByProviderAccountId(identifier.trim()).stream().findFirst())
+                .orElseThrow(() -> new AccountNotFoundException("Account not found with ID or account number: " + identifier));
+        } catch (IllegalArgumentException e) {
+            return accountRepository.findByProviderAccountId(identifier.trim()).stream().findFirst()
+                .orElseThrow(() -> new AccountNotFoundException("Account not found with account number: " + identifier));
+        }
+    }
+
+    @Transactional(readOnly = true)
     public AccountResponse getAccountById(UUID id, UUID userId) {
-        Account account;
-        if (userId != null) {
-            account = accountRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id + " for user: " + userId));
-        } else {
-            account = accountRepository.findById(id)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
+        return getAccountById(id.toString(), userId);
+    }
+
+    @Transactional(readOnly = true)
+    public AccountResponse getAccountById(String identifier, UUID userId) {
+        Account account = findAccountByIdentifier(identifier);
+        if (userId != null && !account.getUserId().equals(userId)) {
+            throw new AccountNotFoundException("Account not found with identifier: " + identifier + " for user: " + userId);
         }
         return AccountResponse.fromEntity(account);
     }
 
     public AccountResponse updateBalance(UUID id, UpdateBalanceRequest request) {
-        Account account = accountRepository.findById(id)
-            .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
+        return updateBalance(id.toString(), request);
+    }
+
+    public AccountResponse updateBalance(String identifier, UpdateBalanceRequest request) {
+        Account account = findAccountByIdentifier(identifier);
 
         account.setAvailableBalance(request.getAvailableBalance());
         if (request.getLedgerBalance() != null) {
@@ -101,8 +147,11 @@ public class AccountService {
     }
 
     public AccountResponse updateStatus(UUID id, UpdateStatusRequest request) {
-        Account account = accountRepository.findById(id)
-            .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
+        return updateStatus(id.toString(), request);
+    }
+
+    public AccountResponse updateStatus(String identifier, UpdateStatusRequest request) {
+        Account account = findAccountByIdentifier(identifier);
 
         if (request.getAccountStatus() != null) {
             account.setAccountStatus(request.getAccountStatus());
@@ -117,8 +166,11 @@ public class AccountService {
     }
 
     public AccountResponse closeAccount(UUID id) {
-        Account account = accountRepository.findById(id)
-            .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
+        return closeAccount(id.toString());
+    }
+
+    public AccountResponse closeAccount(String identifier) {
+        Account account = findAccountByIdentifier(identifier);
 
         account.setAccountStatus("CLOSED");
         account.setConnectionStatus("DISCONNECTED");
@@ -126,5 +178,16 @@ public class AccountService {
 
         Account updated = accountRepository.save(account);
         return AccountResponse.fromEntity(updated);
+    }
+
+    public AccountResponse deleteAccount(UUID id) {
+        return deleteAccount(id.toString());
+    }
+
+    public AccountResponse deleteAccount(String identifier) {
+        Account account = findAccountByIdentifier(identifier);
+        AccountResponse response = AccountResponse.fromEntity(account);
+        accountRepository.delete(account);
+        return response;
     }
 }

@@ -1,0 +1,33 @@
+<div class="rounded-xl border overflow-hidden animate-fade-up" style="border-color: var(--border)">
+  <div
+    class="flex items-start gap-3 px-4 py-3 border-b"
+    [style.background]="result().ok ? 'var(--green-soft)' : 'var(--red-soft)'"
+    style="border-color: var(--border)"
+  >
+    <span
+      class="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0"
+      [style.background]="result().ok ? 'var(--green)' : 'var(--red)'"
+      style="color: #fff"
+    ><span class="icon icon-sm">{{ result().ok ? 'check' : 'close' }}</span></span>
+    <div class="flex-1 min-w-0">
+      <p class="text-[13px] font-semibold" [style.color]="result().ok ? 'var(--green-ink)' : 'var(--red-ink)'">
+        {{ result().summary }}
+      </p>
+      <p class="text-[12px] mt-0.5" style="color: var(--text-2)">Completed in {{ result().latencyMs }} ms</p>
+    </div>
+  </div>
+
+  @for (step of result().steps; track step.key) {
+    <div class="flex items-start gap-3 px-4 py-3 border-b last:border-0" style="border-color: var(--border)">
+      <span
+        class="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5"
+        [style.background]="stepColor(step.status) + '22'"
+        [style.color]="stepColor(step.status)"
+      ><span class="icon icon-sm">{{ stepIcon(step.status) }}</span></span>
+      <div class="flex-1 min-w-0">
+        <p class="text-[13px] font-medium" style="color: var(--text-1)">{{ step.name }}</p>
+        <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--text-2)">{{ step.detail }}</p>
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,147 @@
+<div class="flex-1 overflow-auto p-4 lg:p-6 space-y-5">
+  <div
+    class="rounded-2xl px-5 py-4 flex flex-wrap items-center gap-3"
+    style="background: var(--surface-2); border: 1px solid var(--border)"
+  >
+    <span
+      class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg"
+      style="background: var(--gold-soft); color: var(--gold-ink)"
+    >Demo account</span>
+    <div>
+      <p class="text-[13.5px] font-semibold" style="color: var(--text-1)">
+        {{ accountName() }}<span class="font-mono font-normal"> · {{ accountNumber() || 'waiting for the backend' }}</span>
+      </p>
+      <p class="text-[12px] mt-0.5" style="color: var(--text-3)">
+        A synthetic account for demonstrations. Its movements run through the same pipeline a bank
+        uses, and they never change what a bank is reported to have delivered.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+    <app-kpi-card label="Money in today" [value]="money(creditToday())" sub="credited to this account" color="green" delay="delay-50" action="Credit" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Money out today" [value]="money(debitToday())" sub="paid out of this account" color="red" delay="delay-100" action="Debit" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Net today" [value]="money(netToday())" sub="in less out" color="blue" delay="delay-150" action="all" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Movements" [value]="movements().length" sub="recorded in total" color="gold" delay="delay-200" action="all" (selected)="applyCardAction($event)" />
+  </div>
+
+  <app-surface-card class="overflow-hidden" animDelay="delay-200">
+    <div class="flex flex-wrap items-center gap-3 px-5 py-4 border-b" style="border-color: var(--border)">
+      <div class="segment-track">
+        @for (filter of directionFilters; track filter) {
+          <button type="button" class="segment" [attr.data-active]="directionFilter() === filter" (click)="directionFilter.set(filter)">
+            {{ filter }}
+          </button>
+        }
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <select
+          class="text-[12.5px] font-semibold px-3 py-2 rounded-full border"
+          style="border-color: var(--border); color: var(--text-2); background: var(--surface)"
+          [value]="bankId()"
+          (change)="bankId.set($any($event.target).value)"
+        >
+          @for (bank of banks; track bank) {
+            <option [value]="bank">{{ bank }}</option>
+          }
+        </select>
+
+        <input
+          type="number"
+          min="1"
+          step="100"
+          aria-label="Amount"
+          class="text-[12.5px] font-semibold px-3 py-2 rounded-full border w-[130px]"
+          style="border-color: var(--border); color: var(--text-1); background: var(--surface)"
+          [value]="amount()"
+          (input)="amount.set(+$any($event.target).value)"
+        />
+
+        <button
+          type="button"
+          (click)="send('Credit')"
+          [disabled]="sending()"
+          class="text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90 disabled:opacity-60"
+          style="background: var(--green); color: #fff"
+        >
+          Money in
+        </button>
+        <button
+          type="button"
+          (click)="send('Debit')"
+          [disabled]="sending()"
+          class="text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90 disabled:opacity-60"
+          style="background: var(--red); color: #fff"
+        >
+          Money out
+        </button>
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          (click)="refresh()"
+          class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
+          style="border-color: var(--border); color: var(--text-2)"
+        >
+          <span class="icon icon-sm">refresh</span> Refresh
+        </button>
+        <button
+          type="button"
+          (click)="exportCsv()"
+          class="flex items-center gap-1.5 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
+          style="background: var(--primary); color: #fff"
+        >
+          <span class="icon icon-sm">download</span> Export CSV
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[760px]">
+        <thead>
+          <tr style="background: var(--surface-2)">
+            @for (heading of ['Reference', 'Bank', 'Direction', 'Description', 'Amount', 'Booked']; track heading) {
+              <th
+                class="text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] px-5 py-3 first:rounded-l-xl last:rounded-r-xl"
+                style="color: var(--text-3)"
+              >{{ heading }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (movement of filtered(); track movement.reference) {
+            <tr class="border-b last:border-0 transition-all hover:opacity-90" style="border-color: var(--border)">
+              <td class="px-5 py-3.5 text-[12.5px] font-mono" style="color: var(--primary-ink)">{{ movement.reference }}</td>
+              <td class="px-5 py-3.5">
+                <span
+                  class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg"
+                  style="background: var(--primary-soft); color: var(--primary-ink)"
+                >{{ movement.bankId }}</span>
+              </td>
+              <td class="px-5 py-3.5 text-[12.5px] font-semibold whitespace-nowrap" [style.color]="amountColor(movement.direction)">
+                {{ directionLabel(movement.direction) }}
+              </td>
+              <td class="px-5 py-3.5 text-[12.5px] max-w-[240px] truncate" style="color: var(--text-2)">{{ movement.narration ?? 'no narration' }}</td>
+              <td class="px-5 py-3.5 text-[13px] font-semibold tabular whitespace-nowrap" [style.color]="amountColor(movement.direction)">
+                {{ movement.direction === 'Debit' ? '-' : '+' }}{{ movement.currency }} {{ money(movement.amount) }}
+              </td>
+              <td class="px-5 py-3.5 text-[12.5px] whitespace-nowrap" style="color: var(--text-3)">{{ when(movement.bookingDate) }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="px-5 py-14 text-center">
+                <p class="text-[14px] font-semibold" style="color: var(--text-1)">No demo movements yet</p>
+                <p class="text-[12.5px] mt-1" style="color: var(--text-3)">
+                  Choose an amount, then press Money in or Money out. Each press sends one notification
+                  through the pipeline a bank uses.
+                </p>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </app-surface-card>
+</div>

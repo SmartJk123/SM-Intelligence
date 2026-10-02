@@ -1,6 +1,10 @@
 server:
   port: ${PORT:8080}
 spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
   application:
     name: api-gateway
   cloud:
@@ -8,10 +12,38 @@ spring:
       server:
         webmvc:
           routes:
+            - id: invoices
+              uri: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/invoices,/api/invoices/**
             - id: identity-service
               uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/api/auth/**
+            - id: identity-admin-users
+              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/admin/users/**
+            - id: accounts-service
+              uri: ${ACCOUNTS_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/accounts/**
+            - id: transactions-service
+              uri: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/transactions/**
+            - id: bank-integration-webhooks
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              predicates:
+                - Path=/api/v1/webhooks/**
+            - id: bank-integration-admin
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              predicates:
+                - Path=/api/v1/admin/bank-integrations/**
+            - id: bank-integration-stats
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              predicates:
+                - Path=/api/v1/admin/stats/**
 management:
   endpoints:
     web:

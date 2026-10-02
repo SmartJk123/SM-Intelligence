@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Circular energy ring -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,10 A44,44 0,1 0,54 98 A44,44 0,1 0,54 10"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillAlpha="0"/>
+
+    <!-- Lightning bolt -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M61,18 L35,57 L51,57 L44,91 L73,48 L57,48 Z"/>
+
+    <!-- Left leaf -->
+    <path
+        android:fillColor="#A5D6A7"
+        android:pathData="M50,20 C36,10 24,17 24,32 C38,35 48,30 50,20 Z"/>
+
+    <!-- Right leaf -->
+    <path
+        android:fillColor="#66BB6A"
+        android:pathData="M58,27 C63,11 77,9 86,17 C82,30 70,35 58,27 Z"/>
+
+</vector>

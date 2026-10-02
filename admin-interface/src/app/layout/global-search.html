@@ -1,0 +1,51 @@
+<input
+  type="text"
+  [value]="query()"
+  (input)="onQueryInput($any($event.target).value)"
+  (focus)="open.set(true)"
+  placeholder="Search transactions, organisations, users…"
+  class="w-40 lg:w-60 px-4 py-2.5 pl-10 text-[13px] rounded-full border focus:outline-none transition-all focus:w-56 lg:focus:w-72"
+  [style.background]="'var(--surface-2)'"
+  [style.borderColor]="open() && query() ? 'var(--primary)' : 'var(--border)'"
+  [style.color]="'var(--text-1)'"
+/>
+<span
+  class="icon icon-sm absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+  style="color: var(--text-3)"
+>search</span>
+
+@if (open() && results().length > 0) {
+  <div
+    class="absolute top-full mt-2 left-0 w-[340px] panel z-50 animate-slide-down overflow-hidden"
+    style="box-shadow: var(--shadow-lg)"
+  >
+    @for (result of results(); track result.label + result.type) {
+      <button
+        type="button"
+        (click)="goTo(result)"
+        class="w-full flex items-center gap-3 px-4 py-3 border-b last:border-0 text-left transition-all hover:opacity-80"
+        style="border-color: var(--border)"
+      >
+        <span
+          class="icon-tile w-7 h-7"
+          style="background: var(--primary-soft); color: var(--primary-ink)"
+        ><span class="icon icon-sm">{{ result.icon }}</span></span>
+        <span class="flex-1 min-w-0">
+          <span class="block text-[12.5px] font-semibold truncate" style="color: var(--text-1)">{{ result.label }}</span>
+          <span class="block text-[11px] truncate mt-0.5" style="color: var(--text-3)">
+            {{ result.type }} · {{ result.sub }}
+          </span>
+        </span>
+      </button>
+    }
+  </div>
+}
+
+@if (open() && query().trim().length >= 2 && results().length === 0) {
+  <div
+    class="absolute top-full mt-2 left-0 w-[300px] panel z-50 px-4 py-3 text-[12.5px] animate-slide-down"
+    style="color: var(--text-3)"
+  >
+    No results for "{{ query() }}"
+  </div>
+}

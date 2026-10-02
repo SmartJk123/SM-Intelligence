@@ -19,6 +19,11 @@ import java.util.UUID;
 @Table(name = "users")
 public class User {
 
+    public static final String STATUS_ACTIVE = "ACTIVE";
+    public static final String STATUS_SUSPENDED = "SUSPENDED";
+    public static final String ROLE_USER = "USER";
+    public static final String ROLE_PLATFORM_ADMIN = "PLATFORM_ADMIN";
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
@@ -68,6 +73,17 @@ public class User {
 
     @Column(name = "terms_accepted_at", nullable = false)
     private OffsetDateTime termsAcceptedAt = OffsetDateTime.now();
+
+    /** ACTIVE or SUSPENDED. A suspended user cannot sign in or use a session. */
+    @Column(name = "status", nullable = false)
+    private String status = STATUS_ACTIVE;
+
+    /** USER or PLATFORM_ADMIN. Only a platform admin may use the admin API. */
+    @Column(name = "role", nullable = false)
+    private String role = ROLE_USER;
+
+    @Column(name = "last_login_at")
+    private OffsetDateTime lastLoginAt;
 
     @Version
     @Column(name = "version", nullable = false)
@@ -236,6 +252,38 @@ public class User {
 
     public void setTermsAcceptedAt(OffsetDateTime termsAcceptedAt) {
         this.termsAcceptedAt = termsAcceptedAt;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public boolean isSuspended() {
+        return STATUS_SUSPENDED.equals(status);
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public boolean isPlatformAdmin() {
+        return ROLE_PLATFORM_ADMIN.equals(role);
+    }
+
+    public OffsetDateTime getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(OffsetDateTime lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
     }
 
     public Integer getVersion() {
