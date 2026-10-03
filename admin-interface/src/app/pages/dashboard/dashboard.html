@@ -121,7 +121,7 @@
           <table class="w-full min-w-[720px]">
             <thead>
               <tr style="background: var(--surface-2)">
-                @for (heading of ['Received', 'Bank', 'Flow', 'Reference', 'Signature', 'Status', 'Handled in']; track heading) {
+                @for (heading of ['Received', 'Bank', 'Flow', 'Sender', 'Reference', 'Signature', 'Status', 'Handled in']; track heading) {
                   <th
                     class="text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] px-5 py-3 first:rounded-l-xl last:rounded-r-xl"
                     style="color: var(--text-3)"
@@ -150,6 +150,9 @@
                       >Demo</span>
                     }
                   </td>
+                  <td class="px-5 py-3.5 text-[12.5px]" style="color: var(--text-2)">
+                    {{ event.counterpartyName ?? '—' }}
+                  </td>
                   <td class="px-5 py-3.5 text-[12.5px] font-mono" style="color: var(--primary-ink)">
                     {{ event.externalEventId ?? 'no reference' }}
                   </td>
@@ -161,7 +164,7 @@
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="7" class="px-5 py-14 text-center">
+                  <td colspan="8" class="px-5 py-14 text-center">
                     <p class="text-[14px] font-semibold" style="color: var(--text-1)">Nothing received yet</p>
                     <p class="text-[12.5px] mt-1" style="color: var(--text-3)">
                       Once a bank delivers a notification it appears here within seconds.

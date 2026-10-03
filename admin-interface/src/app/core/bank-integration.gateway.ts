@@ -130,6 +130,8 @@ export interface PlatformEvent {
   errorMessage: string | null;
   /** Credit or Debit when the bank stated one. No amount accompanies it. */
   direction: string | null;
+  /** Who sent or received the money, as the bank named them. No amount or balance accompanies it. */
+  counterpartyName: string | null;
   /** True for the demonstration account rather than a delivery from a bank. */
   simulated: boolean;
 }
