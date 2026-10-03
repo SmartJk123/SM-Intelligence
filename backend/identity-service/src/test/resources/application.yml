@@ -15,3 +15,7 @@ spring:
 
 jwt:
   secret: test-only-signing-key-not-for-production-at-least-32-bytes
+
+app:
+  admin:
+    emails: admin@example.invalid

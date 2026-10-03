@@ -19,7 +19,12 @@ public class UserSummaryResponse {
     private String organizationName;
     private String businessType;
     private String industry;
+    private String status;
+    private String role;
+    private Boolean isEmailVerified;
+    private OffsetDateTime lastLoginAt;
     private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
 
     public UserSummaryResponse() {
     }
@@ -34,7 +39,12 @@ public class UserSummaryResponse {
         response.setOrganizationName(user.getOrganizationName());
         response.setBusinessType(user.getBusinessType());
         response.setIndustry(user.getIndustry());
+        response.setStatus(user.getStatus());
+        response.setRole(user.getRole());
+        response.setIsEmailVerified(user.getIsEmailVerified());
+        response.setLastLoginAt(user.getLastLoginAt());
         response.setCreatedAt(user.getCreatedAt());
+        response.setUpdatedAt(user.getUpdatedAt());
         return response;
     }
 
@@ -108,5 +118,45 @@ public class UserSummaryResponse {
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public Boolean getIsEmailVerified() {
+        return isEmailVerified;
+    }
+
+    public void setIsEmailVerified(Boolean isEmailVerified) {
+        this.isEmailVerified = isEmailVerified;
+    }
+
+    public OffsetDateTime getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(OffsetDateTime lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

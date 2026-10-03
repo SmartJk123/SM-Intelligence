@@ -44,7 +44,7 @@
         </div>
       </div>
       <p class="text-blue-200 text-sm">
-        {{ step() === 'login' ? 'Sign in to your admin account' : 'Two-Factor Authentication' }}
+        Sign in to your admin account
       </p>
     </div>
 
@@ -148,61 +148,8 @@
           </form>
 
           <p class="text-[12px] text-center text-blue-300/60 flex items-center justify-center gap-1">
-            <span class="icon icon-sm">lock</span> Access restricted to &#64;smartmoney.io domain accounts only.
+            <span class="icon icon-sm">lock</span> Access restricted to platform administrator accounts only.
           </p>
-        </div>
-      }
-
-      @if (step() === '2fa') {
-        <div class="space-y-5 animate-fade-up">
-          <div class="text-center">
-            <div
-              class="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center text-2xl"
-              style="background: var(--primary-soft); color: var(--primary)"
-            >
-              🔐
-            </div>
-            <p class="text-white font-semibold text-sm font-display">Enter Verification Code</p>
-            <p class="text-blue-300 text-[13px] mt-1">Enter the 6-digit code from your authenticator app</p>
-          </div>
-
-          <div class="flex gap-2 justify-center">
-            @for (slot of otpSlots; track slot) {
-              <input
-                #otpInput
-                type="text"
-                inputmode="numeric"
-                maxlength="1"
-                [value]="otp()[slot]"
-                (input)="onOtpInput(slot, $any($event.target).value)"
-                (keydown)="onOtpKeydown(slot, $event)"
-                class="otp-input w-11 h-12 text-center text-xl font-bold text-white rounded-xl border border-white/20 focus:outline-none focus:border-blue-400 bg-white/10"
-              />
-            }
-          </div>
-
-          @if (loading()) {
-            <div class="flex justify-center">
-              <span
-                class="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full"
-                style="animation: spin-slow 1s linear infinite"
-              ></span>
-            </div>
-          }
-
-          <div class="text-center">
-            <button type="button" class="text-[13px] text-blue-300 hover:text-white transition-all">
-              Didn't receive a code? Resend
-            </button>
-          </div>
-
-          <button
-            type="button"
-            (click)="backToLogin()"
-            class="w-full text-center text-[13px] text-blue-400 hover:text-blue-200 transition-all"
-          >
-            ← Back to login
-          </button>
         </div>
       }
     </div>

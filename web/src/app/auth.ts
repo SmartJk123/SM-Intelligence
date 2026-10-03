@@ -46,7 +46,7 @@ import { AccountApi, AccountKind } from './account-api';
                   type="radio"
                   formControlName="kind"
                   value="organization"
-                />Organization<small>Company or team</small></label
+                />Company<small>Company or team</small></label
               >
             </fieldset>
             <label for="name">Full name</label

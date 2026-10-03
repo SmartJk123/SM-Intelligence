@@ -119,6 +119,7 @@ public class PlatformStatsService {
     }
 
     private WebhookEventView toView(WebhookEventEntity event) {
+        NormalizedTransactionEntity movement = movement(event);
         return new WebhookEventView(
                 event.getId(),
                 event.getBankId(),
@@ -128,24 +129,22 @@ public class PlatformStatsService {
                 event.getReceivedAt(),
                 event.getProcessedAt(),
                 event.getErrorMessage(),
-                direction(event),
+                movement == null ? null : movement.getDirection(),
+                movement == null ? null : movement.getCounterpartyName(),
                 event.isSimulated());
     }
 
     /**
-     * Credit or Debit, when the notification carried one and it normalised.
-     *
-     * The administrator sees whether money came in or went out, which is what
-     * makes a delivery checkable on the operations surface. The figure stays
-     * away: no amount, no balance and no counterparty is returned here.
+     * Credit or Debit, and who sent or received it, when the notification
+     * carried one and it normalised. The amount and account balance stay off
+     * this surface; only the direction and the counterparty's name are shown.
      */
-    private String direction(WebhookEventEntity event) {
+    private NormalizedTransactionEntity movement(WebhookEventEntity event) {
         if (event.getExternalEventId() == null) {
             return null;
         }
         return normalizedTransactions
                 .findFirstByBankIdAndExternalEventId(event.getBankId(), event.getExternalEventId())
-                .map(NormalizedTransactionEntity::getDirection)
                 .orElse(null);
     }
 
@@ -168,6 +167,7 @@ public class PlatformStatsService {
             Instant processedAt,
             String errorMessage,
             String direction,
+            String counterpartyName,
             boolean simulated) {
     }
 
