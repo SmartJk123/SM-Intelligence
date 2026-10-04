@@ -1,8 +1,9 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
+import { sessionExpiryInterceptor } from './core/session-expiry.interceptor';
 
 /**
  * Every screen reads from the Spring Boot API. There is no simulated mode, so a
@@ -10,5 +11,5 @@ import { routes } from './app.routes';
  * placeholder figures.
  */
 export const appConfig: ApplicationConfig = {
-  providers: [provideBrowserGlobalErrorListeners(), provideRouter(routes), provideHttpClient()],
+  providers: [provideBrowserGlobalErrorListeners(), provideRouter(routes), provideHttpClient(withInterceptors([sessionExpiryInterceptor]))],
 };

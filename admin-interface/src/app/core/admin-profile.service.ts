@@ -1,4 +1,5 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
+import { AuthService } from './auth.service';
 
 export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
@@ -15,12 +16,16 @@ export interface AvatarResult {
  */
 @Injectable({ providedIn: 'root' })
 export class AdminProfileService {
-  readonly firstName = signal('System');
-  readonly lastName = signal('Administrator');
-  readonly email = signal('admin@smartmoney.io');
-  readonly phone = signal('+254 700 000 000');
+  private readonly session = inject(AuthService).session;
+
+  // Name and email follow whoever is signed in; Settings can still edit them
+  // locally, and the next sign-in resets them to that account's own details.
+  readonly firstName = linkedSignal(() => splitName(this.session()?.name)[0]);
+  readonly lastName = linkedSignal(() => splitName(this.session()?.name)[1]);
+  readonly email = linkedSignal(() => this.session()?.email ?? '');
+  readonly phone = signal('');
   readonly jobTitle = signal('Platform Administrator');
-  readonly role = signal('Super Admin');
+  readonly role = signal('Platform Admin');
 
   /** Data URL of the uploaded profile image, or null when none is set. */
   readonly avatar = signal<string | null>(null);
@@ -75,6 +80,12 @@ export class AdminProfileService {
   clearError(): void {
     this.avatarError.set('');
   }
+}
+
+function splitName(name: string | undefined): [string, string] {
+  const parts = (name ?? '').trim().split(/\s+/).filter((part) => part.length > 0);
+  if (!parts.length) return ['Administrator', ''];
+  return [parts[0], parts.slice(1).join(' ')];
 }
 
 function readAsDataUrl(file: File): Promise<string> {
