@@ -63,7 +63,13 @@ interface DashboardData {
             }}
           </p>
         </div>
-        <button class="button secondary" (click)="load()" [disabled]="loading()">Refresh</button>
+        <div class="dashboard-heading-actions">
+          <span class="live-pill" [class.on]="live.status() === 'live'"
+            [attr.title]="live.status() === 'live' ? 'New payments appear here automatically' : 'Live updates are reconnecting'"
+            >{{ live.status() === 'live' ? 'Live' : 'Reconnecting…' }}</span
+          >
+          <button class="button secondary" (click)="load()" [disabled]="loading()">Refresh</button>
+        </div>
       </header>
       <div class="dashboard-toolbar">
         <span>{{
@@ -239,7 +245,7 @@ interface DashboardData {
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Description</th>
+                    <th>From / to</th>
                     <th>Account</th>
                     <th>Status</th>
                     <th class="amount-cell">Amount (KES)</th>
@@ -247,7 +253,7 @@ interface DashboardData {
                 </thead>
                 <tbody>
                   @for (tx of d.transactions; track tx.id) {
-                    <tr>
+                    <tr [class.just-arrived]="arrived().has(tx.id)">
                       <td>{{ tx.date | date: 'd MMM y' : 'UTC' }}<small>{{ tx.date | date: 'HH:mm' : 'UTC' }}</small></td>
                       <td>
                         <strong>{{ tx.description }}</strong
@@ -318,21 +324,29 @@ export class Dashboard {
     this.bank.set(bank);
     void this.load();
   }
-  private readonly live = inject(LiveUpdates);
+  readonly live = inject(LiveUpdates);
+  /** Transactions that arrived on the last live refresh, briefly highlighted. */
+  readonly arrived = signal<ReadonlySet<string>>(new Set());
+  private arrivedTimer: ReturnType<typeof setTimeout> | undefined;
   constructor() {
     void this.load();
     // A transaction arriving for this customer while the page is open means
-    // the figures on screen are stale; reload rather than wait for a manual refresh.
+    // the figures on screen are stale; refresh them in place rather than wait
+    // for a manual refresh or blank the page behind a loading state.
     effect(() => {
       if (this.live.lastUpdate() === null) return;
-      void this.load();
+      void this.load(true);
     });
   }
-  async load() {
-    this.loading.set(true);
-    this.error.set('');
-    this.disconnected.set(false);
-    this.data.set(null);
+  async load(background = false) {
+    if (background && (this.loading() || !this.data())) background = false;
+    const previousIds = new Set(this.data()?.transactions.map((tx) => tx.id) ?? []);
+    if (!background) {
+      this.loading.set(true);
+      this.error.set('');
+      this.disconnected.set(false);
+      this.data.set(null);
+    }
     try {
       const d = await firstValueFrom(
         this.http.get<DashboardData>('/api/dashboard?days=' + this.days() + '&bank=' + encodeURIComponent(this.bank())).pipe(timeout(15000)),
@@ -346,13 +360,23 @@ export class Dashboard {
       )
         throw new Error('Invalid response');
       this.data.set(d);
+      if (background) this.highlight(d.transactions.filter((tx) => !previousIds.has(tx.id)).map((tx) => tx.id));
     } catch (error) {
+      // A failed background refresh keeps the figures already on screen;
+      // the next live update or a manual refresh tries again.
+      if (background) return;
       this.disconnected.set(error instanceof HttpErrorResponse && error.status === 501);
       this.data.set(null);
       this.error.set(this.disconnected() ? 'Live financial activity is not connected. Your dashboard layout and saved account snapshots remain available.' : 'We could not load financial activity. Your dashboard layout remains available. Please try again.');
     } finally {
       this.loading.set(false);
     }
+  }
+  private highlight(ids: string[]) {
+    if (!ids.length) return;
+    this.arrived.set(new Set(ids));
+    clearTimeout(this.arrivedTimer);
+    this.arrivedTimer = setTimeout(() => this.arrived.set(new Set()), 3000);
   }
   changePeriod(days: number) {
     if (this.loading() || days === this.days()) return;

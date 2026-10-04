@@ -530,6 +530,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
               amountMinor: toMinor(tx.amount),
               description: tx.counterparty || describedNarrative(tx.description, account.institution),
               date: tx.transactionDate,
+              bank: account.institution,
             });
             for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(message);
           }
@@ -539,7 +540,9 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       }
     }
   }
-  const pollTimer = setInterval(pollForUpdates, 8000);
+  // Short enough that a payment shows on screen within seconds of the bank
+  // reporting it; each tick is a few local service calls per connected user.
+  const pollTimer = setInterval(pollForUpdates, 4000);
   server.on('close', () => clearInterval(pollTimer));
 
   return server.listen(port, '127.0.0.1');

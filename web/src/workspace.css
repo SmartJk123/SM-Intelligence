@@ -1441,3 +1441,126 @@ html[data-theme='dark'] .workspace-shell .dashboard-metrics article { padding:18
  .workspace-shell .dashboard-metrics { grid-template-columns:minmax(0,1fr); }
  .workspace-shell .dashboard-metrics strong { font-size:24px; }
 }
+
+/* Live payments: a toast per incoming/outgoing payment, and a "Live" pill on pages that update on their own. */
+.ws-toasts {
+  position: fixed;
+  top: 76px;
+  right: 20px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.ws-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 14px 16px;
+  background: var(--ws-card);
+  color: var(--ws-ink);
+  border: 1px solid var(--ws-line);
+  border-left: 4px solid var(--finance-out);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(15, 35, 65, 0.18);
+  animation: ws-toast-in 0.28s ease-out;
+}
+.ws-toast.positive {
+  border-left-color: var(--finance-in);
+}
+.ws-toast-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ws-toast-body small {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ws-muted);
+}
+.ws-toast-body strong {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-toast-amount {
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  color: var(--finance-out);
+}
+.ws-toast.positive .ws-toast-amount {
+  color: var(--finance-in);
+}
+.ws-toast-close {
+  border: 0;
+  background: none;
+  color: var(--ws-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px;
+}
+@keyframes ws-toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ws-line);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ws-muted);
+}
+.live-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ws-muted);
+}
+.live-pill.on {
+  color: var(--finance-in);
+}
+.live-pill.on::before {
+  background: var(--finance-in);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  50% { opacity: 0.35; }
+}
+.dashboard-page tr.just-arrived td {
+  animation: row-arrived 3s ease-out;
+}
+@keyframes row-arrived {
+  from { background: var(--income-soft); }
+  to { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-toast,
+  .live-pill.on::before,
+  .dashboard-page tr.just-arrived td {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .ws-toasts {
+    top: auto;
+    bottom: 84px;
+    right: 16px;
+  }
+}
+.dashboard-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
