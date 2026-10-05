@@ -12,7 +12,7 @@ import { RouterLink } from '@angular/router';
         <h1>{{ title }}</h1><p class="muted">Welcome, {{ api.displayName() }}.</p></div></header>
       @if (page === 'settings') {
         <section class="ws-card"><h2>Your profile</h2><p>{{ api.displayName() }}</p><p>{{ api.email() }}</p>
-          <p>{{ api.kind() === 'organization' ? 'Organization' : 'Individual' }} account</p>
+          <p>{{ api.kind() === 'organization' ? 'Company' : 'Individual' }} account</p>
           <h2>Appearance</h2><button class="button secondary" (click)="toggleTheme()">{{ dark() ? 'Use light mode' : 'Use dark mode' }}</button>
         </section>
       } @else if (page === 'dashboard' || page === 'accounts') {

@@ -20,3 +20,11 @@ export const API_BASE_URL = 'http://localhost:8090/api/v1';
  *   GET {IDENTITY_API_BASE_URL}/admin/users
  */
 export const IDENTITY_API_BASE_URL = 'http://localhost:8080/api/v1';
+
+/**
+ * identity-service's auth endpoints sit directly under /api, not /api/v1 like
+ * its admin routes above, so login needs its own base URL.
+ *
+ *   POST {IDENTITY_AUTH_BASE_URL}/login
+ */
+export const IDENTITY_AUTH_BASE_URL = 'http://localhost:8080/api/auth';

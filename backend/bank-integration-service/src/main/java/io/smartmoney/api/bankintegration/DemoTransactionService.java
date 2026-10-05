@@ -17,6 +17,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.transaction.annotation.Transactional;
+
 /**
  * The demonstration account.
  *
@@ -56,6 +58,12 @@ public class DemoTransactionService {
         this.events = events;
         this.transactions = transactions;
         this.mapper = mapper;
+    }
+
+    @Transactional
+    public void reset() {
+        transactions.deleteBySimulatedTrue();
+        events.deleteBySimulatedTrue();
     }
 
     /** A movement the demonstration account has just made. */
@@ -158,10 +166,10 @@ public class DemoTransactionService {
                 row.getAmount(),
                 row.getCurrency(),
                 row.getNarration(),
-                DEMO_ACCOUNT_NUMBER,
+                row.getAccountNumber() != null ? row.getAccountNumber() : DEMO_ACCOUNT_NUMBER,
                 DEMO_ACCOUNT_NAME,
                 row.getBookingDate(),
-                true);
+                row.isSimulated());
     }
 
     private String payload(

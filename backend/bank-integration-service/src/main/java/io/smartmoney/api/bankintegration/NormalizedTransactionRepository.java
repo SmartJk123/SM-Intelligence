@@ -16,4 +16,7 @@ public interface NormalizedTransactionRepository extends JpaRepository<Normalize
     /** Real movements on one account not yet sent to transactions-service, oldest first. */
     List<NormalizedTransactionEntity> findByBankIdAndAccountNumberAndForwardedAtIsNullAndSimulatedFalseOrderByCreatedAtAsc(
             String bankId, String accountNumber);
+
+    /** Safely purge only simulated movements during demo resets, leaving real bank records untouched. */
+    void deleteBySimulatedTrue();
 }

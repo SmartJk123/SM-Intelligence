@@ -53,6 +53,8 @@ class AuthIntegrationTest {
         assertEquals(id, json.readTree(login.body()).get("userId").asText());
         assertEquals(401, me("invalid.jwt.token").statusCode());
         assertEquals(400, post("/api/auth/register", Map.of("name", "Bad Kind", "emailAddress", "invalid@example.invalid", "password", "ValidPassword123!", "accountType", "ADMIN")).statusCode());
+        // Signing in updates last_login_at, so reload before changing the row again.
+        saved = users.findById(UUID.fromString(id)).orElseThrow();
         saved.setDeletedAt(java.time.OffsetDateTime.now()); users.save(saved);
         assertEquals(401, me(token).statusCode());
     }

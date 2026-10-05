@@ -153,6 +153,24 @@ html[data-theme='dark'] {
   font-weight: 700;
   color: var(--ws-muted);
 }
+.ws-notif-link {
+  position: relative;
+}
+.ws-notif-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e0393e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
 .ws-menu,
 .ws-close,
 .ws-shade,

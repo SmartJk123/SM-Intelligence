@@ -1,11 +1,12 @@
 // Customer cash flow: money in vs money out, drawn from posted deposit-account activity.
 import { WorkspaceIcon } from './workspace-icon';
 import { FinanceChart } from './finance-chart';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, effect, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
+import { LiveUpdates } from './live-updates';
 
 interface CashFlowData {
   bank?: string;
@@ -119,9 +120,14 @@ export class CashFlow {
   readonly days = signal(30);
   readonly bank = signal('');
   readonly banks = ['KCB', 'Equity', 'Stanbic', 'NCBA'];
+  private readonly live = inject(LiveUpdates);
 
   constructor() {
     void this.load();
+    effect(() => {
+      if (this.live.lastUpdate() === null) return;
+      void this.load();
+    });
   }
 
   changeBank(bank: string) {

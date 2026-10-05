@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
@@ -51,22 +53,38 @@ class HomeViewModel(
     private val _isSimulatingOutflow = MutableStateFlow(false)
     val isSimulatingOutflow: StateFlow<Boolean> = _isSimulatingOutflow.asStateFlow()
 
+    private val _hasDismissedWelcomeSheet = MutableStateFlow(false)
+
     private data class HomeAggregatedData(
         val trendCalc: TransactionTrendCalculation,
         val activeBalance: BigDecimal,
-        val effectiveBanks: List<BankAccount>
+        val effectiveBanks: List<BankAccount>,
+        val isOnboardingActive: Boolean,
+        val shouldShowWelcomeSheet: Boolean
     )
 
     private val aggregatedDataFlow = combine(
         accountRepository.getAccountsFlow(userId),
         bankAccountRepository.getBankAccounts(),
-        transactionRepository.getTransactionsFlow(userId = userId)
-    ) { accounts, bankAccounts, transactions ->
+        transactionRepository.getTransactionsFlow(userId = userId),
+        _hasDismissedWelcomeSheet
+    ) { accounts, bankAccounts, transactions, dismissedWelcome ->
         val trendCalc = TransactionTrendCalculator.calculateTrendSummary(transactions)
         val calculatedBalance = accounts.fold(BigDecimal.ZERO) { acc, a -> acc.add(a.availableBalance) }
-        val activeBalance = if (accounts.isNotEmpty()) calculatedBalance else DefaultHomeBalance
-        val effectiveBanks = if (bankAccounts.isNotEmpty()) bankAccounts else DefaultBankAccounts
-        HomeAggregatedData(trendCalc, activeBalance, effectiveBanks)
+        val finalBalance = if (calculatedBalance > BigDecimal.ZERO || accounts.isNotEmpty()) {
+            calculatedBalance
+        } else {
+            bankAccounts.fold(BigDecimal.ZERO) { acc, b -> acc.add(b.balance) }
+        }
+        val isOnboarding = accounts.isEmpty() && bankAccounts.isEmpty()
+        val showSheet = isOnboarding && !dismissedWelcome
+        HomeAggregatedData(
+            trendCalc = trendCalc,
+            activeBalance = finalBalance,
+            effectiveBanks = bankAccounts,
+            isOnboardingActive = isOnboarding,
+            shouldShowWelcomeSheet = showSheet
+        )
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
@@ -81,11 +99,13 @@ class HomeViewModel(
             isSimulatingInflow = simInflow,
             isSimulatingOutflow = simOutflow,
             totalBalance = data.activeBalance,
-            totalCashIn = if (data.trendCalc.hasTransactions) data.trendCalc.totalInflow else DefaultCashIn,
-            totalCashOut = if (data.trendCalc.hasTransactions) data.trendCalc.totalOutflow else DefaultCashOut,
+            totalCashIn = data.trendCalc.totalInflow,
+            totalCashOut = data.trendCalc.totalOutflow,
             trend = data.trendCalc.trendPoints,
             bankAccounts = data.effectiveBanks,
-            hasTransactions = data.trendCalc.hasTransactions
+            hasTransactions = data.trendCalc.hasTransactions,
+            isOnboardingActive = data.isOnboardingActive,
+            shouldShowWelcomeSheet = data.shouldShowWelcomeSheet
         )
     }
     .flowOn(dispatchers.default)
@@ -97,6 +117,20 @@ class HomeViewModel(
 
     init {
         refresh()
+        startPeriodicSync()
+    }
+
+    private fun startPeriodicSync() {
+        viewModelScope.launch(dispatchers.io) {
+            while (isActive) {
+                delay(6_000)
+                try {
+                    transactionRepository.syncTransactions(userId = userId)
+                } catch (_: Exception) {
+                    // Gracefully tolerate temporary network errors
+                }
+            }
+        }
     }
 
     /**
@@ -114,6 +148,43 @@ class HomeViewModel(
                 // Gracefully tolerate network unavailability
             } finally {
                 _isSyncing.value = false
+            }
+        }
+    }
+
+    /**
+     * Dismisses the onboarding welcome bottom sheet off the Main thread.
+     */
+    fun dismissWelcomeSheet() {
+        viewModelScope.launch(dispatchers.default) {
+            _hasDismissedWelcomeSheet.value = true
+        }
+    }
+
+    /**
+     * Executes bank account linking asynchronously on [Dispatchers.IO], ensuring
+     * zero network or database blocking operations occur on the Main thread.
+     */
+    fun linkBankAccount(
+        bankName: String,
+        accountNumber: String,
+        cardType: String,
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        viewModelScope.launch(dispatchers.io) {
+            val result = bankAccountRepository.addBankAccount(
+                bankName = bankName,
+                accountNumber = accountNumber,
+                cardType = cardType
+            )
+            withContext(dispatchers.main) {
+                result.onSuccess {
+                    _hasDismissedWelcomeSheet.value = true
+                    onSuccess?.invoke()
+                }.onFailure { error ->
+                    onError?.invoke(error.localizedMessage ?: "Failed to link bank account")
+                }
             }
         }
     }
@@ -197,18 +268,5 @@ class HomeViewModel(
                 dispatchers = dispatchers
             ) as T
         }
-    }
-
-    companion object {
-        val DefaultHomeBalance = BigDecimal("23590.73")
-        val DefaultCashIn = BigDecimal("45000.00")
-        val DefaultCashOut = BigDecimal("12500.00")
-
-        val DefaultBankAccounts = listOf(
-            BankAccount("sample_equity", "Equity Bank", "**** 4821", "Debit"),
-            BankAccount("sample_kcb", "KCB", "**** 9104", "Credit"),
-            BankAccount("sample_ncba", "NCBA", "**** 3350", "Debit"),
-            BankAccount("sample_stanbic", "Stanbic Bank", "**** 7712", "Credit")
-        )
     }
 }

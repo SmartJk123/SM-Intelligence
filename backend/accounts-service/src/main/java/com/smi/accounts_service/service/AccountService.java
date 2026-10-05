@@ -11,7 +11,9 @@ import com.smi.accounts_service.repository.AccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -79,16 +81,12 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccountsByUserId(UUID userId, String status) {
-        List<Account> accounts;
         if (userId == null) {
-            if (status != null && !status.isBlank()) {
-                accounts = accountRepository.findAll().stream()
-                    .filter(a -> a.getAccountStatus().equalsIgnoreCase(status.trim()))
-                    .collect(Collectors.toList());
-            } else {
-                accounts = accountRepository.findAll();
-            }
-        } else if (status != null && !status.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        List<Account> accounts;
+        if (status != null && !status.isBlank()) {
             accounts = accountRepository.findByUserIdAndAccountStatus(userId, status.toUpperCase());
         } else {
             accounts = accountRepository.findByUserId(userId);
@@ -126,6 +124,17 @@ public class AccountService {
         if (userId != null && !account.getUserId().equals(userId)) {
             throw new AccountNotFoundException("Account not found with identifier: " + identifier + " for user: " + userId);
         }
+        return AccountResponse.fromEntity(account);
+    }
+
+    /** Moves the balance by delta (negative for a debit) and returns the new figure. */
+    public AccountResponse adjustBalance(UUID id, BigDecimal delta) {
+        int updated = accountRepository.adjustAvailableBalance(id, delta, OffsetDateTime.now());
+        if (updated == 0) {
+            throw new AccountNotFoundException("Account not found with ID: " + id);
+        }
+        Account account = accountRepository.findById(id)
+            .orElseThrow(() -> new AccountNotFoundException("Account not found with ID: " + id));
         return AccountResponse.fromEntity(account);
     }
 
