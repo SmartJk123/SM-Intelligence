@@ -69,7 +69,8 @@ public class SecurityConfig {
                 // A refusal is rendered by an error dispatch that carries no token;
                 // denying it would turn every 403 or 404 into a misleading 401.
                 .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                .requestMatchers("/", "/oauth/**", "/api/v1/webhooks/**", "/actuator/health", "/actuator/info")
+                .requestMatchers("/", "/oauth/**", "/api/v1/webhooks/**", "/actuator/health", "/actuator/health/**",
+                        "/actuator/info")
                 .permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/admin/account-links")
                 .hasAnyRole(AdminTokenVerifier.ADMIN_ROLE, CUSTOMER_ROLE)

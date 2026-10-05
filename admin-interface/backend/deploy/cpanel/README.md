@@ -159,3 +159,44 @@ KCB's public key. The endpoint answers with the acknowledgement body the specifi
 6. **Link the account.** In the admin interface, link KCB account `1302360167` to the customer, so its
    payments show on their dashboard. KCB names it in `creditAccountIdentifier`.
 7. **Email KCB.** Send the address above to buni@kcbgroup.com for review.
+
+## Equity Bank (Jenga) Instant Payment Notifications
+
+The address to register as the IPN callback on Jenga HQ:
+
+```text
+https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/equity
+```
+
+`equity-webhook.php` receives Jenga's JSON notifications. Jenga authenticates them with **Basic Auth**:
+the username and password you register with the callback URL on Jenga HQ. It sends successful and failed
+payments; both are stored, and the bank integration service credits only successful ones. Format and
+authentication follow [Jenga's IPN guide](https://developer.jengahq.io/guides/jenga-pgw/instant-payment-notifications).
+
+| Case | HTTP | Body |
+| --- | --- | --- |
+| Accepted | 200 | `{"status":"received","reference":"..."}` |
+| Already received (same reference) | 200 | adds `"duplicate":true` |
+| Basic Auth missing or wrong | 401 | `{"status":"rejected",...}` |
+| Body not JSON | 400 | `{"status":"rejected",...}` |
+| Config or database not ready | 503 | so Jenga can retry |
+
+Jenga does not document the reply it expects, so confirm with Equity that a 200 with this body counts as
+delivered.
+
+### Steps
+
+1. **Upload** `public_html/sm-intelligence/equity-webhook.php`, and the updated
+   `public_html/sm-intelligence/.htaccess` (it adds the `equity` rules and passes the Authorization header
+   through to PHP).
+2. **Config.** Copy `smi-private/equity-config.sample.php` to `smi-private/equity-config.php`, permissions
+   600. Choose a username and a long random password for `ipn_username` and `ipn_password`, generate an
+   `export_token` (32+ characters), and copy the database lines from `ncba-config.php`.
+3. **Table.** Run `schema.sql` again in phpMyAdmin. It only adds `equity_notifications`.
+4. **Check.** Open the address above. It should say `Status   : ready`.
+5. **Jenga HQ.** Register the address as the IPN callback with the same username and password.
+6. **Bank integration service.** In `backend/bank-integration-service/.env.local` set
+   `EQUITY_CPANEL_EXPORT_URL=https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/equity/export`,
+   `EQUITY_CPANEL_EXPORT_TOKEN` (same token), and the Jenga credentials below, then restart.
+7. **Link the account.** Jenga's sample notification has no account number (`bank.account` is null), so
+   payments are filed under `EQUITY_ACCOUNT_NUMBER`. Link that Equity account to its customer in admin.

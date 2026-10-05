@@ -134,6 +134,7 @@ and offers a token protected export that this service imports every minute.
 | --- | --- | --- |
 | NCBA | `https://globalsmartspaces.com/api/v1/webhooks/ncba` (registered with NCBA) | `NCBA_CPANEL_EXPORT_URL`, `NCBA_CPANEL_EXPORT_TOKEN` |
 | KCB | `https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/kcb` | `KCB_CPANEL_EXPORT_URL`, `KCB_CPANEL_EXPORT_TOKEN` |
+| Equity | `https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/equity` | `EQUITY_CPANEL_EXPORT_URL`, `EQUITY_CPANEL_EXPORT_TOKEN` |
 
 KCB instant payment notifications carry no credit or debit field. They are sent only after an account
 is credited, so they are recorded as credits. The sender's name and mobile number, and the payment
@@ -141,6 +142,38 @@ time, come from `customerName`, `customerMobileNumber` and `timestamp`.
 
 A payment reaches a customer only when its account is linked to them in the admin portal, by bank
 and account number (KCB names the account in `creditAccountIdentifier`).
+
+### Equity (Jenga)
+
+The Equity connector authenticates with Jenga (`POST .../authentication/api/v3/authenticate/merchant`,
+`Api-Key` header, merchant code and consumer secret) to prove the credentials, and receives Instant Payment
+Notifications protected with Basic Auth.
+
+| Variable | Meaning |
+| --- | --- |
+| `EQUITY_ENV` | `SANDBOX` (Jenga UAT, `uat.finserve.africa`) or `PRODUCTION` (`api.finserve.africa`) |
+| `EQUITY_MERCHANT_CODE`, `EQUITY_API_KEY`, `EQUITY_CONSUMER_SECRET` | from Jenga HQ |
+| `EQUITY_IPN_USERNAME`, `EQUITY_IPN_PASSWORD` | the Basic Auth pair registered with the IPN callback |
+| `EQUITY_ACCOUNT_NUMBER` | the Equity account payments belong to when a notification names none |
+| `EQUITY_TOKEN_URL` | optional override of the token endpoint |
+
+Failed payments (`transaction.status` FAILED) are recorded with their reason but never credited.
+
+### Bank health (actuator)
+
+`GET /actuator/health/banks` has one indicator per bank (`kcb`, `ncba`, `stanbic`, `equity`), and
+`/actuator/health/banks/<bank>` one bank. Details (environment, connection and notification state, token,
+today's notifications, failures in the last 24 hours, last notification and last test times) are shown
+only with an admin token. Anyone else sees the overall status, and the bank breakdown answers 404.
+
+| Status | Meaning |
+| --- | --- |
+| `UP` | the last connection test passed, or notifications are arriving |
+| `DEGRADED` | the last connection test failed, or no notification for 7 days. The service answers 200, so monitors alert rather than restart it |
+| `UNKNOWN` | not tested and nothing received yet |
+
+The indicators never call a bank, so a health probe cannot use up a bank's rate limit. Refresh them with
+the admin's "Test connection".
 
 ### Webhook base address
 

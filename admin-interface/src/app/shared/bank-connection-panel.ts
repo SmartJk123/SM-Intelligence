@@ -51,6 +51,18 @@ const DEFAULT_LABELS: CredentialLabels = {
 };
 
 const LABELS_BY_BANK: Record<string, Partial<CredentialLabels>> = {
+  equity: {
+    heading: 'Jenga API credentials',
+    description:
+      'Equity is reached through Jenga. The merchant code, API key and consumer secret come from Jenga HQ, ' +
+      'and payment notifications are protected with the Basic Auth username and password registered with ' +
+      'the callback. None of them is ever sent to the browser.',
+    key: 'API key',
+    secret: 'Consumer secret',
+    third: 'Merchant code',
+    firstPill: 'Token',
+    secondPill: 'IPN Basic Auth',
+  },
   ncba: {
     heading: 'Endpoint credentials given to NCBA',
     description:

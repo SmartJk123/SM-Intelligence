@@ -34,7 +34,17 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      # Bank details (activity, token state) only for a signed-in admin; anyone
+      # else sees the overall status, which is what an uptime monitor needs.
+      show-details: when-authorized
+      show-components: when-authorized
+      roles: PLATFORM_ADMIN
+      # DEGRADED (a bank failing, see BankHealthIndicators) ranks below DOWN and
+      # still answers 200, so a monitor alerts instead of restarting the service.
+      status:
+        order: DOWN, OUT_OF_SERVICE, DEGRADED, UP, UNKNOWN
+        http-mapping:
+          DEGRADED: 200
 
 smartmoney:
   # The address the bank can reach. For sandbox testing set this to your tunnel URL.
@@ -60,6 +70,11 @@ smartmoney:
     interval: ${NCBA_CPANEL_IMPORT_INTERVAL:PT1M}
   # Pulls KCB instant payment notifications stored by the cPanel receiver (kcb-webhook.php).
   # Off unless both are set; the token is export_token in cPanel's kcb-config.php.
+  # Pulls Equity IPNs stored by the cPanel receiver (equity-webhook.php).
+  equity-cpanel:
+    export-url: ${EQUITY_CPANEL_EXPORT_URL:}
+    export-token: ${EQUITY_CPANEL_EXPORT_TOKEN:}
+    interval: ${EQUITY_CPANEL_IMPORT_INTERVAL:PT1M}
   kcb-cpanel:
     export-url: ${KCB_CPANEL_EXPORT_URL:}
     export-token: ${KCB_CPANEL_EXPORT_TOKEN:}
@@ -114,6 +129,23 @@ smartmoney:
     signature-header: ${KCB_SIGNATURE_HEADER:Signature}
     # KCB public key, as a PEM block, a path to a .pem file, or a base64 X.509 key.
     public-key: ${KCB_PUBLIC_KEY:}
+    api-timeout-seconds: 30
+
+  # Equity Bank over the Jenga API. Credentials come from Jenga HQ. The token
+  # endpoint follows EQUITY_ENV (UAT or production) unless EQUITY_TOKEN_URL is set.
+  # Jenga protects the IPN callback with Basic Auth: set EQUITY_IPN_USERNAME and
+  # EQUITY_IPN_PASSWORD to the values registered with the callback on Jenga HQ.
+  equity:
+    environment: ${EQUITY_ENV:SANDBOX}
+    token-url: ${EQUITY_TOKEN_URL:}
+    merchant-code: ${EQUITY_MERCHANT_CODE:}
+    api-key: ${EQUITY_API_KEY:}
+    consumer-secret: ${EQUITY_CONSUMER_SECRET:}
+    account-number: ${EQUITY_ACCOUNT_NUMBER:}
+    webhook-path: /api/v1/webhooks/equity
+    ipn-username: ${EQUITY_IPN_USERNAME:}
+    ipn-password: ${EQUITY_IPN_PASSWORD:}
+    signature-verification: ${EQUITY_SIGNATURE_VERIFICATION:true}
     api-timeout-seconds: 30
 
   # NCBA pushes account level notifications to us. There is no token endpoint and

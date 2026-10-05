@@ -29,10 +29,15 @@ DirectoryIndex disabled
     # The KCB instant payment notification endpoint and its import feed.
     RewriteRule ^api/v1/webhooks/kcb/export/?$ kcb-webhook.php?export=1 [L,QSA]
     RewriteRule ^api/v1/webhooks/kcb/?$ kcb-webhook.php [L,QSA]
+
+    # The Equity (Jenga) Instant Payment Notification endpoint and its import feed.
+    # Jenga authenticates with Basic Auth; pass the header through to PHP.
+    RewriteRule ^api/v1/webhooks/equity/export/?$ equity-webhook.php?export=1 [L,QSA]
+    RewriteRule ^api/v1/webhooks/equity/?$ equity-webhook.php [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},L,QSA]
 </IfModule>
 
 # Never serve configuration, SQL, logs or documentation if one is uploaded here
 # by mistake. Credentials belong in smi-private, outside the web root.
-<FilesMatch "(?i)(^(ncba|kcb)-config\.php$|\.(sql|md|log|ini|env|bak)$)">
+<FilesMatch "(?i)(^(ncba|kcb|equity)-config\.php$|\.(sql|md|log|ini|env|bak)$)">
     Require all denied
 </FilesMatch>

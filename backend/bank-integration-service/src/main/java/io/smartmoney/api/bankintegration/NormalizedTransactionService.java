@@ -2,6 +2,7 @@ package io.smartmoney.api.bankintegration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,13 +46,22 @@ public class NormalizedTransactionService {
 
     private final NormalizedTransactionRepository repository;
     private final ObjectMapper mapper;
+    private final String equityAccountNumber;
 
-    public NormalizedTransactionService(NormalizedTransactionRepository repository, ObjectMapper mapper) {
+    public NormalizedTransactionService(NormalizedTransactionRepository repository, ObjectMapper mapper,
+                                        @Value("${smartmoney.equity.account-number:}") String equityAccountNumber) {
         this.repository = repository;
         this.mapper = mapper;
+        this.equityAccountNumber = equityAccountNumber;
     }
 
-    @Transactional
+    /**
+     * A notification that cannot be normalised throws IllegalArgumentException.
+     * That must not mark the caller's transaction for rollback, or the event's
+     * FAILED status and error message would be thrown away with it and the
+     * refusal would leave no trace.
+     */
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public NormalizedTransactionEntity normalizeAndSave(WebhookEventEntity event) {
         if (event.getExternalEventId() == null) {
             throw new IllegalArgumentException("The notification has no external event id");
@@ -72,6 +82,9 @@ public class NormalizedTransactionService {
     private NormalizedTransactionEntity draft(WebhookEventEntity event) {
         String payload = event.getPayload();
         String trimmed = payload == null ? "" : payload.stripLeading();
+        if (trimmed.startsWith("{") && "equity".equals(event.getBankId())) {
+            return fromJenga(event, payload);
+        }
         if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
             return fromJson(event, payload);
         }
@@ -118,6 +131,66 @@ public class NormalizedTransactionService {
         } catch (Exception error) {
             throw new IllegalArgumentException("Notification payload is not valid JSON", error);
         }
+    }
+
+    /**
+     * Equity's Jenga Instant Payment Notification nests the payment:
+     * {"customer": {name, mobileNumber, reference}, "transaction": {date,
+     * reference, amount, currency, status, remarks, ...}, "bank": {reference,
+     * transactionType, account}}. transactionType is C for a credit. A FAILED
+     * payment moved no money, so it is refused here and never delivered.
+     * bank.account may be null, in which case the payment belongs to the
+     * configured Equity account (EQUITY_ACCOUNT_NUMBER).
+     */
+    private NormalizedTransactionEntity fromJenga(WebhookEventEntity event, String payload) {
+        JsonNode root;
+        try {
+            root = mapper.readTree(payload);
+        } catch (Exception error) {
+            throw new IllegalArgumentException("Notification payload is not valid JSON", error);
+        }
+        JsonNode transaction = root.path("transaction");
+        String status = transaction.path("status").asText("");
+        if (!status.isBlank() && !"SUCCESS".equalsIgnoreCase(status)) {
+            throw new IllegalArgumentException("Equity reported this payment as " + status
+                    + (transaction.path("remarks").asText("").isBlank() ? "" : " (" + transaction.path("remarks").asText() + ")")
+                    + ", so no money moved and nothing is recorded");
+        }
+        BigDecimal amount = parse(transaction.path("amount").asText(""));
+        if (amount == null || amount.signum() == 0) {
+            throw new IllegalArgumentException("Notification amount is missing or invalid");
+        }
+        String type = root.at("/bank/transactionType").asText("").trim().toUpperCase();
+        String direction = type.startsWith("D") ? "DEBIT" : "CREDIT";
+        String reference = transaction.path("reference").asText("");
+        if (reference.isBlank()) {
+            reference = root.at("/bank/reference").asText(event.getExternalEventId());
+        }
+        String narration = firstNonBlank(transaction.path("remarks").asText(""),
+                transaction.path("billNumber").asText(""), transaction.path("additionalInfo").asText(""));
+        NormalizedTransactionEntity movement = new NormalizedTransactionEntity(
+                event.getBankId(), event.getExternalEventId(), amount.abs(),
+                transaction.path("currency").asText("").isBlank() ? "KES" : transaction.path("currency").asText(),
+                direction, reference, narration,
+                XmlFields.timestamp(transaction.path("date").asText(null)));
+        String account = root.at("/bank/account").asText("");
+        movement.setAccountNumber(normalizeAccountNumber(account.isBlank() ? equityAccountNumber : account));
+        movement.setCounterpartyName(blankToNull(root.at("/customer/name").asText("")));
+        movement.setCounterpartyPhone(blankToNull(root.at("/customer/mobileNumber").asText("")));
+        return movement;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     /**

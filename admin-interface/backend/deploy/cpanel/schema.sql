@@ -56,3 +56,31 @@ CREATE TABLE IF NOT EXISTS kcb_notifications (
     UNIQUE KEY uq_kcb_notifications_reference (transaction_reference),
     KEY ix_kcb_notifications_received_at (received_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- Equity (Jenga) Instant Payment Notifications received by the cPanel endpoint
+-- (equity-webhook.php). reference is unique, so a repeated notification is
+-- stored once and acknowledged as a duplicate. Failed payments are stored too
+-- (status FAILED) and are never credited.
+
+CREATE TABLE IF NOT EXISTS equity_notifications (
+    id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    reference        VARCHAR(128)    NOT NULL COMMENT 'transaction.reference, else bank.reference',
+    bank_reference   VARCHAR(128)    NULL,
+    payment_mode     VARCHAR(32)     NULL COMMENT 'CARD, MPESA, PWE, EQUITEL or PAYPAL',
+    transaction_date VARCHAR(32)     NULL COMMENT 'As sent, yyyy-MM-dd HH:mm:ss East Africa Time',
+    amount           DECIMAL(18, 2)  NULL,
+    currency         VARCHAR(8)      NULL,
+    status           VARCHAR(16)     NULL COMMENT 'SUCCESS or FAILED',
+    remarks          VARCHAR(255)    NULL,
+    bill_number      VARCHAR(128)    NULL,
+    customer_name    VARCHAR(255)    NULL,
+    customer_mobile  VARCHAR(32)     NULL,
+    account          VARCHAR(64)     NULL,
+    transaction_type VARCHAR(8)      NULL COMMENT 'C for a credit',
+    signature_valid  TINYINT(1)      NULL COMMENT '1 Basic Auth checked, NULL when checking was off',
+    raw_body         MEDIUMTEXT      NOT NULL COMMENT 'Body exactly as received',
+    remote_addr      VARCHAR(64)     NULL,
+    received_at      DATETIME        NOT NULL COMMENT 'UTC',
+    UNIQUE KEY uq_equity_notifications_reference (reference),
+    KEY ix_equity_notifications_received_at (received_at)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
