@@ -12,9 +12,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.Collections;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -50,11 +55,13 @@ public class AccountService {
             effectiveMaskedId = provId.length() > 4 ? "**** " + provId.substring(provId.length() - 4) : "**** " + provId;
         }
 
-        if (accountRepository.existsByInstitutionAndProviderAccountId(effectiveInstitution, request.getProviderAccountId())) {
-            throw new DuplicateAccountException(
-                String.format("Account with institution '%s' and provider account ID '%s' already exists",
-                    effectiveInstitution, request.getProviderAccountId())
-            );
+        Optional<Account> holder = findHolder(effectiveInstitution, request.getProviderAccountId());
+        if (holder.isPresent()) {
+            throw new DuplicateAccountException(!holder.get().getUserId().equals(effectiveUserId)
+                ? "This account number is already registered to another user"
+                : "MANUAL".equals(holder.get().getDataSource())
+                    ? "This customer already added this account themselves. Link it to that account instead."
+                    : "This account is already registered to this user");
         }
 
         Account account = new Account(
@@ -77,6 +84,49 @@ public class AccountService {
 
         Account saved = accountRepository.save(account);
         return AccountResponse.fromEntity(saved);
+    }
+
+    /**
+     * The account already registered under this bank and account number, by
+     * any user, however it was added. A bank account number belongs to one
+     * person, so it may be registered only once across the platform.
+     *
+     * Bank-linked accounts store the plain number. Self-entered accounts store
+     * a fingerprint instead; older ones mixed the owner into it, so those are
+     * matched by trying each owner of a self-entered account at that bank.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Account> findHolder(String institution, String accountNumber) {
+        if (institution == null || accountNumber == null || accountNumber.isBlank()) {
+            return Optional.empty();
+        }
+        String number = accountNumber.trim();
+        Optional<Account> holder = accountRepository.findByInstitutionAndProviderAccountId(institution, number)
+            .or(() -> accountRepository.findByInstitutionAndProviderAccountId(institution, fingerprint(institution, number)));
+        if (holder.isPresent()) {
+            return holder;
+        }
+        for (UUID owner : accountRepository.findManualOwnersByInstitution(institution)) {
+            holder = accountRepository.findByInstitutionAndProviderAccountId(institution,
+                sha256(owner + ":" + institution + ":" + number));
+            if (holder.isPresent()) {
+                return holder;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** What a self-entered account stores in place of its number. The same for every user, so the unique constraint applies. */
+    public static String fingerprint(String institution, String accountNumber) {
+        return sha256("account:" + institution + ":" + accountNumber.trim());
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     @Transactional(readOnly = true)

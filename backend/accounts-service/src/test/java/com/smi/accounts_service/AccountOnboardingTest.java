@@ -54,4 +54,48 @@ class AccountOnboardingTest {
         assertEquals(400, request("/api/accounts/manual", "POST", "Bearer owner", body.replace("2026-01-01", "2999-01-01")).statusCode());
         assertEquals(1, accounts.findByUserId(owner).size());
     }
+
+    @Test void refusesAnAccountNumberAnotherUserHolds() throws Exception {
+        var first = UUID.randomUUID(); var second = UUID.randomUUID();
+        when(identity.owner("Bearer first")).thenReturn(first);
+        when(identity.owner("Bearer second")).thenReturn(second);
+        String body = """
+            {"bank":"NCBA","accountName":"Salary","accountNumber":"55556666",
+             "cardType":"debit","balance":10,"balanceDate":"2026-01-01","currency":"KES"}
+            """;
+        assertEquals(201, request("/api/accounts/manual", "POST", "Bearer first", body).statusCode());
+        var taken = request("/api/accounts/manual", "POST", "Bearer second", body);
+        assertEquals(409, taken.statusCode());
+        assertTrue(taken.body().contains("another user"), taken.body());
+        // The same number at a different bank is a different account.
+        assertEquals(201, request("/api/accounts/manual", "POST", "Bearer second", body.replace("NCBA", "KCB")).statusCode());
+    }
+
+    @Test void refusesASelfEnteredNumberAlreadyLinkedByTheBank() throws Exception {
+        var linked = UUID.randomUUID(); var other = UUID.randomUUID();
+        when(identity.owner("Bearer other")).thenReturn(other);
+        accounts.saveAndFlush(new com.smi.accounts_service.domain.Account(linked, "77778888", "Business", "Equity",
+            "DEPOSIT", "***8888", "KES", java.math.BigDecimal.ZERO));
+        String body = """
+            {"bank":"Equity","accountName":"Mine","accountNumber":"77778888",
+             "cardType":"debit","balance":10,"balanceDate":"2026-01-01","currency":"KES"}
+            """;
+        assertEquals(409, request("/api/accounts/manual", "POST", "Bearer other", body).statusCode());
+    }
+
+    @Test void matchesSelfEnteredAccountsSavedWithTheOlderOwnerFingerprint() throws Exception {
+        var legacyOwner = UUID.randomUUID(); var other = UUID.randomUUID();
+        when(identity.owner("Bearer other")).thenReturn(other);
+        var legacyFingerprint = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+            .digest((legacyOwner + ":Stanbic:99990000").getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        var legacy = new com.smi.accounts_service.domain.Account(legacyOwner, legacyFingerprint, "Old", "Stanbic",
+            "DEPOSIT", "•••• 0000", "KES", java.math.BigDecimal.ZERO);
+        legacy.setDataSource("MANUAL");
+        accounts.saveAndFlush(legacy);
+        String body = """
+            {"bank":"Stanbic","accountName":"Mine","accountNumber":"99990000",
+             "cardType":"debit","balance":10,"balanceDate":"2026-01-01","currency":"KES"}
+            """;
+        assertEquals(409, request("/api/accounts/manual", "POST", "Bearer other", body).statusCode());
+    }
 }

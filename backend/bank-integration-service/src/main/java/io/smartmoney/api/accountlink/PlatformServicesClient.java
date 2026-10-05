@@ -85,8 +85,7 @@ public class PlatformServicesClient {
                 throw unavailable("accounts-service refused the account: " + error.getStatusCode().value());
             }
             String existing = findAccount(userId, institution, accountNumber)
-                    .orElseThrow(() -> new AccountLinkException(HttpStatus.CONFLICT,
-                            "accounts-service already holds this account for a different customer"));
+                    .orElseThrow(() -> new AccountLinkException(HttpStatus.CONFLICT, refusal(error)));
             setStatus(existing, "ACTIVE");
             return existing;
         } catch (RestClientException error) {
@@ -180,6 +179,19 @@ public class PlatformServicesClient {
                 .contentType(MediaType.APPLICATION_JSON).header("X-Internal-Token", internalServiceToken)
                 .body(Map.of("accountStatus", status))
                 .retrieve().toBodilessEntity();
+    }
+
+    /** Why accounts-service refused a duplicate account number, in its own words when it gave them. */
+    private String refusal(RestClientResponseException error) {
+        try {
+            String message = mapper.readTree(error.getResponseBodyAsString()).path("message").asText("");
+            if (!message.isBlank()) {
+                return message;
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException unreadable) {
+            // Fall through to the general message.
+        }
+        return "This account number is already registered to another user";
     }
 
     private static String mask(String accountNumber) {

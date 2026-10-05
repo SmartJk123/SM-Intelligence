@@ -28,6 +28,10 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     List<Account> findByProviderAccountId(String providerAccountId);
 
+    /** Owners of self-entered accounts at one bank, for matching fingerprints made before they were owner-free. */
+    @Query("SELECT DISTINCT a.userId FROM Account a WHERE a.institution = :institution AND a.dataSource = 'MANUAL'")
+    List<UUID> findManualOwnersByInstitution(@Param("institution") String institution);
+
     /**
      * Moves the balance by delta in one statement, so two movements arriving at
      * the same time both land instead of the second silently overwriting the

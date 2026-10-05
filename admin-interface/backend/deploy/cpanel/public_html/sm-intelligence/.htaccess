@@ -1,0 +1,34 @@
+# public_html/sm-intelligence: the SmartMoney Intelligence module folder.
+#
+# Today the main site's public_html/.htaccess forwards
+# https://globalsmartspaces.com/api/v1/webhooks/ncba here. Once the subdomain
+# sm-intelligence.globalsmartspaces.com resolves, set its document root to this
+# folder and the rules below serve the same endpoint on the subdomain too.
+# Nothing else in this folder is meant to be served.
+
+Options -Indexes
+DirectoryIndex disabled
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Send plain HTTP browsers to HTTPS. Only GET and HEAD are redirected,
+    # because a redirected POST loses its body and NCBA would see a failure.
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+    # The export the SmartMoney bank integration service imports from.
+    RewriteRule ^api/v1/webhooks/ncba/export/?$ ncba-webhook.php?export=1 [L,QSA]
+
+    # The NCBA notification endpoint, with or without a trailing slash.
+    RewriteRule ^api/v1/webhooks/ncba/?$ ncba-webhook.php [L,QSA]
+</IfModule>
+
+# Never serve configuration, SQL, logs or documentation if one is uploaded here
+# by mistake. Credentials belong in smi-private, outside the web root.
+<FilesMatch "(?i)(^ncba-config\.php$|\.(sql|md|log|ini|env|bak)$)">
+    Require all denied
+</FilesMatch>
