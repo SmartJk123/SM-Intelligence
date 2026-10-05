@@ -53,6 +53,20 @@ Environment overrides: identity accepts DB_URL, DB_USER, DB_PASSWORD, PORT, JWT_
 Get-Content backend/identity-service/.env.local | Where-Object { $_ -match '^\s*[A-Za-z_]+\s*=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item "Env:$($k.Trim())" $v.Trim() }
 ```
 
+### Organisations and invitations
+
+Admins create organisations and invite members from the admin portal (`/api/organizations`, admin
+only, routed by api-gateway). A new member's account gets a random password nobody is told, and the
+invitation email carries a one-time link to choose their own, valid for 7 days. An existing account is
+added and told by email. The emails use the same SMTP settings as password reset, and
+`FRONTEND_LOGIN_URL` (default `http://localhost:4200/login`) is the sign-in page they name. If mail is
+not set up, the organisation and account are still saved and the portal reports that no email went out.
+
+Admins can also send any user a password reset email from Users, then "Send password reset email".
+
+If email is down, `backend/identity-service/set-password.ps1 -Email <address>` sets a local
+account's password directly (needs PHP and psql).
+
 ### Forgot password emails
 
 The web sign-in page links to `/forgot-password`. identity-service then emails a one-time link to `/reset-password?token=...` that expires after 60 minutes. Only a SHA-256 hash of each token is stored (`password_reset_tokens`, migration V4). The request always answers the same way, so it never reveals whether an address has an account.
@@ -100,6 +114,12 @@ Get-Content backend/bank-integration-service/.env.local | Where-Object { $_ -mat
 ./backend/mvn.ps1 -pl bank-integration-service spring-boot:run
 ```
 
+Or run `backend/bank-integration-service/run-local.ps1`, which loads `.env.local`, refuses to start a
+second copy, picks JDK 25 and uses the Maven wrapper. `stop-local.ps1` stops it, `set-credentials.ps1`
+fills in bank credentials without echoing them, and `tools/` has `send-kcb-notification.ps1` and
+`send-ncba-notification.ps1` (signed test payments), `new-ncba-letter.ps1` (the NCBA request letter),
+`reset-data.ps1` and `demo-account-flow.ps1`.
+
 Its H2 database is `./data/smartmoney`, relative to the folder the service starts in. `spring-boot:run`
 starts in the module folder, so the data is `backend/bank-integration-service/data`. An older copy in
 `admin-interface/backend/data` is not used.
@@ -127,6 +147,19 @@ and account number (KCB names the account in `creditAccountIdentifier`).
 Every webhook URL shown in the admin portal is the base address followed by `/api/v1/webhooks/<bank>`.
 It starts as `PUBLIC_BASE_URL`, and an address saved from Settings, then Bank Integration Settings, is
 stored in `platform_setting` and applied at every start.
+
+### Admin API security
+
+Everything under `/api/v1/admin` needs a token from identity-service with the `PLATFORM_ADMIN` role. The
+bank service checks it with the same `JWT_SECRET` identity-service signs with, so put that value in
+`backend/bank-integration-service/.env.local` too. Without it every admin call is refused, and the admin
+portal says so. Bank webhooks, the info page and the health check stay open.
+
+The one exception: a signed-in customer may `POST /api/v1/admin/account-links` for an account
+accounts-service already holds for them at that bank and number (the web app does this after
+onboarding). Any other customer request is refused.
+
+`PERMIT_ALL=true` opens everything, for tests and isolated debugging only. It is off by default.
 
 ### One account number per user
 

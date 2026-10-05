@@ -38,7 +38,9 @@ reference, not an automatically loaded file.
   [backend setup](backend/README.md#forgot-password-emails)), account onboarding, dashboard, invoices.
 - **One account number, one user:** a bank account number can be registered by only one user, whether
   the customer enters it or an admin links it.
-- **Admin portal:** real sign in for `ADMIN_EMAILS` accounts, user management, bank integrations.
+- **Admin portal:** real sign in for `ADMIN_EMAILS` accounts; suspend, restore, edit and send a
+  password reset to any user; create organisations and invite members (they get a set-password link);
+  bank integrations. The bank service's admin API only accepts admin tokens (shared `JWT_SECRET`).
 - **Bank notifications in production:** NCBA and KCB post to PHP receivers on cPanel
   (`https://sm-intelligence.globalsmartspaces.com`), and bank-integration-service imports them every
   minute. See [cPanel deployment](admin-interface/backend/deploy/cpanel/README.md).

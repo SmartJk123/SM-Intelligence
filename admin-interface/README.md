@@ -13,7 +13,7 @@ colour system, typography and status vocabulary.
 | Status | Active |
 | Owner | Eclectics, SmartMoney Intelligence |
 | Last updated | 5 October 2026 |
-| Related documents | [Service README](backend/README.md), [API contract](../docs/api-contract.md), [NCBA integration setup](../docs/ncba-integration-setup.md), [Domain knowledge](domain-knowledge.md) |
+| Related documents | [Service README](../backend/README.md), [API contract](../docs/api-contract.md), [NCBA integration setup](../docs/ncba-integration-setup.md), [Domain knowledge](domain-knowledge.md) |
 | Prerequisites | Node.js 20 or later, npm |
 
 ## Running the application
