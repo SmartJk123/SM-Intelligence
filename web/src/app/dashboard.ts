@@ -1,12 +1,13 @@
 // Customer financial overview.
 import { WorkspaceIcon } from './workspace-icon';
 import { CategoryChart, FinanceChart } from './finance-chart';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 import { BankLogo } from './bank-logo';
 import { AccountApi } from './account-api';
+import { LiveUpdates } from './live-updates';
 import { RouterLink } from '@angular/router';
 
 interface Account {
@@ -66,7 +67,7 @@ interface DashboardData {
       </header>
       <div class="dashboard-toolbar">
         <span>{{
-          api.kind() === 'organization' ? 'Organization overview' : 'Personal overview'
+          api.kind() === 'organization' ? 'Company overview' : 'Personal overview'
         }}</span>
         <label class="overview-bank">Bank
           <select [value]="bank()" (change)="changeBank($any($event.target).value)" [disabled]="loading()">
@@ -247,12 +248,17 @@ interface DashboardData {
                 <tbody>
                   @for (tx of d.transactions; track tx.id) {
                     <tr>
-                      <td>{{ tx.date | date: 'd MMM y' : 'UTC' }}</td>
+                      <td>{{ tx.date | date: 'd MMM y' : 'UTC' }}<small>{{ tx.date | date: 'HH:mm' : 'UTC' }}</small></td>
                       <td>
                         <strong>{{ tx.description }}</strong
                         ><small>{{ tx.category }}</small>
                       </td>
-                      <td>{{ accountName(tx.accountId) }}</td>
+                      <td>
+                        <span class="transaction-account">
+                          <app-bank-logo [bank]="accountBank(tx.accountId)" />
+                          <small>{{ accountMasked(tx.accountId) }}</small>
+                        </span>
+                      </td>
                       <td>
                         <span
                           [attr.data-status]="tx.status"
@@ -312,8 +318,15 @@ export class Dashboard {
     this.bank.set(bank);
     void this.load();
   }
+  private readonly live = inject(LiveUpdates);
   constructor() {
     void this.load();
+    // A transaction arriving for this customer while the page is open means
+    // the figures on screen are stale; reload rather than wait for a manual refresh.
+    effect(() => {
+      if (this.live.lastUpdate() === null) return;
+      void this.load();
+    });
   }
   async load() {
     this.loading.set(true);
@@ -374,5 +387,11 @@ export class Dashboard {
   }
   accountName(id: string) {
     return this.data()?.accounts.find((a) => a.id === id)?.accountName ?? 'Account';
+  }
+  accountBank(id: string) {
+    return this.data()?.accounts.find((a) => a.id === id)?.bank ?? '';
+  }
+  accountMasked(id: string) {
+    return this.data()?.accounts.find((a) => a.id === id)?.maskedIdentifier ?? '—';
   }
 }

@@ -1,6 +1,7 @@
 package com.smi.accounts_service.controller;
 
 import com.smi.accounts_service.dto.AccountResponse;
+import com.smi.accounts_service.dto.AdjustBalanceRequest;
 import com.smi.accounts_service.dto.CreateAccountRequest;
 import com.smi.accounts_service.dto.UpdateBalanceRequest;
 import com.smi.accounts_service.dto.UpdateStatusRequest;
@@ -36,8 +37,13 @@ public class AccountController {
     }
 
     @PostMapping
-    public ResponseEntity<AccountResponse> createAccount(@RequestHeader(value="Authorization", required=false) String authorization, @Valid @RequestBody CreateAccountRequest request) {
-        request.setUserId(identity.owner(authorization));
+    public ResponseEntity<AccountResponse> createAccount(
+            @RequestHeader(value="Authorization", required=false) String authorization,
+            @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
+            @Valid @RequestBody CreateAccountRequest request) {
+        if (!identity.isInternalService(internalToken)) {
+            request.setUserId(identity.owner(authorization));
+        }
         AccountResponse created = accountService.createAccount(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -45,8 +51,11 @@ public class AccountController {
     @GetMapping
     public ResponseEntity<List<AccountResponse>> getAccounts(
             @RequestHeader(value="Authorization", required=false) String authorization,
+            @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
+            @RequestParam(required = false) String userId,
             @RequestParam(required = false) String status) {
-        List<AccountResponse> accounts = accountService.getAccountsByUserId(identity.owner(authorization), status);
+        UUID owner = identity.isInternalService(internalToken) ? UUID.fromString(userId) : identity.owner(authorization);
+        List<AccountResponse> accounts = accountService.getAccountsByUserId(owner, status);
         return ResponseEntity.ok(accounts);
     }
 
@@ -84,19 +93,44 @@ public class AccountController {
     }
 }
 
+    /**
+     * Moves the balance by a posted transaction's amount instead of replacing it,
+     * so a linked bank account's balance tracks real activity. Only
+     * bank-integration-service calls this, proven by the internal token, since
+     * nobody else should be able to move a balance without a matching transaction.
+     */
+    @RequestMapping(value = "/{id}/balance/adjust", method = RequestMethod.PATCH)
+    public ResponseEntity<AccountResponse> adjustBalance(
+            @PathVariable UUID id,
+            @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
+            @Valid @RequestBody AdjustBalanceRequest request) {
+        if (!identity.isInternalService(internalToken)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only a trusted internal service may adjust a balance directly");
+        }
+        AccountResponse updated = accountService.adjustBalance(id, request.getDelta());
+        return ResponseEntity.ok(updated);
+    }
+
     @RequestMapping(value = "/{id}/status", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<AccountResponse> updateStatus(
         @PathVariable String id,
         @RequestHeader(value="Authorization", required=false) String authorization,
+        @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
         @Valid @RequestBody UpdateStatusRequest request) {
-        
+        boolean internal = identity.isInternalService(internalToken);
+
     try {
         UUID uuid = UUID.fromString(id);
-        accountService.getAccountById(uuid, identity.owner(authorization));
+        if (!internal) {
+            accountService.getAccountById(uuid, identity.owner(authorization));
+        }
         AccountResponse updated = accountService.updateStatus(uuid, request);
         return ResponseEntity.ok(updated);
     } catch (IllegalArgumentException e) {
-        accountService.getAccountById(id, identity.owner(authorization));
+        if (!internal) {
+            accountService.getAccountById(id, identity.owner(authorization));
+        }
         AccountResponse updated = accountService.updateStatus(id, request);
         return ResponseEntity.ok(updated);
     }

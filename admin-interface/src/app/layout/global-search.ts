@@ -40,7 +40,7 @@ export class GlobalSearch {
         label: org.name,
         sub: org.type,
         page: 'organisations',
-        icon: '◈',
+        icon: 'apartment',
       })),
       ...USERS.filter(
         (user) =>
@@ -50,7 +50,7 @@ export class GlobalSearch {
         label: user.name,
         sub: user.email,
         page: 'users',
-        icon: '◉',
+        icon: 'group',
       })),
       ...TRANSACTIONS.filter(
         (tx) =>
@@ -62,7 +62,7 @@ export class GlobalSearch {
         label: tx.id,
         sub: tx.org,
         page: 'transactions',
-        icon: '↕',
+        icon: 'swap_vert',
       })),
       ...BANKS.filter(
         (bank) =>
@@ -72,7 +72,7 @@ export class GlobalSearch {
         label: bank.full,
         sub: 'Bank Integration',
         page: 'bank-integrations',
-        icon: '⬡',
+        icon: 'account_balance',
       })),
     ].slice(0, MAX_RESULTS);
   });

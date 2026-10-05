@@ -176,8 +176,17 @@ public class AccountLinkService {
                 throw new IllegalStateException("The amount is zero, which transactions-service does not accept");
             }
             Instant bookedAt = movement.getBookingDate() != null ? movement.getBookingDate() : movement.getCreatedAt();
-            platform.recordTransaction(link.getAccountId(), movement.getAmount(), movement.getCurrency(), type,
-                    link.getBankId() + ":" + movement.getReference(), movement.getNarration(), bookedAt);
+            PlatformServicesClient.Recorded recorded = platform.recordTransaction(link.getAccountId(),
+                    movement.getAmount(), movement.getCurrency(), type,
+                    link.getBankId() + ":" + movement.getReference(), movement.getNarration(), bookedAt,
+                    counterparty(movement));
+            // Only a movement recorded for the first time should move the balance:
+            // one already present was counted when it first arrived, and moving it
+            // again on a retry would count the same money twice.
+            if (recorded == PlatformServicesClient.Recorded.CREATED) {
+                BigDecimal delta = "DEBIT".equals(type) ? movement.getAmount().negate() : movement.getAmount();
+                platform.adjustBalance(link.getAccountId(), delta);
+            }
             movement.setForwardedAt(Instant.now());
             movement.setForwardError(null);
         } catch (Exception error) {
@@ -187,6 +196,16 @@ public class AccountLinkService {
                     movement.getBankId(), movement.getReference(), message);
         }
         transactions.save(movement);
+    }
+
+    /** Who sent or received the money, as the bank named them, with their number if given. */
+    private static String counterparty(NormalizedTransactionEntity movement) {
+        String name = movement.getCounterpartyName();
+        String phone = movement.getCounterpartyPhone();
+        if (name == null || name.isBlank()) {
+            return phone;
+        }
+        return phone == null || phone.isBlank() ? name : name + " (" + phone + ")";
     }
 
     /** Credit or debit from the direction the bank gave, in whatever spelling it used. */

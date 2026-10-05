@@ -17,8 +17,12 @@ public class BankIntegrationHealthService {
     /** Banks the platform is designed to support. Connectors exist for some of them. */
     private static final List<String> SUPPORTED_BANKS = List.of("kcb", "ncba", "equity", "stanbic");
 
-    private static final Duration HEALTHY_WINDOW = Duration.ofMinutes(30);
-    private static final Duration WARNING_WINDOW = Duration.ofHours(2);
+    // These banks push a notification only when a customer's own money actually
+    // moves, so a quiet window of hours or days is normal, not a sign of a
+    // broken connection. Thresholds are loose on purpose: a real customer
+    // account can easily go a day without any activity.
+    private static final Duration HEALTHY_WINDOW = Duration.ofHours(24);
+    private static final Duration WARNING_WINDOW = Duration.ofDays(7);
 
     private final Map<String, BankConnector> connectors;
     private final BankIntegrationSettingsService settingsService;
@@ -79,6 +83,7 @@ public class BankIntegrationHealthService {
                 failures,
                 notifications,
                 today,
+                connector != null,
                 lastTest);
     }
 

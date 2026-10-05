@@ -14,11 +14,28 @@ import java.util.UUID;
 @Component
 public class AccountIdentity {
     private final RestClient client;
-    public AccountIdentity(@Value("${IDENTITY_SERVICE_URL:http://localhost:8081}") String identityUrl) {
+    private final String internalServiceToken;
+
+    public AccountIdentity(
+            @Value("${IDENTITY_SERVICE_URL:http://localhost:8081}") String identityUrl,
+            @Value("${INTERNAL_SERVICE_TOKEN:}") String internalServiceToken) {
         var factory = new JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
         factory.setReadTimeout(Duration.ofSeconds(10));
         client = RestClient.builder().baseUrl(identityUrl).requestFactory(factory).build();
+        this.internalServiceToken = internalServiceToken;
     }
+
+    /**
+     * True when the caller is a trusted backend service (bank-integration-service
+     * linking or closing a customer's account), not a browser acting as a signed-in
+     * user. Such a caller has no user's own bearer token to send, so it identifies
+     * the account owner directly in the request body instead.
+     */
+    public boolean isInternalService(String providedToken) {
+        return internalServiceToken != null && !internalServiceToken.isBlank()
+                && internalServiceToken.equals(providedToken);
+    }
+
     public UUID owner(String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer "))
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in required");

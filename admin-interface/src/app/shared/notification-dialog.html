@@ -19,7 +19,7 @@
           [style.background]="severityColor() + '22'"
           [style.color]="severityColor()"
         >
-          {{ item.severity === 'Critical' ? '⚠' : item.severity === 'Warning' ? '⚠' : 'ℹ' }}
+          <span class="icon">{{ item.severity === 'Critical' || item.severity === 'Warning' ? 'warning' : 'info' }}</span>
         </span>
         <div class="flex-1 min-w-0">
           <div class="flex flex-wrap items-center gap-2 mb-1">
@@ -35,7 +35,7 @@
           class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 border transition-all hover:opacity-80"
           style="background: var(--surface-2); border-color: var(--border); color: var(--text-2)"
         >
-          ✕
+          <span class="icon icon-sm">close</span>
         </button>
       </div>
 

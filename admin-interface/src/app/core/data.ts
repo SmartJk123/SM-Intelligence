@@ -158,17 +158,17 @@ export type NavGroup = 'Overview' | 'Operations' | 'System';
 export const NAV_GROUPS: NavGroup[] = ['Overview', 'Operations', 'System'];
 
 export const NAV: { id: Page; label: string; icon: string; group: NavGroup }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: '⊡', group: 'Overview' },
-  { id: 'organisations', label: 'Organisations', icon: '◈', group: 'Operations' },
-  { id: 'users', label: 'Users', icon: '◉', group: 'Operations' },
-  { id: 'bank-integrations', label: 'Bank Integrations', icon: '⬡', group: 'Operations' },
-  { id: 'bank-accounts', label: 'Bank Accounts', icon: '▣', group: 'Operations' },
-  { id: 'transactions', label: 'Transactions', icon: '↕', group: 'Operations' },
-  { id: 'reconciliation', label: 'Reconciliation', icon: '⊕', group: 'Operations' },
-  { id: 'notifications', label: 'Notifications', icon: '◎', group: 'System' },
-  { id: 'audit-logs', label: 'Audit Logs', icon: '☰', group: 'System' },
-  { id: 'reports', label: 'Reports', icon: '▦', group: 'System' },
-  { id: 'settings', label: 'Settings', icon: '⚙', group: 'System' },
+  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', group: 'Overview' },
+  { id: 'organisations', label: 'Organisations', icon: 'apartment', group: 'Operations' },
+  { id: 'users', label: 'Users', icon: 'group', group: 'Operations' },
+  { id: 'bank-integrations', label: 'Bank Integrations', icon: 'account_balance', group: 'Operations' },
+  { id: 'bank-accounts', label: 'Bank Accounts', icon: 'account_balance_wallet', group: 'Operations' },
+  { id: 'transactions', label: 'Transactions', icon: 'swap_vert', group: 'Operations' },
+  { id: 'reconciliation', label: 'Reconciliation', icon: 'rule', group: 'Operations' },
+  { id: 'notifications', label: 'Notifications', icon: 'notifications', group: 'System' },
+  { id: 'audit-logs', label: 'Audit Logs', icon: 'history', group: 'System' },
+  { id: 'reports', label: 'Reports', icon: 'grid_view', group: 'System' },
+  { id: 'settings', label: 'Settings', icon: 'settings', group: 'System' },
 ];
 
 export interface PageMeta {

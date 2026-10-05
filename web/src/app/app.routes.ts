@@ -43,14 +43,14 @@ export const routes: Routes = [
       { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'invoices', title: 'Invoices | SM-Intelligence', loadComponent: () => import('./invoices').then(m => m.Invoices) },
       { path: 'transactions', title: 'Transactions | SM-Intelligence', data: { page: 'transactions' }, loadComponent: () => import('./invoices').then(m => m.Invoices) },
+      { path: 'cashflow', title: 'Cash Flow | SM-Intelligence', loadComponent: () => import('./cash-flow').then((m) => m.CashFlow) },
+      { path: 'notifications', title: 'Notifications | SM-Intelligence', loadComponent: () => import('./notifications-page').then((m) => m.NotificationsPage) },
+      { path: 'analysis', title: 'Analytics | SM-Intelligence', loadComponent: () => import('./analysis').then((m) => m.Analysis) },
+      { path: 'budgets', title: 'Budgets | SM-Intelligence', loadComponent: () => import('./budgets').then((m) => m.Budgets) },
       ...[
         { page: 'accounts', title: 'Accounts' },
-        { page: 'cashflow', title: 'Cash Flow' },
-        { page: 'budgets', title: 'Budgets' },
         { page: 'investments', title: 'Investments' },
-        { page: 'analysis', title: 'Analytics' },
         { page: 'reports', title: 'Reports' },
-        { page: 'notifications', title: 'Notifications' },
         { page: 'settings', title: 'Profile and Settings' },
       ].map(({ page, title }) => ({
         path: page,

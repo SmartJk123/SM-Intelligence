@@ -21,7 +21,7 @@ export interface ActionMenuItem {
         [style.background]="open() ? 'var(--surface-3)' : 'transparent'"
         style="color: var(--text-2)"
       >
-        <span class="text-[15px] leading-none tracking-tight">⋮</span>
+        <span class="icon">more_vert</span>
       </button>
 
       @if (open()) {

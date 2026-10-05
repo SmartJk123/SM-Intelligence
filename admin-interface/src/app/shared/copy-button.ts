@@ -12,7 +12,7 @@ import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core
       class="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-xl border transition-all hover:opacity-80 whitespace-nowrap"
       style="border-color: var(--border-strong); color: var(--text-2); background: var(--surface)"
     >
-      <span>{{ copied() ? '✓' : '⧉' }}</span>
+      <span class="icon icon-sm">{{ copied() ? 'check' : 'content_copy' }}</span>
       {{ copied() ? 'Copied' : label() }}
     </button>
   `,

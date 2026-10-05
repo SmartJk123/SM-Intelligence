@@ -11,7 +11,7 @@ export class ConnectionSteps {
   readonly result = input.required<ConnectionTestResult>();
 
   protected stepIcon(status: string): string {
-    return status === 'ok' ? '✓' : status === 'warn' ? '!' : '✕';
+    return status === 'ok' ? 'check' : status === 'warn' ? 'priority_high' : 'close';
   }
 
   protected stepColor(status: string): string {
