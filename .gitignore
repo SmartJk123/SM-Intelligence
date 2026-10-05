@@ -95,3 +95,12 @@ local.properties
 # Personal notes, kept on this machine only
 MYREADME.md
 myreadme.md
+
+# Keys, certificates and local tunnel settings never belong in git
+*.pem
+*.key
+*.p12
+*.jks
+**/keys/
+.tunnel-config.yml
+**/.tunnel-config.yml
