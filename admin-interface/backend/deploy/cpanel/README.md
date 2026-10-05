@@ -109,3 +109,53 @@ Apache commonly strips `Authorization`). With no `export_token` set it does not 
 - An HTTP to HTTPS redirect added for POST requests. A redirected POST loses its body.
 - The database living in a different cPanel account from `public_html`. Each account has its own
   MySQL, and one cannot log in to another's.
+
+## KCB instant payment notifications (IPN)
+
+The address to give KCB (email it to buni@kcbgroup.com for review, as the IPN specification asks):
+
+```text
+https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/kcb
+```
+
+`kcb-webhook.php` is the KCB counterpart of `ncba-webhook.php`. KCB posts JSON after crediting the
+account, with a `Signature` header: a base64 SHA256withRSA signature of the body, checked against
+KCB's public key. The endpoint answers with the acknowledgement body the specification fixes:
+
+```json
+{"transactionID": "FT00026252", "statusCode": "0", "statusMessage": "Notification received successfully"}
+```
+
+| Case | HTTP | statusCode |
+| --- | --- | --- |
+| Accepted | 200 | `0` |
+| Already received (same `transactionReference`) | 200 | `0`, "Duplicate notification received" |
+| Signature missing or wrong | 401 | `401` |
+| Body not JSON | 400 | `400` |
+| Config or database not ready | 503 | `503`, so KCB can retry |
+
+### Files
+
+| File in this folder | Goes to on the server |
+| --- | --- |
+| `public_html/sm-intelligence/kcb-webhook.php` | `public_html/sm-intelligence/kcb-webhook.php` |
+| `public_html/sm-intelligence/.htaccess` | replaces the existing one (adds the `kcb` rules) |
+| `smi-private/kcb-config.sample.php` | `smi-private/kcb-config.php`, filled in, permissions `600` |
+| `schema.sql` | run again in phpMyAdmin; it only creates `kcb_notifications` if missing |
+
+### Steps
+
+1. **Public key.** Ask BUNI for the **production** public key that signs IPN notifications. The sandbox key
+   will not verify production notifications. Paste the PEM block into `public_key` in `kcb-config.php`.
+2. **Database.** Use the same database and user as `ncba-config.php`, and run `schema.sql` again.
+3. **Export token.** Generate a new 32+ character token, for example
+   `[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(36))`, and put it
+   in `export_token`.
+4. **Upload** the files above, then open `https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/kcb` in a browser.
+   It should show `Status   : ready`. Any `not ready:` line names the step to fix.
+5. **Bank integration service.** In `backend/bank-integration-service/.env.local` set
+   `KCB_CPANEL_EXPORT_URL=https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/kcb/export` and
+   `KCB_CPANEL_EXPORT_TOKEN` to the same token. It then imports new KCB payments every minute.
+6. **Link the account.** In the admin interface, link KCB account `1302360167` to the customer, so its
+   payments show on their dashboard. KCB names it in `creditAccountIdentifier`.
+7. **Email KCB.** Send the address above to buni@kcbgroup.com for review.

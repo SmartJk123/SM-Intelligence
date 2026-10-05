@@ -19,11 +19,12 @@ public class NormalizedTransactionService {
     private static final List<String> REFERENCE_FIELDS = List.of(
             "transactionReference", "transactionRef", "reference", "transactionID", "transactionId");
     private static final List<String> NARRATION_FIELDS = List.of("narration", "description", "remarks");
-    private static final List<String> DATE_FIELDS = List.of("bookingDate", "transactionDate", "valueDate");
+    private static final List<String> DATE_FIELDS = List.of(
+            "bookingDate", "transactionDate", "valueDate", "timestamp");
     private static final List<String> COUNTERPARTY_NAME_FIELDS = List.of(
             "customerName", "payerName", "senderName", "payeeName", "name");
     private static final List<String> COUNTERPARTY_PHONE_FIELDS = List.of(
-            "phoneNr", "phoneNumber", "mobileNo", "msisdn");
+            "phoneNr", "phoneNumber", "mobileNo", "msisdn", "customerMobileNumber");
 
     // XML aliases, which is the shape NCBA posts. The specification fixes the
     // element names, and the aliases cover the renames banks make between
@@ -89,6 +90,11 @@ public class NormalizedTransactionService {
                 throw new IllegalArgumentException("Notification amount is missing or invalid");
             }
             String direction = text(root, DIRECTION_FIELDS, null);
+            // KCB sends an instant payment notification only after crediting the
+            // account, and the payload has no direction field of its own.
+            if ((direction == null || direction.isBlank()) && "kcb".equals(event.getBankId()) && amount.signum() > 0) {
+                direction = "CREDIT";
+            }
             if (amount.signum() < 0) {
                 if (direction == null || direction.isBlank()) {
                     direction = "DEBIT";

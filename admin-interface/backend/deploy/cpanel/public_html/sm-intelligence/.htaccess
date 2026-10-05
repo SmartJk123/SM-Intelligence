@@ -25,10 +25,14 @@ DirectoryIndex disabled
 
     # The NCBA notification endpoint, with or without a trailing slash.
     RewriteRule ^api/v1/webhooks/ncba/?$ ncba-webhook.php [L,QSA]
+
+    # The KCB instant payment notification endpoint and its import feed.
+    RewriteRule ^api/v1/webhooks/kcb/export/?$ kcb-webhook.php?export=1 [L,QSA]
+    RewriteRule ^api/v1/webhooks/kcb/?$ kcb-webhook.php [L,QSA]
 </IfModule>
 
 # Never serve configuration, SQL, logs or documentation if one is uploaded here
 # by mistake. Credentials belong in smi-private, outside the web root.
-<FilesMatch "(?i)(^ncba-config\.php$|\.(sql|md|log|ini|env|bak)$)">
+<FilesMatch "(?i)(^(ncba|kcb)-config\.php$|\.(sql|md|log|ini|env|bak)$)">
     Require all denied
 </FilesMatch>

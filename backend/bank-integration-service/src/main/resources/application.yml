@@ -55,6 +55,12 @@ smartmoney:
     export-url: ${NCBA_CPANEL_EXPORT_URL:}
     export-token: ${NCBA_CPANEL_EXPORT_TOKEN:}
     interval: ${NCBA_CPANEL_IMPORT_INTERVAL:PT1M}
+  # Pulls KCB instant payment notifications stored by the cPanel receiver (kcb-webhook.php).
+  # Off unless both are set; the token is export_token in cPanel's kcb-config.php.
+  kcb-cpanel:
+    export-url: ${KCB_CPANEL_EXPORT_URL:}
+    export-token: ${KCB_CPANEL_EXPORT_TOKEN:}
+    interval: ${KCB_CPANEL_IMPORT_INTERVAL:PT1M}
 
   stanbic:
     environment: ${STANBIC_ENV:SANDBOX}
