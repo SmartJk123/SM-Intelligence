@@ -9,10 +9,10 @@ colour system, typography and status vocabulary.
 | Field | Value |
 | --- | --- |
 | Document type | Implementation notes |
-| Version | 1.1 |
+| Version | 1.2 |
 | Status | Active |
 | Owner | Eclectics, SmartMoney Intelligence |
-| Last updated | 18 September 2026 |
+| Last updated | 5 October 2026 |
 | Related documents | [Service README](backend/README.md), [API contract](../docs/api-contract.md), [NCBA integration setup](../docs/ncba-integration-setup.md), [Domain knowledge](domain-knowledge.md) |
 | Prerequisites | Node.js 20 or later, npm |
 
@@ -23,16 +23,18 @@ inside WSL.
 
 ```powershell
 cd "C:\Users\user\Desktop\ECLECTICS\SM-Intelligence\admin-interface"
-npm start
+npm start -- --port 4300
 ```
 
-The development server serves the application at `http://localhost:4200/` and redirects to
-`/admin/login`.
+Open `http://localhost:4300/admin/login`. Use port 4300: the web app uses 4200, and api-gateway only
+accepts browser requests from 4200 and 4300. On any other port, sign in fails with "Could not reach
+the identity service".
 
-Sign in with any address on the `@smartmoney.io` domain and a password of six or more characters,
-then enter any six digit code on the two factor screen. Authentication is simulated in memory by
-`src/app/core/auth.service.ts`. The bank integration screens read from the Spring Boot service when
-it is running, and say so when it is not.
+Sign in with an identity-service account whose email is listed in `ADMIN_EMAILS` (see
+[backend setup](../backend/README.md)). The password is the one that account uses on the web app, and
+a forgotten one is reset from the web app's "Forgot password?" link. Sign in needs api-gateway (8080)
+and identity-service (8081). The bank screens need bank-integration-service (8090) and say so when it
+is not running.
 
 To produce a production bundle:
 
@@ -158,6 +160,18 @@ Calling a secret key a client key is how an operator ends up looking for the wro
 wrong portal, which is why the panel relabels itself rather than showing one bank's language to
 another bank's operator.
 
+Credentials are read only here. They live in `backend/bank-integration-service/.env.local` and are
+never sent to the browser. Environment, timeouts, retries and signature checking are editable and
+saved with "Save settings".
+
+### Webhook base address
+
+Above the bank panels, Settings, then Bank Integration Settings, has a "Webhook base address" field.
+Every bank's webhook URL is that address followed by `/api/v1/webhooks/<bank>`. Saving stores it in
+the bank service's database (`platform_setting`), so it is kept across restarts and overrides
+`PUBLIC_BASE_URL`. For production it is `https://sm-intelligence.globalsmartspaces.com`. The main site
+`https://globalsmartspaces.com` belongs to a different system and is not used for SmartMoney.
+
 ## Dependency note
 
 The npm registry was unreachable on the machine where this project was assembled, so `node_modules`
@@ -178,7 +192,7 @@ yet.
 | Item | State |
 | --- | --- |
 | Backend services | The bank integration screens are wired to the API. The remaining screens still read `src/app/core/data.ts` |
-| Authentication | Simulated in memory, not connected to an identity provider |
+| Authentication | Real sign in against identity-service; only `PLATFORM_ADMIN` accounts are accepted |
 | Detail views | Bank and organisation details open as in-page drawers rather than as routes, so they cannot be linked to directly |
 | Automated tests | No test runner installed. The build is the only check |
 | Live bank connectivity | The panel reports real credential state, real notification counts and a real four step connection test. No amount or balance passes through the admin surface |
@@ -187,5 +201,6 @@ yet.
 
 | Version | Date | Summary |
 | --- | --- | --- |
+| 1.2 | 5 October 2026 | Real admin sign in on port 4300. Settings opens the section named in `?section=` (Integration settings opens Bank Integration Settings). Webhook base address editable and stored across restarts. Save errors say when port 8090 is down |
 | 1.1 | 18 September 2026 | Bank connection panel documented, including the per bank labels. Backend contract replaced with the endpoints that are actually wired, and the limitations table corrected |
 | 1.0 | 10 September 2026 | Initial Angular implementation of the admin interface |
