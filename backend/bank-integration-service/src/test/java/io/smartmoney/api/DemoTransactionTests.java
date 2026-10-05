@@ -15,6 +15,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -116,6 +117,24 @@ class DemoTransactionTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"amount\":100,\"direction\":\"sideways\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void resetPurgesSimulatedTransactionsSafely() throws Exception {
+        record("""
+                {"bankId":"kcb","direction":"Credit","amount":5000.00,"narration":"Demo deposit"}
+                """);
+        awaitMovements(1);
+
+        mvc.perform(delete("/api/v1/admin/demo/transactions"))
+                .andExpect(status().isOk());
+
+        JsonNode movementsAfterReset = mapper.readTree(
+                mvc.perform(get("/api/v1/admin/demo/transactions"))
+                        .andExpect(status().isOk())
+                        .andReturn().getResponse().getContentAsString());
+
+        assertThat(movementsAfterReset).isEmpty();
     }
 
     private String record(String body) throws Exception {

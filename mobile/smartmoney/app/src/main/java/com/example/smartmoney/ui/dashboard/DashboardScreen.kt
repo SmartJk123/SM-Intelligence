@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +57,7 @@ import com.example.smartmoney.data.local.UserProfileManager
 import com.example.smartmoney.domain.model.Notification
 import com.example.smartmoney.ui.accounts.AccountScreen
 import com.example.smartmoney.ui.accounts.AccountViewModel
+import com.example.smartmoney.ui.accounts.LinkBankAccountDialog
 import com.example.smartmoney.ui.budget.BudgetScreen
 import com.example.smartmoney.ui.budget.BudgetViewModel
 import com.example.smartmoney.ui.components.AppTopBar
@@ -71,6 +73,7 @@ import com.example.smartmoney.ui.more.MoreScreen
 import com.example.smartmoney.ui.navigation.Screen
 import com.example.smartmoney.ui.notifications.NotificationViewModel
 import com.example.smartmoney.ui.notifications.NotificationsScreen
+import com.example.smartmoney.ui.onboarding.AccountOnboardingBottomSheet
 import com.example.smartmoney.ui.theme.SmartMoneyColors
 import com.example.smartmoney.ui.transactions.TransactionScreen
 import com.example.smartmoney.ui.transactions.TransactionViewModel
@@ -104,6 +107,8 @@ fun DashboardScreen(
     val unreadNotifCount by (notificationViewModel?.unreadCount?.collectAsState() ?: remember { mutableStateOf(0) })
     val activeBanner by (notificationViewModel?.activeBanner?.collectAsState() ?: remember { mutableStateOf(null) })
     val homeUiState by (homeViewModel?.uiState?.collectAsState() ?: remember { mutableStateOf(HomeUiState.DEFAULT) })
+    var showLinkDialog by remember { mutableStateOf(false) }
+    val showOnboardingSheet = homeUiState.shouldShowWelcomeSheet && !homeUiState.isLoading
 
     // Automatically trigger transaction sync in the background only after settling on the Transactions tab
     LaunchedEffect(bottomBarPagerState.settledPage) {
@@ -196,6 +201,7 @@ fun DashboardScreen(
                                 onSimulateOutflow = { onSuccess, onError ->
                                     homeViewModel?.simulateKcbOutflow(onSuccess = onSuccess, onError = onError)
                                 },
+                                onLinkAccountClick = { showLinkDialog = true },
                                 unreadNotificationCount = unreadNotifCount,
                                 onNotificationsClick = { navController.navigate(Screen.Notifications.route) },
                                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
@@ -328,6 +334,34 @@ fun DashboardScreen(
                 )
             }
         }
+    }
+
+    if (showOnboardingSheet) {
+        AccountOnboardingBottomSheet(
+            onDismiss = { homeViewModel?.dismissWelcomeSheet() },
+            onLinkAccountClick = {
+                homeViewModel?.dismissWelcomeSheet()
+                showLinkDialog = true
+            }
+        )
+    }
+
+    if (showLinkDialog) {
+        LinkBankAccountDialog(
+            onDismiss = { showLinkDialog = false },
+            onSave = { bank, accNumber, cardType ->
+                homeViewModel?.linkBankAccount(
+                    bankName = bank,
+                    accountNumber = accNumber,
+                    cardType = cardType
+                ) ?: accountViewModel.addBankAccount(
+                    bankName = bank,
+                    accountNumber = accNumber,
+                    cardType = cardType
+                )
+                showLinkDialog = false
+            }
+        )
     }
 }
 
