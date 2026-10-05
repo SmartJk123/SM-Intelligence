@@ -111,6 +111,16 @@ export interface WebhookInfo {
   accountNumber: string | null;
 }
 
+/**
+ * The base address every bank's webhook URL is derived from, as PUBLIC_BASE_URL
+ * on the backend reports it. Editing this updates the running service; it does
+ * not touch any .env file, and reverts on restart.
+ */
+export interface PlatformBaseUrlInfo {
+  publicBaseUrl: string;
+  callbackIsPublic: boolean;
+}
+
 /** One day of notification volume. */
 export interface PlatformDailyPoint {
   date: string;
@@ -219,6 +229,8 @@ export interface BankIntegrationGateway {
   registerCallback(bankId: string): Promise<CallbackRegistration[]>;
   loadCredentials(bankId: string): Promise<CredentialStatus | null>;
   loadWebhookInfo(bankId: string): Promise<WebhookInfo | null>;
+  loadPublicBaseUrl(): Promise<PlatformBaseUrlInfo | null>;
+  updatePublicBaseUrl(publicBaseUrl: string): Promise<PlatformBaseUrlInfo>;
   loadStats(): Promise<PlatformStats | null>;
   /** The demonstration account, or null when the backend is unreachable. */
   loadDemoSummary(): Promise<DemoSummary | null>;

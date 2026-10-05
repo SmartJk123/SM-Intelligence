@@ -106,6 +106,9 @@ import { AccountApi, AccountKind } from './account-api';
           <small id="password-help">{{
             register ? 'Use at least 12 characters.' : 'Enter the password for your account.'
           }}</small>
+          @if (!register) {
+            <a class="text-link forgot-link" routerLink="/forgot-password">Forgot password?</a>
+          }
           @if (invalid('password')) {
             <p class="field-error">
               {{

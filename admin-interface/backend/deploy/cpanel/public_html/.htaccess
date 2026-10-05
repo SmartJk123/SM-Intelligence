@@ -1,0 +1,20 @@
+# public_html of globalsmartspaces.com on cPanel.
+#
+# Each module keeps its files in its own folder under public_html. This file
+# only forwards the SmartMoney Intelligence NCBA addresses into its folder,
+# public_html/sm-intelligence, so index.html, erp/, properties/ and every other
+# module behave exactly as before.
+#
+#   https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/ncba         -> sm-intelligence/ncba-webhook.php
+#   https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/ncba/export  -> the import feed for the bank service
+#
+# If public_html already has other rules, keep them: paste the block between
+# BEGIN and END at the very top, above anything already there.
+
+# BEGIN SmartMoney Intelligence
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^api/v1/webhooks/ncba/export/?$ sm-intelligence/ncba-webhook.php?export=1 [L,QSA]
+    RewriteRule ^api/v1/webhooks/ncba/?$ sm-intelligence/ncba-webhook.php [L,QSA]
+</IfModule>
+# END SmartMoney Intelligence

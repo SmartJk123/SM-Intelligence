@@ -7,6 +7,7 @@ import io.smartmoney.api.config.PlatformProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import io.smartmoney.api.bankintegration.equity.EquityProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -19,6 +20,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         StanbicProperties.class,
         KcbProperties.class,
         NcbaProperties.class,
+        EquityProperties.class,
         PlatformProperties.class
 })
 public class BankIntegrationServiceApplication {

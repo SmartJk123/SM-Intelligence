@@ -169,7 +169,7 @@ export class BankIntegrations {
         await this.copyWebhookUrl(bank);
         break;
       case 'settings':
-        void this.router.navigate(['/admin', 'settings']);
+        void this.router.navigate(['/admin', 'settings'], { queryParams: { section: 'bank-integration' } });
         break;
       default:
         break;

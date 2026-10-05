@@ -33,7 +33,7 @@ export class Transactions {
   private readonly integrations = inject(BankIntegrationService);
 
   protected readonly money = money;
-  protected readonly banks = ['kcb', 'stanbic', 'ncba'];
+  protected readonly banks = ['kcb', 'stanbic', 'ncba', 'equity'];
   protected readonly directionFilters: DirectionFilter[] = ['All', 'Credit', 'Debit'];
 
   protected readonly directionFilter = signal<DirectionFilter>('All');

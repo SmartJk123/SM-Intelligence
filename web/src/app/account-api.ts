@@ -82,6 +82,13 @@ export class AccountApi {
     if ('registered' in result && result.registered) return 'sign-in';
     this.acceptSession(result as Session);
   }
+  /** Asks for a reset link. Resolves the same way whether or not the address has an account. */
+  async forgotPassword(email: string) {
+    await firstValueFrom(this.http.post('/api/auth/forgot-password', { email }).pipe(timeout(30000)));
+  }
+  async resetPassword(token: string, password: string) {
+    await firstValueFrom(this.http.post('/api/auth/reset-password', { token, password }).pipe(timeout(30000)));
+  }
   async restoreSession() {
     try {
       this.acceptSession(

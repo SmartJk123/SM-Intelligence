@@ -8,12 +8,42 @@ Invoice capture is also available: upload a photo/PDF, review extracted details 
 
 ## Run locally
 
-1. Start PostgreSQL for identity and accounts: `docker compose -f backend/docker-compose.yml up -d postgres-identity postgres-accounts`.
-2. In a PowerShell terminal, set `JWT_SECRET` to a private random value of at least 32 bytes, then run `./backend/mvn.ps1 -pl identity-service spring-boot:run`.
-3. In separate terminals, run `./backend/mvn.ps1 -pl accounts-service spring-boot:run` and `./backend/mvn.ps1 -pl api-gateway spring-boot:run`.
-4. In `web/`, run `npm ci` and `npm start`, then open http://localhost:4200.
+Every Java service needs JDK 25 and is started from the repository root, one terminal each. Maven does
+not read `.env.local` files, so load a service's file into the terminal first (see
+[backend setup](backend/README.md)).
 
-See [backend setup](backend/README.md) for Java/Maven requirements and [frontend setup](web/README.md) for API configuration. Environment variables must be set in the terminal running each service; the root `.env.example` is a reference, not an automatically loaded file.
+| Service | Port | Start | Needed for |
+| --- | --- | --- | --- |
+| PostgreSQL | 5432 | local PostgreSQL service with `smi_identity`, `smi_accounts`, `smi_transactions` | everything |
+| identity-service | 8081 | `./backend/mvn.ps1 -pl identity-service spring-boot:run` | sign in, users, password reset |
+| api-gateway | 8080 | `./backend/mvn.ps1 -pl api-gateway spring-boot:run` | everything the browsers call |
+| accounts-service | 8082 | `$env:DB_URL = 'jdbc:postgresql://localhost:5432/smi_accounts'` then `./backend/mvn.ps1 -pl accounts-service spring-boot:run` | customer accounts and balances |
+| transactions-service | 8083 | `$env:DB_URL = 'jdbc:postgresql://localhost:5432/smi_transactions'` then `./backend/mvn.ps1 -pl transactions-service spring-boot:run` | customer transactions |
+| bank-integration-service | 8090 | `./backend/mvn.ps1 -pl bank-integration-service spring-boot:run` | bank webhooks, admin bank screens |
+| web | 4200 | `npm start` in `web/` | customer app |
+| admin-interface | 4300 | `npm start -- --port 4300` in `admin-interface/` | admin portal |
+
+Start bank-integration-service exactly as shown. Its H2 database is a folder relative to where it starts,
+and this command uses `backend/bank-integration-service/data`, which holds the real data. Starting it
+from anywhere else opens an empty or older database, and transactions appear to vanish.
+
+With Docker (`backend/docker-compose.yml`) the accounts and transactions databases are on 5433 and 5434 instead, and the `DB_URL` lines are not needed.
+
+Environment variables must be set in the terminal running each service; the root `.env.example` is a
+reference, not an automatically loaded file.
+
+## Features at a glance
+
+- **Customer app:** sign up, sign in, "Forgot password?" by email (SMTP settings in
+  [backend setup](backend/README.md#forgot-password-emails)), account onboarding, dashboard, invoices.
+- **One account number, one user:** a bank account number can be registered by only one user, whether
+  the customer enters it or an admin links it.
+- **Admin portal:** real sign in for `ADMIN_EMAILS` accounts; suspend, restore, edit and send a
+  password reset to any user; create organisations and invite members (they get a set-password link);
+  bank integrations. The bank service's admin API only accepts admin tokens (shared `JWT_SECRET`).
+- **Bank notifications in production:** NCBA and KCB post to PHP receivers on cPanel
+  (`https://sm-intelligence.globalsmartspaces.com`), and bank-integration-service imports them every
+  minute. See [cPanel deployment](admin-interface/backend/deploy/cpanel/README.md).
 
 ## Project layout
 

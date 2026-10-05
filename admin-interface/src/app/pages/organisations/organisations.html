@@ -109,6 +109,8 @@
       (closed)="closeDetail()"
       (saved)="onDetailSaved($event)"
       (statusChange)="onDetailStatusChange($event)"
+      [canInvite]="canInvite(detailOrg)"
+      (invite)="sendInvite(detailOrg)"
     />
   }
 </div>

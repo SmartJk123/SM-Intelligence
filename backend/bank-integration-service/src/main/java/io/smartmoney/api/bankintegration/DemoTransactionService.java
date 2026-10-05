@@ -38,7 +38,7 @@ public class DemoTransactionService {
     public static final String DEMO_ACCOUNT_NUMBER = "1000000001";
     public static final String DEMO_ACCOUNT_NAME = "Demo business account";
 
-    private static final List<String> DEMO_BANKS = List.of("kcb", "stanbic", "ncba");
+    private static final List<String> DEMO_BANKS = List.of("kcb", "stanbic", "ncba", "equity");
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("100000000");
     private static final BigDecimal DEFAULT_AMOUNT = new BigDecimal("1000.00");
     private static final String CURRENCY = "KES";

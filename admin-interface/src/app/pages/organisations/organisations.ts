@@ -3,6 +3,7 @@ import { OrgStatus, Organisation } from '../../core/data';
 import { CsvExportService } from '../../core/csv-export.service';
 import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
+import { OrganizationService } from '../../core/organization.service';
 import { UserService } from '../../core/user.service';
 import { ActionMenu, ActionMenuItem } from '../../shared/action-menu';
 import { Badge } from '../../shared/badge';
@@ -31,6 +32,7 @@ export class Organisations {
   private readonly csv = inject(CsvExportService);
   private readonly toasts = inject(ToastService);
   private readonly userDirectory = inject(UserService);
+  private readonly organizations = inject(OrganizationService);
 
   /** Status changes made from the row menu, so the actions really take effect. */
   private readonly statusOverrides = signal<Record<string, OrgStatus>>({});
@@ -54,10 +56,20 @@ export class Organisations {
     'Action',
   ];
 
+  /** Ids of organisations created in admin (identity-service), which can be sent an owner invite. */
+  private readonly invitable = computed(() => new Set(this.organizations.organisations().map((org) => org.id)));
+
+  /**
+   * Organisations created in admin, plus companies that signed up on the web
+   * under a name no admin-created organisation already has.
+   */
   protected readonly orgs = computed<Organisation[]>(() => {
     const overrides = this.statusOverrides();
     const edits = this.edits();
-    return this.userDirectory.organisations().map((org) => ({
+    const created = this.organizations.organisations();
+    const names = new Set(created.map((org) => org.name.trim().toLowerCase()));
+    const signedUp = this.userDirectory.organisations().filter((org) => !names.has(org.name.trim().toLowerCase()));
+    return [...created, ...signedUp].map((org) => ({
       ...org,
       ...(edits[org.id] ?? {}),
       status: overrides[org.id] ?? org.status,
@@ -85,6 +97,7 @@ export class Organisations {
     return [
       { id: 'view', label: 'View organisation', tone: 'primary' },
       { id: 'edit', label: 'Edit details' },
+      ...(this.invitable().has(org.id) ? [{ id: 'invite', label: 'Send owner invite' }] : []),
       { id: 'export', label: 'Export this row' },
       org.status === 'Active'
         ? { id: 'suspend', label: 'Suspend organisation', tone: 'danger' }
@@ -100,6 +113,15 @@ export class Organisations {
   protected applyCardAction(action: string): void {
     this.query.set('');
     this.statusFilter.set(action === 'all' ? 'All' : action);
+  }
+
+  /** Opens the invite form for the owner of an organisation created in admin. */
+  protected sendInvite(org: Organisation): void {
+    this.ui.openOwnerInvite(org.id, org.name);
+  }
+
+  protected canInvite(org: Organisation): boolean {
+    return this.invitable().has(org.id);
   }
 
   protected addOrganisation(): void {
@@ -160,6 +182,9 @@ export class Organisations {
 
   protected onRowAction(action: string, org: Organisation): void {
     switch (action) {
+      case 'invite':
+        this.sendInvite(org);
+        break;
       case 'edit':
         this.toasts.show('Edit organisation', 'info', `${org.name} is ready for editing.`);
         break;

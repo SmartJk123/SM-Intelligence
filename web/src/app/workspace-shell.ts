@@ -1,6 +1,7 @@
 // Authenticated workspace layout and navigation shared by all customer-facing finance pages.
 import { WorkspaceIcon } from './workspace-icon';
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AccountApi } from './account-api';
 import { LiveUpdates } from './live-updates';
@@ -21,7 +22,7 @@ export const workspaceLinks = [
 ];
 
 @Component({
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, WorkspaceIcon],
+  imports: [CurrencyPipe, RouterLink, RouterLinkActive, RouterOutlet, WorkspaceIcon],
   template: ` <div class="workspace-shell" (keydown.escape)="closeMenu()">
     <button
       class="ws-shade"
@@ -91,6 +92,23 @@ export const workspaceLinks = [
         <p class="ws-alert" role="alert">{{ error() }}</p>
       }
       <router-outlet />
+    </div>
+    <div class="ws-toasts" role="status" aria-live="polite">
+      @for (toast of live.toasts(); track toast.id) {
+        <div class="ws-toast" [class.positive]="toast.direction === 'CREDIT'">
+          <span class="notif-icon" [class.positive]="toast.direction === 'CREDIT'">
+            <app-workspace-icon [name]="toast.direction === 'CREDIT' ? 'content-income' : 'content-expense'" />
+          </span>
+          <div class="ws-toast-body">
+            <small>{{ toast.direction === 'CREDIT' ? 'Payment received' : 'Payment sent' }}{{ toast.bank ? ' · ' + toast.bank : '' }}</small>
+            <strong>{{ toast.description }}</strong>
+          </div>
+          <span class="ws-toast-amount">
+            {{ toast.direction === 'CREDIT' ? '+' : '−' }}{{ toast.amountMinor / 100 | currency: 'KES' : 'code' : '1.2-2' }}
+          </span>
+          <button class="ws-toast-close" (click)="live.dismissToast(toast.id)" aria-label="Dismiss">✕</button>
+        </div>
+      }
     </div>
     <nav class="ws-bottom" aria-label="Mobile navigation">
       <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page"

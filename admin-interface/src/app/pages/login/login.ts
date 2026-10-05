@@ -21,19 +21,21 @@ export class LoginPage {
 
   protected async submitCredentials(event: Event): Promise<void> {
     event.preventDefault();
+    if (this.loading()) return;
+    const email = this.email().trim();
+    if (!email || !this.password()) {
+      this.error.set('Enter your email address and password.');
+      return;
+    }
     this.error.set('');
     this.loading.set(true);
     try {
-      await this.auth.login(this.email().trim(), this.password());
+      await this.auth.login(email, this.password());
       void this.router.navigate(['/admin', 'dashboard']);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Sign in failed. Please try again.');
     } finally {
       this.loading.set(false);
     }
-  }
-
-  protected signInWithGoogle(): void {
-    this.error.set('Google sign-in is not available yet. Use your email and password.');
   }
 }

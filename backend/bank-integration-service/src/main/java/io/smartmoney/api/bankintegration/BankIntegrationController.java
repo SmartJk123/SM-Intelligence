@@ -2,6 +2,7 @@ package io.smartmoney.api.bankintegration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.smartmoney.api.bankintegration.equity.EquityProperties;
 import io.smartmoney.api.bankintegration.kcb.KcbProperties;
 import io.smartmoney.api.bankintegration.ncba.NcbaProperties;
 import io.smartmoney.api.bankintegration.stanbic.StanbicProperties;
@@ -38,6 +39,7 @@ public class BankIntegrationController {
     private final StanbicProperties stanbic;
     private final KcbProperties kcb;
     private final NcbaProperties ncba;
+    private final EquityProperties equity;
     private final StanbicRegistrationService stanbicRegistrations;
     private final ObjectMapper mapper;
     private final Map<String, BankConnector> connectors;
@@ -52,6 +54,7 @@ public class BankIntegrationController {
             StanbicProperties stanbic,
             KcbProperties kcb,
             NcbaProperties ncba,
+            EquityProperties equity,
             StanbicRegistrationService stanbicRegistrations,
             ObjectMapper mapper,
             List<BankConnector> connectors,
@@ -64,6 +67,7 @@ public class BankIntegrationController {
         this.stanbic = stanbic;
         this.kcb = kcb;
         this.ncba = ncba;
+        this.equity = equity;
         this.stanbicRegistrations = stanbicRegistrations;
         this.mapper = mapper;
         this.demo = demo;
@@ -98,6 +102,9 @@ public class BankIntegrationController {
         }
         if ("ncba".equals(bankId)) {
             return ResponseEntity.ok(ncbaCredentials());
+        }
+        if ("equity".equals(bankId)) {
+            return ResponseEntity.ok(equityCredentials());
         }
         if (!"stanbic".equals(bankId)) {
             return ResponseEntity.noContent().build();
@@ -145,6 +152,43 @@ public class BankIntegrationController {
         }
         return "Key, Secret and public key are loaded. Set the notification address on the "
                 + "application in BUNI, then send a test notification.";
+    }
+
+    /**
+     * Jenga issues a merchant code, API key and consumer secret. The IPN
+     * callback is protected with Basic Auth credentials registered with it on
+     * Jenga HQ. None of the values is ever returned.
+     */
+    private IntegrationCredentials equityCredentials() {
+        boolean ipnReady = equity.ipnCredentialsConfigured();
+        String advice;
+        if (!equity.credentialsConfigured()) {
+            advice = "Copy the merchant code, API key and consumer secret from Jenga HQ into EQUITY_MERCHANT_CODE, "
+                    + "EQUITY_API_KEY and EQUITY_CONSUMER_SECRET, then restart the service.";
+        } else if (!ipnReady) {
+            advice = "Credentials are loaded. Register the webhook URL as the IPN callback on Jenga HQ with a "
+                    + "username and password, and set the same values as EQUITY_IPN_USERNAME and EQUITY_IPN_PASSWORD.";
+        } else {
+            advice = "Credentials and IPN Basic Auth are loaded. Send a test payment to confirm delivery.";
+        }
+        return new IntegrationCredentials(
+                "equity",
+                EquityProperties.isPresent(equity.apiKey()),
+                StanbicProperties.tail(equity.apiKey()),
+                EquityProperties.isPresent(equity.consumerSecret()),
+                EquityProperties.isPresent(equity.merchantCode()),
+                StanbicProperties.tail(equity.merchantCode()),
+                "merchant code",
+                equity.tokenUrl(),
+                "",
+                "",
+                "",
+                equity.maskedAccountNumber() == null ? "" : equity.maskedAccountNumber(),
+                tokenReady("equity"),
+                ipnReady,
+                advice,
+                "Equity pushes Instant Payment Notifications for successful and failed payments; only "
+                        + "successful ones are credited to a customer.");
     }
 
     /**
@@ -271,6 +315,7 @@ public class BankIntegrationController {
         body.put("publiclyReachable", reachability.state(bankId) == CallbackReachability.State.RESOLVABLE);
         body.put("accountNumber", switch (bankId) {
             case "stanbic" -> stanbic.maskedAccountNumber();
+            case "equity" -> equity.maskedAccountNumber();
             case "ncba" -> NcbaProperties.isPresent(ncba.accountNumber())
                     ? ncba.maskedAccountNumber() : null;
             default -> null;
