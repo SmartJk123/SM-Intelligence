@@ -40,7 +40,7 @@ public class NormalizedTransactionService {
     private static final String[] XML_PHONE = {"PhoneNr", "PhoneNumber", "MobileNo", "MSISDN"};
     // KCB names the credited account in creditAccountIdentifier.
     private static final List<String> ACCOUNT_FIELDS = List.of(
-            "accountNumber", "creditAccountIdentifier", "accountNo", "account", "accountId");
+            "accountNumber", "creditAccountIdentifier", "bankAccountNumber", "accountNo", "account", "accountId");
 
     private final NormalizedTransactionRepository repository;
     private final ObjectMapper mapper;
@@ -105,6 +105,7 @@ public class NormalizedTransactionService {
             transaction.setAccountNumber(normalizeAccountNumber(text(root, ACCOUNT_FIELDS, null)));
             transaction.setCounterpartyName(text(root, COUNTERPARTY_NAME_FIELDS, null));
             transaction.setCounterpartyPhone(text(root, COUNTERPARTY_PHONE_FIELDS, null));
+            transaction.setSimulated(event.isSimulated());
             return transaction;
         } catch (IllegalArgumentException error) {
             throw error;
@@ -135,6 +136,7 @@ public class NormalizedTransactionService {
         transaction.setAccountNumber(normalizeAccountNumber(XmlFields.first(fields, XML_ACCOUNT)));
         transaction.setCounterpartyName(XmlFields.first(fields, XML_CUSTOMER_NAME));
         transaction.setCounterpartyPhone(XmlFields.first(fields, XML_PHONE));
+        transaction.setSimulated(event.isSimulated());
         return transaction;
     }
 

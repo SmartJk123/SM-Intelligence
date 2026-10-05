@@ -35,13 +35,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -77,6 +81,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -110,6 +115,7 @@ fun HomeScreen(
     userName: String = "User",
     onSimulateInflow: (onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit = { _, _ -> },
     onSimulateOutflow: (onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit = { _, _ -> },
+    onLinkAccountClick: () -> Unit = {},
     unreadNotificationCount: Int = uiState.unreadNotificationCount,
     onNotificationsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -174,7 +180,9 @@ fun HomeScreen(
                                 onToggleBalanceVisibility = { isBalanceVisible = !isBalanceVisible }
                             )
                             1 -> ConnectedAppsBannerCard(
-                                bankAccounts = uiState.bankAccounts
+                                bankAccounts = uiState.bankAccounts,
+                                isOnboardingActive = uiState.isOnboardingActive,
+                                onLinkAccountClick = onLinkAccountClick
                             )
                         }
                     }
@@ -212,42 +220,49 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // =========================================================================
-            // SIMULATION ACTION BAR (Moved between main card and cash flow graph)
+            // ONBOARDING GET STARTED CARD (when onboarding is active off Main thread)
+            // OR SIMULATION ACTION BAR (when user has active accounts)
             // =========================================================================
-            SimulationActionBar(
-                isSimulatingInflow = uiState.isSimulatingInflow,
-                isSimulatingOutflow = uiState.isSimulatingOutflow,
-                onSimulateInflow = {
-                    if (uiState.isSimulatingInflow) return@SimulationActionBar
-                    onSimulateInflow(
-                        {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("⚡ Simulated KCB inflow of KES 1,000 received!")
+            if (uiState.isOnboardingActive) {
+                OnboardingGetStartedCard(
+                    onLinkAccountClick = onLinkAccountClick
+                )
+            } else {
+                SimulationActionBar(
+                    isSimulatingInflow = uiState.isSimulatingInflow,
+                    isSimulatingOutflow = uiState.isSimulatingOutflow,
+                    onSimulateInflow = {
+                        if (uiState.isSimulatingInflow) return@SimulationActionBar
+                        onSimulateInflow(
+                            {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("⚡ Simulated KCB inflow of KES 1,000 received!")
+                                }
+                            },
+                            { error ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Simulation failed: $error")
+                                }
                             }
-                        },
-                        { error ->
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Simulation failed: $error")
+                        )
+                    },
+                    onSimulateOutflow = {
+                        if (uiState.isSimulatingOutflow) return@SimulationActionBar
+                        onSimulateOutflow(
+                            {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("⚡ Simulated KCB outflow of KES 500 debited!")
+                                }
+                            },
+                            { error ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Simulation failed: $error")
+                                }
                             }
-                        }
-                    )
-                },
-                onSimulateOutflow = {
-                    if (uiState.isSimulatingOutflow) return@SimulationActionBar
-                    onSimulateOutflow(
-                        {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("⚡ Simulated KCB outflow of KES 500 debited!")
-                            }
-                        },
-                        { error ->
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Simulation failed: $error")
-                            }
-                        }
-                    )
-                }
-            )
+                        )
+                    }
+                )
+            }
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -257,7 +272,11 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             // Linked Accounts Summary Section
-            LinkedAccountsSummarySection(bankAccounts = uiState.bankAccounts)
+            LinkedAccountsSummarySection(
+                bankAccounts = uiState.bankAccounts,
+                isOnboardingActive = uiState.isOnboardingActive,
+                onLinkAccountClick = onLinkAccountClick
+            )
 
             Spacer(modifier = Modifier.navigationBarsPadding().height(96.dp))
         }
@@ -315,35 +334,84 @@ private fun TotalBalanceBannerCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Dark green pill-shaped badge: "↑ 24% Last week"
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (isDark) SmartMoneyColors.DarkSurface else DarkGreenPillBadge
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                if (uiState.isOnboardingActive) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (isDark) SmartMoneyColors.DarkSurface else MaterialTheme.colorScheme.surfaceVariant
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowUpward,
-                            contentDescription = null,
-                            tint = if (isDark) SmartMoneyColors.PaleMintGreen else MutedSageCard,
-                            modifier = Modifier.size(11.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = "24%",
-                            color = if (isDark) SmartMoneyColors.PaleMintGreen else MutedSageCard,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Last week",
-                            color = Color.White.copy(alpha = 0.92f),
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "No cards linked",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                } else if (!uiState.hasTransactions) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (isDark) SmartMoneyColors.DarkSurface else SmartMoneyColors.PaleMintGreen.copy(alpha = 0.5f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "Card active",
+                                color = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (isDark) SmartMoneyColors.DarkSurface else DarkGreenPillBadge
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowUpward,
+                                contentDescription = null,
+                                tint = if (isDark) SmartMoneyColors.PaleMintGreen else MutedSageCard,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "Live",
+                                color = if (isDark) SmartMoneyColors.PaleMintGreen else MutedSageCard,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "This week",
+                                color = Color.White.copy(alpha = 0.92f),
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }
@@ -421,6 +489,8 @@ private fun TotalBalanceBannerCard(
 @Composable
 private fun ConnectedAppsBannerCard(
     bankAccounts: List<BankAccount>,
+    isOnboardingActive: Boolean = false,
+    onLinkAccountClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalDarkTheme.current
@@ -471,9 +541,22 @@ private fun ConnectedAppsBannerCard(
                     }
                 }
 
+                val statusBg = if (isOnboardingActive) {
+                    if (isDark) SmartMoneyColors.DarkSurface else MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    if (isDark) Color(0xFF143823) else SmartMoneyColors.PaleMintGreen
+                }
+                val statusDotColor = if (isOnboardingActive) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                } else themeGreen
+                val statusTextColor = if (isOnboardingActive) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else themeGreen
+                val statusText = if (isOnboardingActive) "0 Active" else "Real-time"
+
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = if (isDark) Color(0xFF143823) else SmartMoneyColors.PaleMintGreen
+                    color = statusBg
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -483,13 +566,13 @@ private fun ConnectedAppsBannerCard(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(themeGreen)
+                                .background(statusDotColor)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Real-time",
+                            text = statusText,
                             style = MaterialTheme.typography.labelSmall,
-                            color = themeGreen,
+                            color = statusTextColor,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp
                         )
@@ -499,16 +582,56 @@ private fun ConnectedAppsBannerCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (bankAccounts.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+            if (isOnboardingActive) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountBalance,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "No connected bank or payment apps yet",
+                        text = "No Connected Accounts",
                         style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Link a bank or card to see live balances",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        onClick = onLinkAccountClick,
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
+                        contentColor = if (isDark) SmartMoneyColors.DarkSlateGreen else Color.White
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Link Account",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             } else {
                 // Scrollable container: allows the user to scroll through to view all other banks not initially in FOV
@@ -795,49 +918,84 @@ private fun CashFlowTrendGraphCard(trendPoints: List<TrendPoint>) {
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Legend
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Cash In", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFF44336)))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Cash Out", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            if (trendPoints.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoGraph,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "No Cash Flow Activity Yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Connect an account to automatically generate your 7-day cash flow analysis.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
+                // Legend
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Cash In", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            // Canvas Line Chart
-            CashFlowLineGraphCanvas(
-                points = trendPoints,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-            )
+                    Spacer(modifier = Modifier.width(16.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFF44336)))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Cash Out", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
 
-            // X-Axis Day Labels
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 32.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                trendPoints.forEach { point ->
-                    Text(
-                        text = point.dayLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
-                    )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Canvas Line Chart
+                CashFlowLineGraphCanvas(
+                    points = trendPoints,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // X-Axis Day Labels
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 32.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    trendPoints.forEach { point ->
+                        Text(
+                            text = point.dayLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -1023,7 +1181,12 @@ private fun CashFlowLineGraphCanvas(
  * Shows a compact horizontal scroll row (LazyRow) of bank names, card types, and masked numbers.
  */
 @Composable
-private fun LinkedAccountsSummarySection(bankAccounts: List<BankAccount>) {
+private fun LinkedAccountsSummarySection(
+    bankAccounts: List<BankAccount>,
+    isOnboardingActive: Boolean = false,
+    onLinkAccountClick: () -> Unit = {}
+) {
+    val isDark = LocalDarkTheme.current
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1053,7 +1216,7 @@ private fun LinkedAccountsSummarySection(bankAccounts: List<BankAccount>) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (bankAccounts.isEmpty()) {
+        if (isOnboardingActive) {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -1066,28 +1229,68 @@ private fun LinkedAccountsSummarySection(bankAccounts: List<BankAccount>) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.AccountBalance,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountBalance,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "No Accounts Linked",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Connect a bank or card to begin",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "No linked bank accounts yet. Link an account from the Accounts tab.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Surface(
+                        onClick = onLinkAccountClick,
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
+                        contentColor = if (isDark) SmartMoneyColors.DarkSlateGreen else Color.White
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Link",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         } else {
@@ -1101,6 +1304,114 @@ private fun LinkedAccountsSummarySection(bankAccounts: List<BankAccount>) {
                 ) { bankAccount ->
                     LinkedAccountMiniCard(bankAccount = bankAccount)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Persistent "Get Started" setup card displayed on the Overview screen
+ * whenever a user has no linked bank accounts or cards.
+ */
+@Composable
+fun OnboardingGetStartedCard(
+    onLinkAccountClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isDark = LocalDarkTheme.current
+    ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isDark) SmartMoneyColors.DarkSurfaceElevated else MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isDark) SmartMoneyColors.DarkSlateGreen.copy(alpha = 0.5f) else SmartMoneyColors.PaleMintGreen
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalance,
+                            contentDescription = null,
+                            tint = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "GET STARTED",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
+                            fontSize = 10.5.sp
+                        )
+                    }
+                }
+
+                Text(
+                    text = "🔒 256-bit Encrypted",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = "Connect Your First Account",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Your balance is currently KES 0.00 because no accounts are connected. Link your bank or card to activate live balance tracking, automated expense categorization, and budgets.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onLinkAccountClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
+                    contentColor = if (isDark) SmartMoneyColors.DarkSlateGreen else Color.White
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Connect Your First Account",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
             }
         }
     }
