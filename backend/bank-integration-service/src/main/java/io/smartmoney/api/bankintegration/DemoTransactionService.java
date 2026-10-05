@@ -62,8 +62,8 @@ public class DemoTransactionService {
 
     @Transactional
     public void reset() {
-        transactions.deleteAll();
-        events.deleteAll();
+        transactions.deleteBySimulatedTrue();
+        events.deleteBySimulatedTrue();
     }
 
     /** A movement the demonstration account has just made. */
@@ -147,7 +147,7 @@ public class DemoTransactionService {
      */
     private List<NormalizedTransactionEntity> rows() {
         List<NormalizedTransactionEntity> rows = new ArrayList<>();
-        for (WebhookEventEntity event : events.findTop100ByOrderByReceivedAtDesc()) {
+        for (WebhookEventEntity event : events.findTop100BySimulatedTrueOrderByReceivedAtDesc()) {
             if (event.getExternalEventId() == null) {
                 continue;
             }
