@@ -2,12 +2,15 @@ package com.smi.identity_service.controller;
 
 import com.smi.identity_service.domain.User;
 import com.smi.identity_service.dto.AuthResponse;
+import com.smi.identity_service.dto.ForgotPasswordRequest;
 import com.smi.identity_service.dto.LoginRequest;
 import com.smi.identity_service.dto.RegisterRequest;
+import com.smi.identity_service.dto.ResetPasswordRequest;
 import com.smi.identity_service.dto.UserProfileResponse;
 import com.smi.identity_service.exception.AccountSuspendedException;
 import com.smi.identity_service.exception.InvalidCredentialsException;
 import com.smi.identity_service.security.JwtService;
+import com.smi.identity_service.service.PasswordResetService;
 import com.smi.identity_service.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -27,10 +31,12 @@ public class AuthController {
 
     private final UserService userService;
     private final JwtService jwtService;
+    private final PasswordResetService passwordReset;
 
-    public AuthController(UserService userService, JwtService jwtService) {
+    public AuthController(UserService userService, JwtService jwtService, PasswordResetService passwordReset) {
         this.userService = userService;
         this.jwtService = jwtService;
+        this.passwordReset = passwordReset;
     }
 
     @PostMapping("/register")
@@ -94,5 +100,19 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(UserProfileResponse.fromUser(user));
+    }
+
+    /** Always 202 with the same message, so the answer never reveals whether the address has an account. */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordReset.requestReset(request.emailAddress());
+        return ResponseEntity.accepted().body(Map.of("message",
+                "If an account exists for that email address, a reset link is on its way."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordReset.resetPassword(request.token(), request.password());
+        return ResponseEntity.noContent().build();
     }
 }

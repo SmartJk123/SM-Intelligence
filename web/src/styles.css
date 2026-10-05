@@ -441,6 +441,10 @@ main {
   color: #2869e8;
   font-weight: 600;
 }
+.forgot-link {
+  display: inline-block;
+  margin: 8px 0 4px;
+}
 .faq {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -31,3 +31,14 @@ jwt:
 app:
   admin:
     emails: ${ADMIN_EMAILS:}
+  # Outgoing email for password reset links. Leave SMTP_HOST unset to disable sending.
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    from: ${MAIL_FROM:}
+  password-reset:
+    # The web app page the emailed link opens; the token is appended as ?token=
+    url: ${PASSWORD_RESET_URL:http://localhost:4200/reset-password}
+    valid-minutes: 60

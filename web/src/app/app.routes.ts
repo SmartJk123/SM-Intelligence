@@ -24,6 +24,16 @@ export const routes: Routes = [
     loadComponent: () => import('./auth').then((m) => m.Auth),
   },
   {
+    path: 'forgot-password',
+    title: 'Forgot password | SM-Intelligence',
+    loadComponent: () => import('./password-reset').then((m) => m.PasswordReset),
+  },
+  {
+    path: 'reset-password',
+    title: 'Choose a new password | SM-Intelligence',
+    loadComponent: () => import('./password-reset').then((m) => m.PasswordReset),
+  },
+  {
     path: 'setup',
     canActivate: [setupGuard],
     title: 'Set up your workspace | SM-Intelligence',
