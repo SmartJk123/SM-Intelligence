@@ -104,3 +104,6 @@ myreadme.md
 **/keys/
 .tunnel-config.yml
 **/.tunnel-config.yml
+
+# Local test databases
+*.db
