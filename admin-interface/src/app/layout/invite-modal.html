@@ -3,13 +3,11 @@
     class="w-full max-w-md rounded-2xl border animate-fade-up p-6"
     style="background: var(--surface); border-color: var(--border); box-shadow: var(--shadow-lg)"
   >
-    @if (!sent()) {
+    @if (stage() === 'form') {
       <div class="flex items-center justify-between mb-5">
         <div>
           <h3 class="text-base font-bold font-display" style="color: var(--text-1)">{{ title() }}</h3>
-          <p class="text-[13px] mt-0.5" style="color: var(--text-3)">
-            An invite link with login credentials will be sent via email.
-          </p>
+          <p class="text-[13px] mt-0.5" style="color: var(--text-3)">{{ subtitle() }}</p>
         </div>
         <button type="button" (click)="closed.emit()" style="color: var(--text-3)"><span class="icon icon-lg">close</span></button>
       </div>
@@ -23,17 +21,6 @@
             [value]="name()"
             (input)="name.set($any($event.target).value)"
             [placeholder]="isOrg() ? 'e.g. Kilimani Properties Ltd' : 'e.g. James Otieno'"
-            class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none"
-            style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
-          />
-        </div>
-        <div>
-          <label class="text-[12px] font-medium mb-1 block" style="color: var(--text-2)">Email Address *</label>
-          <input
-            type="email"
-            [value]="email()"
-            (input)="email.set($any($event.target).value)"
-            placeholder="contact@organisation.co.ke"
             class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none"
             style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
           />
@@ -55,15 +42,36 @@
           </div>
         } @else {
           <div>
-            <label class="text-[12px] font-medium mb-1 block" style="color: var(--text-2)">Organisation</label>
-            <select
+            <label class="text-[12px] font-medium mb-1 block" style="color: var(--text-2)">Email Address *</label>
+            <input
+              type="email"
+              [value]="email()"
+              (input)="email.set($any($event.target).value)"
+              placeholder="contact@organisation.co.ke"
               class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none"
               style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
-            >
-              @for (org of orgs; track org.id) {
-                <option>{{ org.name }}</option>
-              }
-            </select>
+            />
+          </div>
+          <div>
+            <label class="text-[12px] font-medium mb-1 block" style="color: var(--text-2)">Organisation *</label>
+            @if (fixedOrg(); as org) {
+              <p
+                class="w-full px-3 py-2 text-sm rounded-lg border"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+              >{{ org.organizationName }}</p>
+            } @else {
+              <select
+                [value]="selectedOrgId()"
+                (change)="selectedOrgId.set($any($event.target).value)"
+                class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+              >
+                <option value="" disabled>Select an organisation</option>
+                @for (org of orgs(); track org.id) {
+                  <option [value]="org.id">{{ org.name }}</option>
+                }
+              </select>
+            }
           </div>
           <div>
             <label class="text-[12px] font-medium mb-1 block" style="color: var(--text-2)">Role</label>
@@ -73,11 +81,45 @@
               class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none"
               style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
             >
-              @for (roleOption of roles; track roleOption) {
-                <option [value]="roleOption">{{ roleOption }}</option>
+              @for (roleOption of roles; track roleOption.value) {
+                <option [value]="roleOption.value" [selected]="roleOption.value === role()">{{ roleOption.label }}</option>
               }
             </select>
           </div>
+          <div>
+            <label class="text-[12px] font-medium mb-1 block" style="color: var(--text-2)">Bank account (optional)</label>
+            <div class="flex flex-wrap gap-1.5">
+              @for (bank of banks; track bank.id) {
+                <button
+                  type="button"
+                  (click)="bankId.set(bankId() === bank.id ? '' : bank.id)"
+                  class="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border text-[12px] font-medium transition-all"
+                  [style.border-color]="bankId() === bank.id ? 'var(--primary)' : 'var(--border)'"
+                  style="color: var(--text-1); background: var(--surface-2)"
+                >
+                  <app-bank-logo [src]="bank.logo" [name]="bank.name" size="sm" />
+                  {{ bank.name }}
+                </button>
+              }
+            </div>
+            @if (bankId()) {
+              <input
+                type="text"
+                inputmode="numeric"
+                [value]="accountNumber()"
+                (input)="accountNumber.set($any($event.target).value)"
+                placeholder="Account number"
+                class="w-full mt-2 px-3 py-2 text-sm font-mono rounded-lg border focus:outline-none"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+              />
+            }
+          </div>
+        }
+
+        @if (errorMessage(); as message) {
+          <p class="text-[12.5px] px-3 py-2 rounded-lg" style="background: var(--red-soft); color: var(--red)">
+            {{ message }}
+          </p>
         }
       </div>
 
@@ -92,31 +134,80 @@
         </button>
         <button
           type="button"
-          (click)="send()"
-          [disabled]="!canSend()"
+          (click)="submit()"
+          [disabled]="!canSubmit() || working()"
           class="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-40"
           style="background: var(--primary)"
         >
-          Send Invite Link
+          @if (isOrg()) {
+            {{ working() ? 'Saving…' : 'Save' }}
+          } @else {
+            {{ working() ? 'Sending…' : 'Send Invite' }}
+          }
         </button>
       </div>
-    } @else {
+    } @else if (stage() === 'saved') {
       <div class="text-center py-4 animate-fade-up">
         <div
           class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"
           style="background: var(--green-soft); color: var(--green)"
         ><span class="icon icon-lg">check</span></div>
-        <h3 class="text-base font-bold mb-1 font-display" style="color: var(--text-1)">Invite Sent!</h3>
-        <p class="text-[13px] mb-4" style="color: var(--text-2)">
-          An invitation email has been sent to <strong>{{ email() }}</strong> with a temporary username and password.
+        <h3 class="text-base font-bold mb-1 font-display" style="color: var(--text-1)">Organisation saved</h3>
+        <p class="text-[13px] mb-5" style="color: var(--text-2)">
+          <strong>{{ savedOrg()?.organizationName }}</strong> was created. No invite has been sent yet. You can send the
+          owner their invite now, or later from the Organisations page.
         </p>
-        <div
-          class="px-3 py-2 rounded-lg border text-left mb-4"
-          style="background: var(--surface-2); border-color: var(--border)"
-        >
-          <p class="text-[11px] font-semibold uppercase tracking-widest mb-1" style="color: var(--text-3)">Invite Link</p>
-          <p class="text-[12px] font-mono break-all" style="color: var(--primary)">{{ inviteLink }}</p>
+        <div class="flex gap-3">
+          <button
+            type="button"
+            (click)="closed.emit()"
+            class="flex-1 py-2 rounded-lg text-sm font-semibold border transition-all"
+            style="border-color: var(--border); color: var(--text-2)"
+          >
+            Done
+          </button>
+          <button
+            type="button"
+            (click)="startOwnerInvite()"
+            class="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-all"
+            style="background: var(--primary)"
+          >
+            Send invite
+          </button>
         </div>
+      </div>
+    } @else {
+      <div class="text-center py-4 animate-fade-up">
+        <div
+          class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"
+          [style.background]="emailSent() ? 'var(--green-soft)' : 'var(--gold-soft)'"
+          [style.color]="emailSent() ? 'var(--green)' : 'var(--gold)'"
+        ><span class="icon icon-lg">{{ emailSent() ? 'check' : 'priority_high' }}</span></div>
+        @if (emailSent()) {
+          <h3 class="text-base font-bold mb-1 font-display" style="color: var(--text-1)">Invite Sent!</h3>
+          <p class="text-[13px] mb-4" style="color: var(--text-2)">
+            The account was created and <strong>{{ recipientEmail() }}</strong> was emailed a link to choose
+            their password. The link expires in 7 days.
+          </p>
+        } @else {
+          <h3 class="text-base font-bold mb-1 font-display" style="color: var(--text-1)">Account created, email not sent</h3>
+          <p class="text-[13px] mb-4" style="color: var(--text-2)">
+            The account for <strong>{{ recipientEmail() }}</strong> was created, but the set-password email could not
+            be delivered. Check the SMTP settings of identity-service. Meanwhile they can use "Forgot password?" on
+            the sign-in page to choose a password.
+          </p>
+        }
+        @if (bankLinked(); as linked) {
+          <p class="text-[12.5px] px-3 py-2 rounded-lg mb-4" style="background: var(--green-soft); color: var(--green)">
+            {{ linked.bankName }} account {{ linked.accountNumber }} was linked. Its notifications will now appear on
+            {{ recipientEmail() }}'s dashboard.
+          </p>
+        }
+        @if (bankLinkWarning(); as warning) {
+          <p class="text-[12.5px] px-3 py-2 rounded-lg mb-4" style="background: var(--gold-soft); color: var(--gold)">
+            {{ warning }}
+          </p>
+        }
         <button
           type="button"
           (click)="closed.emit()"

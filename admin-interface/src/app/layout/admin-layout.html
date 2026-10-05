@@ -28,7 +28,7 @@
   }
 
   @if (ui.inviteType(); as inviteType) {
-    <app-invite-modal [type]="inviteType" (closed)="ui.closeInvite()" />
+    <app-invite-modal [type]="inviteType" [preset]="ui.invitePreset()" (closed)="ui.closeInvite()" />
   }
 
   <app-notification-dialog />

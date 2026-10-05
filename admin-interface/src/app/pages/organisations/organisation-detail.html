@@ -25,6 +25,14 @@
           <span class="text-[11.5px]" style="color: var(--text-3)">Joined {{ org().joined }}</span>
         </div>
       </div>
+      @if (canInvite()) {
+        <button
+          type="button"
+          (click)="invite.emit()"
+          class="text-[12px] font-semibold px-3.5 py-2 rounded-full flex-shrink-0 transition-all hover:opacity-90"
+          style="background: var(--primary); color: #fff"
+        >Send invite</button>
+      }
       <button
         type="button"
         (click)="closed.emit()"

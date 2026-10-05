@@ -62,25 +62,38 @@ public class PasswordResetMailer {
 
     /** Sends the link. Failures are logged, never thrown: the caller's answer must not reveal them. */
     public void sendResetLink(String to, String name, String link, long validMinutes) {
-        if (sender == null) {
-            log.warn("Password reset requested for an account, but SMTP_HOST is not set, so no email was sent");
-            return;
-        }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(from);
-        message.setTo(to);
-        message.setSubject("Reset your SM-Intelligence password");
-        message.setText("Hello " + name + ",\n\n"
+        send(to, "Reset your SM-Intelligence password", "Hello " + name + ",\n\n"
                 + "We received a request to reset the password for your SM-Intelligence account.\n"
                 + "Open this link to choose a new password:\n\n"
                 + link + "\n\n"
                 + "The link works once and expires in " + validMinutes + " minutes.\n"
                 + "If you did not ask for this, you can ignore this email; your password has not changed.\n");
+    }
+
+    /**
+     * Sends a plain text email with the SMTP settings above.
+     *
+     * @return true when the server accepted it; false when SMTP is not set up or
+     *         sending failed. Never throws, so a mail outage cannot undo work the
+     *         caller has already saved.
+     */
+    public boolean send(String to, String subject, String text) {
+        if (sender == null) {
+            log.warn("SMTP_HOST is not set, so the email \"{}\" was not sent", subject);
+            return false;
+        }
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(text);
         try {
             sender.send(message);
-            log.info("Sent a password reset email");
+            log.info("Sent the email \"{}\"", subject);
+            return true;
         } catch (MailException error) {
-            log.warn("Could not send a password reset email: {}", error.getMessage());
+            log.warn("Could not send the email \"{}\": {}", subject, error.getMessage());
+            return false;
         }
     }
 }

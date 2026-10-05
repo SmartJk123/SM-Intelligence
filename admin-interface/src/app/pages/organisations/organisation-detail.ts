@@ -32,6 +32,9 @@ export class OrganisationDetail {
   readonly closed = output<void>();
   readonly saved = output<{ name: string; type: string }>();
   readonly statusChange = output<OrgStatus>();
+  /** True for an organisation created in admin, which can be sent an owner invite. */
+  readonly canInvite = input(false);
+  readonly invite = output<void>();
 
   protected readonly money = money;
   protected readonly businessTypes = [

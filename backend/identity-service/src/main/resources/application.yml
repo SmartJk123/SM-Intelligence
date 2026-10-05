@@ -38,6 +38,9 @@ app:
     username: ${SMTP_USERNAME:}
     password: ${SMTP_PASSWORD:}
     from: ${MAIL_FROM:}
+  frontend:
+    # Sign-in page named in organisation invitation emails.
+    login-url: ${FRONTEND_LOGIN_URL:http://localhost:4200/login}
   password-reset:
     # The web app page the emailed link opens; the token is appended as ?token=
     url: ${PASSWORD_RESET_URL:http://localhost:4200/reset-password}
