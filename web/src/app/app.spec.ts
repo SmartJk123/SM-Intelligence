@@ -67,15 +67,15 @@ describe('Account journey', () => {
     await s.save();
     expect(api.saveSetup).not.toHaveBeenCalled();
   });
-  it('preserves credit as debt, uses KES, masks and clears the full number after save', async () => {
+  it('saves a bank account as debit, uses KES, masks and clears the full number after save', async () => {
     api.saveSetup.mockResolvedValue(undefined);
     const s = TestBed.createComponent(Setup).componentInstance;
-    s.form.patchValue({ accountNumber: '00123456', cardType: 'credit', balance: '1250.50' });
+    s.form.patchValue({ accountNumber: '00123456', balance: '1250.50' });
     await s.save();
     expect(api.saveSetup).toHaveBeenCalledWith(
       expect.objectContaining({
         currency: 'KES',
-        cardType: 'credit',
+        cardType: 'debit',
         balance: 1250.5,
         accountNumber: '00123456',
       }),
