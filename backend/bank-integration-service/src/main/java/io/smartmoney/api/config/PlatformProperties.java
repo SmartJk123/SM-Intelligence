@@ -35,6 +35,8 @@ public class PlatformProperties {
 
     public static class Security {
         private boolean permitAll;
+        /** identity-service's JWT_SECRET, used to verify admin and customer tokens. */
+        private String jwtSecret;
 
         public Security() {
         }
@@ -46,6 +48,10 @@ public class PlatformProperties {
         public boolean isPermitAll() { return permitAll; }
         public void setPermitAll(boolean permitAll) { this.permitAll = permitAll; }
         public boolean permitAll() { return permitAll; }
+
+        public String getJwtSecret() { return jwtSecret; }
+        public void setJwtSecret(String jwtSecret) { this.jwtSecret = jwtSecret; }
+        public String jwtSecret() { return jwtSecret; }
     }
 
     public String callbackUrl(String bankId) {

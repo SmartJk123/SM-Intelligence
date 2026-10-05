@@ -40,8 +40,11 @@ smartmoney:
   # The address the bank can reach. For sandbox testing set this to your tunnel URL.
   public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}
   security:
-    # Development only. Set to false before any shared deployment.
-    permit-all: ${PERMIT_ALL:true}
+    # true opens the admin API to anyone. For tests and isolated debugging only.
+    permit-all: ${PERMIT_ALL:false}
+    # The same JWT_SECRET identity-service signs tokens with. Admin API calls
+    # carry the admin's identity token and are verified with it.
+    jwt-secret: ${JWT_SECRET:}
 
   # Where a linked customer's bank movements are delivered, so they show on the
   # web dashboard. Private addresses: these services have no authentication.

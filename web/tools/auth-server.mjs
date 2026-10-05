@@ -449,7 +449,9 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         if (req.method === 'POST' && parsedBody?.bank && parsedBody?.accountNumber && result?.id) {
           requestBackend(new URL('/api/v1/admin/account-links', bankIntegrationBackend), {
             method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
-            headers: { 'Content-Type': 'application/json' },
+            // The customer's own token: the bank service lets a customer link only
+            // an account accounts-service holds for them.
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.token },
             body: JSON.stringify({
               bankId: parsedBody.bank, accountNumber: parsedBody.accountNumber,
               userId: session.userId, accountName: parsedBody.accountName, accountId: result.id,

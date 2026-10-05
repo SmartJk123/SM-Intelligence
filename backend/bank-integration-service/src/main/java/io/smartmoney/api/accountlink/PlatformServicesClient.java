@@ -152,6 +152,49 @@ public class PlatformServicesClient {
         }
     }
 
+    /**
+     * Whether accounts-service holds this account for this customer, at this
+     * bank, under this account number. A self-entered account stores a
+     * fingerprint instead of the number (see accounts-service
+     * AccountService.fingerprint), so both fingerprint forms are recomputed
+     * here and compared, along with the plain number a bank link stores.
+     */
+    public boolean ownsAccount(String userId, String accountId, String institution, String accountNumber) {
+        String raw = accounts.get().uri(uri -> uri.path("/api/accounts").queryParam("userId", userId).build())
+                .header("X-Internal-Token", internalServiceToken)
+                .retrieve().body(String.class);
+        JsonNode list;
+        try {
+            list = raw == null ? null : mapper.readTree(raw);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+            throw unavailable("accounts-service returned a response that could not be read");
+        }
+        if (list == null) {
+            return false;
+        }
+        String number = accountNumber.trim();
+        java.util.Set<String> forms = java.util.Set.of(number,
+                sha256("account:" + institution + ":" + number),
+                sha256(userId + ":" + institution + ":" + number));
+        for (JsonNode account : list) {
+            if (accountId.equals(account.path("id").asText())
+                    && institution.equals(account.path("institution").asText())
+                    && forms.contains(account.path("providerAccountId").asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String sha256(String value) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
     private Optional<String> findAccount(String userId, String institution, String accountNumber) {
         String raw = accounts.get().uri(uri -> uri.path("/api/accounts").queryParam("userId", userId).build())
                 .header("X-Internal-Token", internalServiceToken)

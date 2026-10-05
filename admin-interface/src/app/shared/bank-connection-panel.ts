@@ -167,6 +167,9 @@ function errorMessage(error: unknown): string {
     if (error.status === 0) {
       return 'The bank integration service on port 8090 is not running, so nothing can be saved or tested.';
     }
+    if (error.status === 401 || error.status === 403) {
+      return 'The bank integration service refused your sign-in. Start it with the same JWT_SECRET as identity-service.';
+    }
     if (typeof error.error?.message === 'string') return error.error.message;
   }
   return error instanceof Error ? error.message : 'The backend could not complete the request.';

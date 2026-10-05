@@ -3,6 +3,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
+import { bankServiceAuthInterceptor } from './core/bank-service-auth.interceptor';
 import { sessionExpiryInterceptor } from './core/session-expiry.interceptor';
 
 /**
@@ -11,5 +12,5 @@ import { sessionExpiryInterceptor } from './core/session-expiry.interceptor';
  * placeholder figures.
  */
 export const appConfig: ApplicationConfig = {
-  providers: [provideBrowserGlobalErrorListeners(), provideRouter(routes), provideHttpClient(withInterceptors([sessionExpiryInterceptor]))],
+  providers: [provideBrowserGlobalErrorListeners(), provideRouter(routes), provideHttpClient(withInterceptors([bankServiceAuthInterceptor, sessionExpiryInterceptor]))],
 };
