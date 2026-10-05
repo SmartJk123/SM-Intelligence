@@ -1,10 +1,21 @@
 <div class="flex-1 overflow-auto p-4 lg:p-6 space-y-5">
   <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
     <app-kpi-card label="Total users" [value]="total()" sub="with platform access" color="blue" delay="delay-50" action="all" (selected)="applyCardAction($event)" />
-    <app-kpi-card label="Active" [value]="active()" sub="signed in recently" color="green" delay="delay-100" action="Active" (selected)="applyCardAction($event)" />
-    <app-kpi-card label="Inactive" [value]="inactive()" sub="never or not lately" color="gold" delay="delay-150" action="Inactive" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Active" [value]="active()" sub="can sign in" color="green" delay="delay-100" action="Active" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Never signed in" [value]="neverSignedIn()" sub="registered, no sign in yet" color="gold" delay="delay-150" action="Never signed in" (selected)="applyCardAction($event)" />
     <app-kpi-card label="Suspended" [value]="suspended()" sub="access withdrawn" color="red" delay="delay-200" action="Suspended" (selected)="applyCardAction($event)" />
   </div>
+
+  @if (userService.loadError(); as loadError) {
+    <div
+      class="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border text-[12.5px]"
+      style="background: var(--red-soft); border-color: var(--red); color: var(--red)"
+      role="alert"
+    >
+      <span>{{ loadError }}</span>
+      <button type="button" (click)="refresh()" class="font-semibold underline">Retry</button>
+    </div>
+  }
 
   <app-surface-card class="overflow-hidden" animDelay="delay-200">
     <div class="flex flex-wrap items-center gap-3 px-5 py-4 border-b" style="border-color: var(--border)">
@@ -64,10 +75,10 @@
           @for (user of filtered(); track user.id) {
             <tr class="border-b last:border-0 transition-all hover:opacity-90" style="border-color: var(--border)">
               <td class="px-5 py-3.5">
-                <div class="flex items-center gap-3">
+                <button type="button" class="flex items-center gap-3 text-left" (click)="onRowAction('view', user)">
                   <app-avatar [name]="user.name" size="md" />
                   <span class="text-[13px] font-semibold" style="color: var(--text-1)">{{ user.name }}</span>
-                </div>
+                </button>
               </td>
               <td class="px-5 py-3.5 text-[12.5px] font-mono" style="color: var(--text-3)">{{ user.email }}</td>
               <td class="px-5 py-3.5 text-[12.5px]" style="color: var(--text-2)">{{ user.org }}</td>
@@ -86,8 +97,15 @@
           } @empty {
             <tr>
               <td colspan="7" class="px-5 py-14 text-center">
-                <p class="text-[14px] font-semibold" style="color: var(--text-1)">No users match</p>
-                <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Clear the search or choose a different status.</p>
+                @if (!userService.loaded()) {
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">Loading users…</p>
+                } @else if (total() === 0 && !userService.loadError()) {
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">No users yet</p>
+                  <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Accounts appear here as soon as someone registers on the web app.</p>
+                } @else {
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">No users match</p>
+                  <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Clear the search or choose a different status.</p>
+                }
               </td>
             </tr>
           }
@@ -95,4 +113,16 @@
       </table>
     </div>
   </app-surface-card>
+
+  @if (selected(); as user) {
+    <app-user-detail
+      [user]="user"
+      [isSelf]="isSelf(user.id)"
+      [startInEdit]="openInEdit()"
+      [busy]="busy()"
+      (closed)="close()"
+      (saved)="save($event)"
+      (statusChange)="changeStatus(user.id, $event)"
+    />
+  }
 </div>

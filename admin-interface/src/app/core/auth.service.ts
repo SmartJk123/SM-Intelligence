@@ -7,6 +7,8 @@ const TOKEN_STORAGE_KEY = 'smi_admin_token';
 
 /** The signed-in administrator, read from the identity-service JWT's claims. */
 export interface AdminSession {
+  /** identity-service user id of the signed-in admin. */
+  userId: string;
   name: string;
   email: string;
   /** Token expiry, epoch milliseconds. */
@@ -43,6 +45,9 @@ export class AuthService {
    * an explicit logout. Without the expiry check a stale token kept the login
    * guard redirecting to a dashboard whose every call failed with 401.
    */
+  /** The signed-in admin's user id, so the users page can stop them suspending themselves. */
+  readonly userId = (): string | null => this.session()?.userId || null;
+
   readonly isAuthenticated = (): boolean => {
     const session = this.session();
     if (session && session.expiresAt > Date.now()) return true;
@@ -106,9 +111,19 @@ function decodeSession(token: string): AdminSession | null {
   try {
     const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
     const bytes = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
-    const claims = JSON.parse(new TextDecoder().decode(bytes)) as { name?: string; email?: string; exp?: number };
+    const claims = JSON.parse(new TextDecoder().decode(bytes)) as {
+      sub?: string;
+      name?: string;
+      email?: string;
+      exp?: number;
+    };
     if (typeof claims.exp !== 'number') return null;
-    return { name: claims.name?.trim() ?? '', email: claims.email ?? '', expiresAt: claims.exp * 1000 };
+    return {
+      userId: claims.sub ?? '',
+      name: claims.name?.trim() ?? '',
+      email: claims.email ?? '',
+      expiresAt: claims.exp * 1000,
+    };
   } catch {
     return null;
   }
