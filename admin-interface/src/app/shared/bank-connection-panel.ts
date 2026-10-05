@@ -7,6 +7,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { CredentialStatus } from '../core/bank-integration.gateway';
 import { Bank } from '../core/data';
 import { BankEnvironment } from '../core/bank-integration.gateway';
@@ -50,6 +51,18 @@ const DEFAULT_LABELS: CredentialLabels = {
 };
 
 const LABELS_BY_BANK: Record<string, Partial<CredentialLabels>> = {
+  equity: {
+    heading: 'Jenga API credentials',
+    description:
+      'Equity is reached through Jenga. The merchant code, API key and consumer secret come from Jenga HQ, ' +
+      'and payment notifications are protected with the Basic Auth username and password registered with ' +
+      'the callback. None of them is ever sent to the browser.',
+    key: 'API key',
+    secret: 'Consumer secret',
+    third: 'Merchant code',
+    firstPill: 'Token',
+    secondPill: 'IPN Basic Auth',
+  },
   ncba: {
     heading: 'Endpoint credentials given to NCBA',
     description:
@@ -162,5 +175,14 @@ export class BankConnectionPanel {
 }
 
 function errorMessage(error: unknown): string {
+  if (error instanceof HttpErrorResponse) {
+    if (error.status === 0) {
+      return 'The bank integration service on port 8090 is not running, so nothing can be saved or tested.';
+    }
+    if (error.status === 401 || error.status === 403) {
+      return 'The bank integration service refused your sign-in. Start it with the same JWT_SECRET as identity-service.';
+    }
+    if (typeof error.error?.message === 'string') return error.error.message;
+  }
   return error instanceof Error ? error.message : 'The backend could not complete the request.';
 }

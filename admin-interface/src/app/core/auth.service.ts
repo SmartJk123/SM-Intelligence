@@ -1,9 +1,19 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { IDENTITY_AUTH_BASE_URL } from './api.config';
 
 const TOKEN_STORAGE_KEY = 'smi_admin_token';
+
+/** The signed-in administrator, read from the identity-service JWT's claims. */
+export interface AdminSession {
+  /** identity-service user id of the signed-in admin. */
+  userId: string;
+  name: string;
+  email: string;
+  /** Token expiry, epoch milliseconds. */
+  expiresAt: number;
+}
 
 interface LoginResponse {
   token: string;
@@ -22,12 +32,28 @@ interface LoginResponse {
 export class AuthService {
   private readonly http = inject(HttpClient);
 
-  private readonly tokenState = signal<string | null>(
-    typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null,
-  );
+  private readonly tokenState = signal<string | null>(readStoredToken());
 
-  readonly isAuthenticated = () => this.tokenState() !== null;
   readonly token = this.tokenState.asReadonly();
+  readonly session = computed(() => {
+    const token = this.tokenState();
+    return token ? decodeSession(token) : null;
+  });
+
+  /**
+   * False once the token has expired (24 hours after sign-in), not only after
+   * an explicit logout. Without the expiry check a stale token kept the login
+   * guard redirecting to a dashboard whose every call failed with 401.
+   */
+  /** The signed-in admin's user id, so the users page can stop them suspending themselves. */
+  readonly userId = (): string | null => this.session()?.userId || null;
+
+  readonly isAuthenticated = (): boolean => {
+    const session = this.session();
+    if (session && session.expiresAt > Date.now()) return true;
+    if (this.tokenState() !== null) this.logout();
+    return false;
+  };
 
   /** @throws Error with a message safe to show the operator. */
   async login(email: string, password: string): Promise<void> {
@@ -51,6 +77,9 @@ export class AuthService {
     if (response.role !== 'PLATFORM_ADMIN') {
       throw new Error('This account is not an administrator of this platform.');
     }
+    if (!decodeSession(response.token)) {
+      throw new Error('The identity service returned an unreadable session. Please try again.');
+    }
     this.tokenState.set(response.token);
     try {
       localStorage.setItem(TOKEN_STORAGE_KEY, response.token);
@@ -66,5 +95,36 @@ export class AuthService {
     } catch {
       // Nothing to clean up if storage was never available.
     }
+  }
+}
+
+function readStoredToken(): string | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reads the claims identity-service puts in its JWT; null when the token is malformed. */
+function decodeSession(token: string): AdminSession | null {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
+    const claims = JSON.parse(new TextDecoder().decode(bytes)) as {
+      sub?: string;
+      name?: string;
+      email?: string;
+      exp?: number;
+    };
+    if (typeof claims.exp !== 'number') return null;
+    return {
+      userId: claims.sub ?? '',
+      name: claims.name?.trim() ?? '',
+      email: claims.email ?? '',
+      expiresAt: claims.exp * 1000,
+    };
+  } catch {
+    return null;
   }
 }

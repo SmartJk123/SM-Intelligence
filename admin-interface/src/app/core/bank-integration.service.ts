@@ -8,6 +8,7 @@ import {
   DemoMovement,
   DemoMovementRequest,
   DemoSummary,
+  PlatformBaseUrlInfo,
   PlatformStats,
   ConnectionTestResult,
   TokenStatus,
@@ -42,6 +43,7 @@ export class BankIntegrationService {
   private readonly resultsState = signal<Record<string, ConnectionTestResult>>({});
   private readonly statsState = signal<PlatformStats | null>(null);
   private readonly webhookState = signal<Record<string, WebhookInfo>>({});
+  private readonly publicBaseUrlState = signal<PlatformBaseUrlInfo | null>(null);
   private readonly demoSummaryState = signal<DemoSummary | null>(null);
   private readonly demoMovementsState = signal<DemoMovement[]>([]);
 
@@ -55,6 +57,8 @@ export class BankIntegrationService {
   readonly stats = this.statsState.asReadonly();
   /** Notification addresses, as the backend reports them from PUBLIC_BASE_URL. */
   readonly webhookInfo = this.webhookState.asReadonly();
+  /** The shared base address every bank's webhook URL is built from. */
+  readonly publicBaseUrl = this.publicBaseUrlState.asReadonly();
   /** The demonstration account, or null when the backend has not answered. */
   readonly demoSummary = this.demoSummaryState.asReadonly();
   readonly demoMovements = this.demoMovementsState.asReadonly();
@@ -69,6 +73,31 @@ export class BankIntegrationService {
     void this.loadStats();
     void this.loadDemo();
     void this.loadWebhookInfos();
+    void this.loadPublicBaseUrl();
+  }
+
+  /** Reloads the shared webhook base address from the backend. */
+  async loadPublicBaseUrl(): Promise<void> {
+    try {
+      this.publicBaseUrlState.set(await this.gateway.loadPublicBaseUrl());
+    } catch {
+      // Backend not reachable. The field stays unknown rather than guessed.
+    }
+  }
+
+  /**
+   * Saves the webhook base address on the backend, which stores it so it
+   * survives a restart, then reloads every bank's webhook address so the panels
+   * show what the backend actually holds. A changed address invalidates any
+   * earlier connection test.
+   */
+  async updatePublicBaseUrl(publicBaseUrl: string): Promise<void> {
+    const updated = await this.gateway.updatePublicBaseUrl(publicBaseUrl);
+    this.publicBaseUrlState.set(updated);
+    await this.loadWebhookInfos();
+    for (const bank of BANKS) {
+      this.clearResult(bank.id);
+    }
   }
 
   /**

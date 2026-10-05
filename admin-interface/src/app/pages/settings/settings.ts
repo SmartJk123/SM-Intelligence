@@ -1,13 +1,19 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
+  effect,
   inject,
   signal,
   viewChild,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import { BANKS } from '../../core/data';
 import { AdminProfileService } from '../../core/admin-profile.service';
+import { BankIntegrationService } from '../../core/bank-integration.service';
 import { Badge } from '../../shared/badge';
 import { BankConnectionPanel } from '../../shared/bank-connection-panel';
 import { SettingsField } from '../../shared/settings-field';
@@ -15,6 +21,13 @@ import { SettingsInput } from '../../shared/settings-input';
 import { SurfaceCard } from '../../shared/surface-card';
 import { Toggle } from '../../shared/toggle';
 import { ToastService } from '../../core/toast.service';
+
+/** Short names other pages use to open a settings section directly (?section=...). */
+const SECTION_ALIASES: Record<string, string> = {
+  'bank-integration': 'Bank Integration Settings',
+  'bank-integrations': 'Bank Integration Settings',
+  profile: 'Admin Profile',
+};
 
 interface RoleDefinition {
   name: string;
@@ -37,7 +50,14 @@ interface RoleDefinition {
 })
 export class Settings {
   protected readonly profile = inject(AdminProfileService);
+  protected readonly integrations = inject(BankIntegrationService);
   private readonly toasts = inject(ToastService);
+
+  protected readonly platformUrlDraft = signal('');
+  protected readonly platformUrlEditing = signal(false);
+  protected readonly platformUrlSaving = signal(false);
+  protected readonly platformUrlSaved = signal(false);
+  protected readonly platformUrlError = signal('');
 
   private readonly avatarInput = viewChild<ElementRef<HTMLInputElement>>('avatarInput');
 
@@ -52,6 +72,49 @@ export class Settings {
   ];
 
   protected readonly active = signal('General');
+
+  constructor() {
+    // Follows ?section= so links such as "Integration settings" open the right
+    // section, including when Settings is already on screen.
+    inject(ActivatedRoute).queryParamMap
+      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe((params) => {
+        const requested = params.get('section') ?? '';
+        const section = SECTION_ALIASES[requested] ?? requested;
+        if (this.sections.some((known) => known.id === section)) {
+          this.active.set(section);
+        }
+      });
+    // Keeps the draft in sync with the backend without overwriting what the
+    // operator is typing.
+    effect(() => {
+      const info = this.integrations.publicBaseUrl();
+      if (info && !this.platformUrlEditing()) {
+        this.platformUrlDraft.set(info.publicBaseUrl);
+      }
+    });
+  }
+
+  protected onPlatformUrlInput(value: string): void {
+    this.platformUrlEditing.set(true);
+    this.platformUrlDraft.set(value);
+  }
+
+  /** Saves the webhook base address that every bank's URL is built from. */
+  protected async savePlatformUrl(): Promise<void> {
+    this.platformUrlError.set('');
+    this.platformUrlSaving.set(true);
+    try {
+      await this.integrations.updatePublicBaseUrl(this.platformUrlDraft().trim());
+      this.platformUrlEditing.set(false);
+      this.platformUrlSaved.set(true);
+      setTimeout(() => this.platformUrlSaved.set(false), 2200);
+    } catch (error) {
+      this.platformUrlError.set(saveError(error));
+    } finally {
+      this.platformUrlSaving.set(false);
+    }
+  }
   protected readonly banks = BANKS;
   protected readonly dateFormats = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
   protected readonly environments = ['Production', 'Sandbox'];
@@ -145,8 +208,8 @@ export class Settings {
    */
   protected onSectionSave(event: Event): void {
     const button = (event.target as HTMLElement | null)?.closest('button');
-    if (!button || button.closest('app-bank-connection-panel')) {
-      // The bank connection panel confirms its own save.
+    if (!button || button.closest('app-bank-connection-panel') || button.hasAttribute('data-self-reporting')) {
+      // The bank connection panel and the webhook address card confirm their own save.
       return;
     }
     const label = (button.textContent ?? '').trim();
@@ -155,4 +218,14 @@ export class Settings {
     }
     this.toasts.show('Changes saved', 'success', `${label} applied.`);
   }
+}
+
+/** The backend's own reason when it gives one, so a refused address says why. */
+function saveError(error: unknown): string {
+  if (error instanceof HttpErrorResponse) {
+    if (error.status === 0) return 'The bank integration service on port 8090 is not running.';
+    if (error.status === 401 || error.status === 403) return 'The bank integration service refused your sign-in. Start it with the same JWT_SECRET as identity-service.';
+    if (typeof error.error?.message === 'string') return error.error.message;
+  }
+  return error instanceof Error ? error.message : 'The backend rejected that address.';
 }

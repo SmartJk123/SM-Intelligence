@@ -197,3 +197,26 @@ test('dashboard requires a session and never invents data when downstream is unr
     assert.equal((await fx.call('/api/dashboard', null, cookie)).status, 503);
   } finally { await fx.close(); }
 });
+
+test('forgot and reset password pass through without a session and hide whether an account exists', async () => {
+  const seen = [];
+  const fx = await fixture(async (url, init) => {
+    seen.push([url.pathname, JSON.parse(init.body)]);
+    if (url.pathname.endsWith('/forgot-password')) return Response.json({ message: 'queued' }, { status: 202 });
+    const { token } = JSON.parse(init.body);
+    if (token === 'good-token') return new Response(null, { status: 204 });
+    return Response.json({ code: 'INVALID_RESET_TOKEN' }, { status: 400 });
+  });
+  try {
+    const requested = await fx.call('/api/auth/forgot-password', { email: ' Member@Example.invalid ' });
+    assert.equal(requested.status, 202);
+    assert.deepEqual(requested.body, { requested: true });
+    assert.deepEqual(seen[0], ['/api/auth/forgot-password', { emailAddress: 'member@example.invalid' }]);
+    assert.equal((await fx.call('/api/auth/forgot-password', { email: '' })).status, 400);
+    const reset = await fx.call('/api/auth/reset-password', { token: 'good-token', password: 'BrandNewPassword2!' });
+    assert.equal(reset.status, 200);
+    const refused = await fx.call('/api/auth/reset-password', { token: 'used-token', password: 'BrandNewPassword2!' });
+    assert.equal(refused.status, 400);
+    assert.equal(refused.body.error, 'invalid-token');
+  } finally { await fx.close(); }
+});

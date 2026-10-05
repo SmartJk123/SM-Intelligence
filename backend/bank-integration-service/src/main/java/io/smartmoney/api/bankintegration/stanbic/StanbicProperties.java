@@ -31,19 +31,45 @@ public record StanbicProperties(
         String signatureHeader,
         String signatureSecret) {
 
+    static final String HOST = "https://api.connect.stanbicbank.co.ke";
+    static final String SANDBOX_BASE = HOST + "/api/sandbox";
+    static final String PRODUCTION_BASE = HOST + "/api/prod";
+
+    public boolean production() {
+        return environment == BankEnvironment.PRODUCTION;
+    }
+
+    /** STANBIC_API_BASE_URL when set, otherwise the sandbox or production base for STANBIC_ENV. */
+    @Override
+    public String apiBaseUrl() {
+        return isPresent(apiBaseUrl) ? apiBaseUrl.trim() : (production() ? PRODUCTION_BASE : SANDBOX_BASE);
+    }
+
+    /**
+     * STANBIC_TOKEN_URL when set, otherwise the base followed by /auth/oauth2/token,
+     * which is where the sandbox specification puts it. Confirm the production
+     * value with Stanbic before going live and set STANBIC_TOKEN_URL if it differs.
+     */
+    @Override
+    public String tokenUrl() {
+        if (isPresent(tokenUrl)) {
+            return tokenUrl.trim();
+        }
+        String base = apiBaseUrl();
+        return (base.endsWith("/") ? base.substring(0, base.length() - 1) : base) + "/auth/oauth2/token";
+    }
+
     public boolean credentialsConfigured() {
-        return isPresent(tokenUrl) && isPresent(clientKey) && isPresent(clientSecret);
+        return isPresent(tokenUrl()) && isPresent(clientKey) && isPresent(clientSecret);
     }
 
     public boolean apiConfigured() {
-        return isPresent(apiBaseUrl);
+        return isPresent(apiBaseUrl());
     }
 
     /** Registration endpoint: the API base plus the register path. */
     public String registrationUrl() {
-        String base = apiBaseUrl == null || apiBaseUrl.isBlank()
-                ? "https://api.connect.stanbicbank.co.ke/api/sandbox"
-                : apiBaseUrl;
+        String base = apiBaseUrl();
         String path = registrationPath == null || registrationPath.isBlank()
                 ? "/registerurl/"
                 : registrationPath;

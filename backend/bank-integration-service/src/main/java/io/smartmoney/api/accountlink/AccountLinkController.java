@@ -1,5 +1,6 @@
 package io.smartmoney.api.accountlink;
 
+import io.smartmoney.api.config.SecurityConfig;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -39,9 +40,16 @@ public class AccountLinkController {
     }
 
     private final AccountLinkService service;
+    private final PlatformServicesClient platform;
 
-    public AccountLinkController(AccountLinkService service) {
+    public AccountLinkController(AccountLinkService service, PlatformServicesClient platform) {
         this.service = service;
+        this.platform = platform;
+    }
+
+    private static boolean isCustomer(Authentication caller) {
+        return caller != null && caller.getAuthorities().stream()
+                .anyMatch(authority -> ("ROLE_" + SecurityConfig.CUSTOMER_ROLE).equals(authority.getAuthority()));
     }
 
     @GetMapping
@@ -49,10 +57,28 @@ public class AccountLinkController {
         return service.list(userId).stream().map(this::view).toList();
     }
 
+    /**
+     * An admin may link any account. A signed-in customer (the web app, right
+     * after onboarding) may only link an account accounts-service already holds
+     * for them at that bank and number; otherwise anyone could route a
+     * stranger's bank notifications to their own dashboard.
+     */
     @PostMapping
-    public ResponseEntity<LinkView> link(@RequestBody LinkRequest request, Authentication admin) {
+    public ResponseEntity<LinkView> link(@RequestBody LinkRequest request, Authentication caller) {
+        if (isCustomer(caller)) {
+            String self = String.valueOf(caller.getPrincipal());
+            String institution = AccountLinkService.INSTITUTIONS.get(
+                    request.bankId() == null ? "" : request.bankId().trim().toLowerCase());
+            boolean own = self.equals(request.userId())
+                    && request.accountId() != null && !request.accountId().isBlank()
+                    && institution != null && request.accountNumber() != null
+                    && platform.ownsAccount(self, request.accountId().trim(), institution, request.accountNumber());
+            if (!own) {
+                throw new AccountLinkException(HttpStatus.FORBIDDEN, "You can only link an account you have saved yourself");
+            }
+        }
         AccountLinkEntity link = service.link(request.bankId(), request.accountNumber(), request.userId(),
-                request.accountName(), admin == null ? null : String.valueOf(admin.getPrincipal()), request.accountId());
+                request.accountName(), caller == null ? null : String.valueOf(caller.getPrincipal()), request.accountId());
         return ResponseEntity.status(HttpStatus.CREATED).body(view(link));
     }
 

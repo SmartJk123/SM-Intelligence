@@ -34,14 +34,27 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      # Bank details (activity, token state) only for a signed-in admin; anyone
+      # else sees the overall status, which is what an uptime monitor needs.
+      show-details: when-authorized
+      show-components: when-authorized
+      roles: PLATFORM_ADMIN
+      # DEGRADED (a bank failing, see BankHealthIndicators) ranks below DOWN and
+      # still answers 200, so a monitor alerts instead of restarting the service.
+      status:
+        order: DOWN, OUT_OF_SERVICE, DEGRADED, UP, UNKNOWN
+        http-mapping:
+          DEGRADED: 200
 
 smartmoney:
   # The address the bank can reach. For sandbox testing set this to your tunnel URL.
   public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}
   security:
-    # Development only. Set to false before any shared deployment.
-    permit-all: ${PERMIT_ALL:true}
+    # true opens the admin API to anyone. For tests and isolated debugging only.
+    permit-all: ${PERMIT_ALL:false}
+    # The same JWT_SECRET identity-service signs tokens with. Admin API calls
+    # carry the admin's identity token and are verified with it.
+    jwt-secret: ${JWT_SECRET:}
 
   # Where a linked customer's bank movements are delivered, so they show on the
   # web dashboard. Private addresses: these services have no authentication.
@@ -55,14 +68,28 @@ smartmoney:
     export-url: ${NCBA_CPANEL_EXPORT_URL:}
     export-token: ${NCBA_CPANEL_EXPORT_TOKEN:}
     interval: ${NCBA_CPANEL_IMPORT_INTERVAL:PT1M}
+  # Pulls KCB instant payment notifications stored by the cPanel receiver (kcb-webhook.php).
+  # Off unless both are set; the token is export_token in cPanel's kcb-config.php.
+  # Pulls Equity IPNs stored by the cPanel receiver (equity-webhook.php).
+  equity-cpanel:
+    export-url: ${EQUITY_CPANEL_EXPORT_URL:}
+    export-token: ${EQUITY_CPANEL_EXPORT_TOKEN:}
+    interval: ${EQUITY_CPANEL_IMPORT_INTERVAL:PT1M}
+  kcb-cpanel:
+    export-url: ${KCB_CPANEL_EXPORT_URL:}
+    export-token: ${KCB_CPANEL_EXPORT_TOKEN:}
+    interval: ${KCB_CPANEL_IMPORT_INTERVAL:PT1M}
 
   stanbic:
     environment: ${STANBIC_ENV:SANDBOX}
     portal-url: https://sandbox.stanbicbank.co.ke/
-    # Endpoints taken from the Stanbic "Register Your Payment Result URL for
-    # Real-time Credit Alerts - Sandbox" 1.0.2 specification.
-    api-base-url: ${STANBIC_API_BASE_URL:https://api.connect.stanbicbank.co.ke/api/sandbox}
-    token-url: ${STANBIC_TOKEN_URL:https://api.connect.stanbicbank.co.ke/api/sandbox/auth/oauth2/token}
+    # Endpoints from the Stanbic "Register Your Payment Result URL for Real-time
+    # Credit Alerts" 1.0.2 specification. Left empty, they follow STANBIC_ENV:
+    #   SANDBOX     https://api.connect.stanbicbank.co.ke/api/sandbox
+    #   PRODUCTION  https://api.connect.stanbicbank.co.ke/api/prod
+    # with the token at <base>/auth/oauth2/token. Set them only to override.
+    api-base-url: ${STANBIC_API_BASE_URL:}
+    token-url: ${STANBIC_TOKEN_URL:}
     oauth-scope: ${STANBIC_OAUTH_SCOPE:payments}
     registration-path: ${STANBIC_REGISTRATION_PATH:/registerurl/}
     client-key: ${STANBIC_CLIENT_KEY:}
@@ -79,9 +106,11 @@ smartmoney:
     retry-delay-seconds: 5
     webhook-path: /api/v1/webhooks/stanbic
     signature-verification: ${STANBIC_SIGNATURE_VERIFICATION:true}
-    # Set both once Stanbic confirms how the callback is authenticated.
+    # Set both once Stanbic confirms how the callback is authenticated. There is
+    # deliberately no default secret: a published one would let anyone forge a
+    # notification, so with verification on and no secret every one is refused.
     signature-header: ${STANBIC_SIGNATURE_HEADER:X-Stanbic-Signature}
-    signature-secret: ${STANBIC_SIGNATURE_SECRET:test-secret-key-stanbic-987}
+    signature-secret: ${STANBIC_SIGNATURE_SECRET:}
 
   kcb:
     environment: ${KCB_ENV:SANDBOX}
@@ -100,6 +129,23 @@ smartmoney:
     signature-header: ${KCB_SIGNATURE_HEADER:Signature}
     # KCB public key, as a PEM block, a path to a .pem file, or a base64 X.509 key.
     public-key: ${KCB_PUBLIC_KEY:}
+    api-timeout-seconds: 30
+
+  # Equity Bank over the Jenga API. Credentials come from Jenga HQ. The token
+  # endpoint follows EQUITY_ENV (UAT or production) unless EQUITY_TOKEN_URL is set.
+  # Jenga protects the IPN callback with Basic Auth: set EQUITY_IPN_USERNAME and
+  # EQUITY_IPN_PASSWORD to the values registered with the callback on Jenga HQ.
+  equity:
+    environment: ${EQUITY_ENV:SANDBOX}
+    token-url: ${EQUITY_TOKEN_URL:}
+    merchant-code: ${EQUITY_MERCHANT_CODE:}
+    api-key: ${EQUITY_API_KEY:}
+    consumer-secret: ${EQUITY_CONSUMER_SECRET:}
+    account-number: ${EQUITY_ACCOUNT_NUMBER:}
+    webhook-path: /api/v1/webhooks/equity
+    ipn-username: ${EQUITY_IPN_USERNAME:}
+    ipn-password: ${EQUITY_IPN_PASSWORD:}
+    signature-verification: ${EQUITY_SIGNATURE_VERIFICATION:true}
     api-timeout-seconds: 30
 
   # NCBA pushes account level notifications to us. There is no token endpoint and

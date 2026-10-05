@@ -1,0 +1,125 @@
+<div class="rounded-2xl border p-4" style="border-color: var(--border)">
+  <div class="flex items-center justify-between gap-3">
+    <p class="text-[13.5px] font-bold font-display" style="color: var(--text-1)">Bank accounts</p>
+    @if (!adding()) {
+      <button
+        type="button"
+        (click)="startAdd()"
+        class="text-[12px] font-semibold px-3 py-1.5 rounded-full border transition-all hover:opacity-80"
+        style="border-color: var(--border); color: var(--text-2)"
+      >Link account</button>
+    }
+  </div>
+  <p class="text-[12px] mt-1" style="color: var(--text-3)">
+    Notifications for a linked account appear on this customer's web dashboard, including ones received before it was linked.
+  </p>
+
+  @if (loading()) {
+    <p class="text-[12.5px] mt-3" style="color: var(--text-3)">Loading…</p>
+  } @else if (loadError()) {
+    <p class="text-[12.5px] mt-3 font-medium" style="color: var(--red)">
+      {{ loadError() }}
+      <button type="button" class="underline ml-1" (click)="load()">Retry</button>
+    </p>
+  } @else {
+    <ul class="mt-3 space-y-2">
+      @for (link of items(); track link.id) {
+        <li class="rounded-xl p-3" style="background: var(--surface-2)">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[13px] font-semibold truncate" style="color: var(--text-1)">{{ link.accountName }}</p>
+              <p class="text-[12px] font-mono" style="color: var(--text-3)">{{ bankName(link.bankId) }} · {{ link.accountNumber }}</p>
+              @if (link.pendingDeliveries > 0) {
+                <p class="text-[12px] mt-1" style="color: var(--red)">
+                  {{ link.pendingDeliveries }} waiting{{ link.lastError ? ': ' + link.lastError : '' }}
+                </p>
+              }
+            </div>
+            <div class="flex gap-1.5 flex-shrink-0">
+              @if (link.pendingDeliveries > 0) {
+                <button
+                  type="button"
+                  (click)="sync(link)"
+                  [disabled]="busy()"
+                  class="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border disabled:opacity-60"
+                  style="border-color: var(--border); color: var(--text-2)"
+                >Retry</button>
+              }
+              <button
+                type="button"
+                (click)="unlink(link)"
+                [disabled]="busy()"
+                class="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border disabled:opacity-60"
+                style="border-color: var(--border); color: var(--red)"
+              >Unlink</button>
+            </div>
+          </div>
+        </li>
+      } @empty {
+        @if (!adding()) {
+          <li class="text-[12.5px]" style="color: var(--text-3)">No bank accounts linked yet.</li>
+        }
+      }
+    </ul>
+  }
+
+  @if (adding()) {
+    <div class="space-y-3 mt-3">
+      <div class="grid grid-cols-[120px_1fr] gap-3">
+        <label class="block">
+          <span class="eyebrow">Bank</span>
+          <select
+            [value]="draftBank()"
+            (change)="draftBank.set($any($event.target).value)"
+            class="w-full mt-1.5 px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+            style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+          >
+            @for (bank of banks; track bank.id) {
+              <option [value]="bank.id">{{ bank.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="block">
+          <span class="eyebrow">Account number</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            [value]="draftNumber()"
+            (input)="draftNumber.set($any($event.target).value)"
+            class="w-full mt-1.5 px-3 py-2.5 text-[13px] font-mono rounded-xl border focus:outline-none"
+            style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+          />
+        </label>
+      </div>
+      <label class="block">
+        <span class="eyebrow">Name on the dashboard (optional)</span>
+        <input
+          type="text"
+          [value]="draftName()"
+          (input)="draftName.set($any($event.target).value)"
+          placeholder="e.g. Rent collection account"
+          class="w-full mt-1.5 px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+          style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+        />
+      </label>
+      @if (formError()) {
+        <p class="text-[12.5px] font-medium" style="color: var(--red)">{{ formError() }}</p>
+      }
+      <div class="flex gap-2">
+        <button
+          type="button"
+          (click)="save()"
+          [disabled]="busy()"
+          class="text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90 disabled:opacity-60"
+          style="background: var(--primary); color: #fff"
+        >{{ busy() ? 'Linking…' : 'Link account' }}</button>
+        <button
+          type="button"
+          (click)="adding.set(false)"
+          class="text-[12.5px] font-semibold px-4 py-2 rounded-full border transition-all hover:opacity-80"
+          style="border-color: var(--border); color: var(--text-2)"
+        >Cancel</button>
+      </div>
+    </div>
+  }
+</div>

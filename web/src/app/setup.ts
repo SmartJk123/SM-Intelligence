@@ -34,8 +34,7 @@ import { AccountApi, AccountDetails } from './account-api';
               <div>
                 <strong>{{ summary().name }}</strong
                 ><small
-                  >{{ summary().bank }} · •••• {{ summary().lastFour }} ·
-                  {{ summary().type === 'debit' ? 'Debit' : 'Credit' }} account</small
+                  >{{ summary().bank }} · •••• {{ summary().lastFour }} · Bank account</small
                 >
               </div>
             </div>
@@ -89,21 +88,7 @@ import { AccountApi, AccountDetails } from './account-api';
             @if (invalid('accountNumber')) {
               <p class="field-error">Enter an account number with 4–34 digits.</p>
             }
-            <fieldset class="card-options">
-              <legend>Account / card type</legend>
-              <label [class.selected]="!credit"
-                ><input type="radio" formControlName="cardType" value="debit" />Debit</label
-              ><label [class.selected]="credit"
-                ><input type="radio" formControlName="cardType" value="credit" />Credit</label
-              >
-            </fieldset>
-            <p class="hint">
-              Debit means money held in your account and counted as available cash. Credit means
-              borrowed funds; its balance is treated as an amount owed, never as cash.
-            </p>
-            <label for="balance">{{
-              credit ? 'Credit outstanding (KES)' : 'Opening available balance (KES)'
-            }}</label
+            <label for="balance">Opening available balance (KES)</label
             ><input
               id="balance"
               formControlName="balance"
@@ -131,8 +116,7 @@ import { AccountApi, AccountDetails } from './account-api';
               <div>
                 <strong>{{ form.controls.accountName.value || 'Your bank account' }}</strong
                 ><small
-                  >{{ form.controls.bank.value }} Bank · {{ maskedNumber }} ·
-                  {{ credit ? 'Credit' : 'Debit' }} account</small
+                  >{{ form.controls.bank.value }} Bank · {{ maskedNumber }} · Bank account</small
                 >
               </div>
             </div>
@@ -164,6 +148,8 @@ export class Setup {
     bank: ['KCB', Validators.required],
     accountName: [this.defaultName('KCB'), [Validators.required, Validators.maxLength(150), Validators.pattern(/.*\S.*/)]],
     accountNumber: ['', [Validators.required, Validators.pattern(/^\d{4,34}$/)]],
+    // An account number entered here is a bank (deposit) account, so it is always
+    // debit: its balance is cash. The number alone cannot tell a credit card apart.
     cardType: ['debit' as 'debit' | 'credit'],
     balance: [
       '',
@@ -181,9 +167,6 @@ export class Setup {
   chooseBank(bank: string) {
     if (!this.form.controls.accountName.dirty)
       this.form.controls.accountName.setValue(this.defaultName(bank));
-  }
-  get credit() {
-    return this.form.controls.cardType.value === 'credit';
   }
   get maskedNumber() {
     const number = this.form.controls.accountNumber.value;
@@ -224,10 +207,14 @@ export class Setup {
       this.form.controls.accountNumber.reset('');
       this.saved.set(true);
     } catch (error) {
-      this.error.set(error instanceof HttpErrorResponse && error.status === 409
-        ? 'This account is already saved. Reload your accounts to continue.'
-        : 'We could not save your account. Please try again. Your details remain here.');
-      if (error instanceof HttpErrorResponse && error.status === 409) {
+      const takenByAnotherUser = error instanceof HttpErrorResponse && error.status === 409
+        && String(error.error?.message ?? '').includes('another user');
+      this.error.set(takenByAnotherUser
+        ? 'This account number is already registered to another user. Check the number, or contact support if it is yours.'
+        : error instanceof HttpErrorResponse && error.status === 409
+          ? 'This account is already saved. Reload your accounts to continue.'
+          : 'We could not save your account. Please try again. Your details remain here.');
+      if (error instanceof HttpErrorResponse && error.status === 409 && !takenByAnotherUser) {
         this.api.accountsError.set('This account is already saved. Retry loading accounts to continue.');
       }
     } finally {

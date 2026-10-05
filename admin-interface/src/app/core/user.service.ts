@@ -1,21 +1,18 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { AppUser, Organisation } from './data';
 import { HttpUserGateway } from './http-user.gateway';
-import { UserSummary } from './user.gateway';
+import { IdentityUserStatus, UpdateUserRequest, UserSummary } from './user.gateway';
 
-export type { UserSummary } from './user.gateway';
+export type { UpdateUserRequest, UserSummary } from './user.gateway';
 
 /**
  * Single source of truth for registered users, backed by identity-service.
  *
  * A signup on the customer-facing web app is a row in identity-service's
- * users table. This service reads that table so it shows up here without any
- * separate "sync" step. Organisations are derived from it: identity-service
- * has no separate Organization/membership entity yet, so an "organisation" is
- * however many ORGANIZATION-type signups share the same organisation name.
- * Two people typing the same company name become one row; a typo produces a
- * second one. That is a real limitation of today's data model, not a bug in
- * this grouping.
+ * users table, and so is every change made here: suspending an account stops
+ * that user signing in to the web app, and restoring it lets them back in.
+ * Organisations created in admin come from organization.service.ts; companies
+ * that signed up on the web are grouped here by organizationName.
  */
 @Injectable({ providedIn: 'root' })
 export class UserService {
@@ -23,9 +20,12 @@ export class UserService {
 
   private readonly usersState = signal<UserSummary[]>([]);
   private readonly loadedState = signal(false);
+  private readonly errorState = signal<string | null>(null);
 
   /** False until the backend has answered once. */
   readonly loaded = this.loadedState.asReadonly();
+  /** Why the last load failed, or null. */
+  readonly loadError = this.errorState.asReadonly();
 
   constructor() {
     void this.loadUsers();
@@ -34,8 +34,10 @@ export class UserService {
   async loadUsers(): Promise<void> {
     try {
       this.usersState.set(await this.gateway.loadUsers());
+      this.errorState.set(null);
     } catch {
-      // Backend not reachable. The list stays as it was rather than being invented.
+      // The list stays as it was rather than being invented.
+      this.errorState.set('Users could not be loaded. Check that identity-service is running.');
     } finally {
       this.loadedState.set(true);
     }
@@ -43,9 +45,22 @@ export class UserService {
 
   readonly users = () => this.usersState().map(toAppUser);
 
-  /** The full record behind a user id, for places that need more than the table row shows. */
+  /** The full record behind a table row, for the detail panel. */
   summary(id: string): UserSummary | undefined {
     return this.usersState().find((user) => user.id === id);
+  }
+
+  async updateUser(id: string, request: UpdateUserRequest): Promise<UserSummary> {
+    return this.replace(await this.gateway.updateUser(id, request));
+  }
+
+  /** Asks identity-service to email the user a reset link. It answers the same whether or not mail is set up. */
+  async sendPasswordReset(emailAddress: string): Promise<void> {
+    await this.gateway.sendPasswordReset(emailAddress);
+  }
+
+  async changeStatus(id: string, status: IdentityUserStatus): Promise<UserSummary> {
+    return this.replace(await this.gateway.changeStatus(id, status));
   }
 
   readonly organisations = () => {
@@ -61,6 +76,11 @@ export class UserService {
     }
     return [...groups.values()].map(toOrganisation);
   };
+
+  private replace(updated: UserSummary): UserSummary {
+    this.usersState.update((users) => users.map((user) => (user.id === updated.id ? updated : user)));
+    return updated;
+  }
 }
 
 function toAppUser(user: UserSummary): AppUser {
@@ -69,14 +89,23 @@ function toAppUser(user: UserSummary): AppUser {
     name: user.name,
     email: user.emailAddress,
     org: user.organizationName ?? '—',
-    // Placeholder: identity-service has no per-user role/RBAC yet.
-    role: user.accountType === 'ORGANIZATION' ? 'Owner' : 'Individual',
-    // Placeholder: this listing only ever contains active (non-deleted) users,
-    // and identity-service has no "Suspended" concept yet.
-    status: 'Active',
-    // Placeholder: identity-service does not record login timestamps yet.
-    lastLogin: 'Never',
+    role:
+      user.role === 'PLATFORM_ADMIN'
+        ? 'Platform admin'
+        : user.accountType === 'ORGANIZATION'
+          ? 'Organisation'
+          : 'Individual',
+    status: user.status === 'SUSPENDED' ? 'Suspended' : 'Active',
+    lastLogin: formatLastLogin(user.lastLoginAt),
   };
+}
+
+function formatLastLogin(value: string | null): string {
+  if (!value) return 'Never';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Never'
+    : date.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 function toOrganisation(members: UserSummary[]): Organisation {

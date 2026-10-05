@@ -28,3 +28,13 @@ export const IDENTITY_API_BASE_URL = 'http://localhost:8080/api/v1';
  *   POST {IDENTITY_AUTH_BASE_URL}/login
  */
 export const IDENTITY_AUTH_BASE_URL = 'http://localhost:8080/api/auth';
+
+/**
+ * identity-service's organisations API, also under /api rather than /api/v1.
+ *
+ *   GET  {IDENTITY_ORGANIZATIONS_URL}
+ *   POST {IDENTITY_ORGANIZATIONS_URL}
+ *   GET  {IDENTITY_ORGANIZATIONS_URL}/{id}/members
+ *   POST {IDENTITY_ORGANIZATIONS_URL}/{id}/members
+ */
+export const IDENTITY_ORGANIZATIONS_URL = 'http://localhost:8080/api/organizations';

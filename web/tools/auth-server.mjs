@@ -360,6 +360,28 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
           return registering ? send(201, { registered: true }) : send(502, { error: 'Invalid session from identity service' });
         }
       }
+      if (['/api/auth/forgot-password', '/api/auth/reset-password'].includes(route) && req.method === 'POST') {
+        let raw = ''; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > 16384) return send(413, { error: 'Request too large' }); raw += chunk; }
+        let body; try { body = JSON.parse(raw); } catch { return send(400, { error: 'Invalid JSON' }); }
+        if (route.endsWith('/forgot-password')) {
+          const emailAddress = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+          if (!emailAddress) return send(400, { error: 'Email is required' });
+          const response = await call(route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emailAddress }) });
+          if (response.status === 400) return send(400, { error: 'Enter a valid email address' });
+          // Same answer whether or not the address has an account.
+          return response.ok ? send(202, { requested: true }) : send(503, { error: 'Identity service unavailable' });
+        }
+        if (typeof body?.token !== 'string' || !body.token || typeof body?.password !== 'string' || !body.password)
+          return send(400, { error: 'Token and password are required' });
+        const response = await call(route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: body.token, password: body.password }) });
+        if (response.ok) { sessions.delete(sessionId); clear(); return send(200, { reset: true }); }
+        if (response.status === 400) {
+          const detail = await response.json().catch(() => ({}));
+          return send(400, { error: detail.code === 'INVALID_RESET_TOKEN' ? 'invalid-token' : 'invalid-password' });
+        }
+        return send(503, { error: 'Identity service unavailable' });
+      }
       if (!session) return send(401, { error: 'Sign in required' });
       if (route === '/api/dashboard' && req.method === 'GET') {
         return await sendDashboard(send, call, session, url.searchParams);
@@ -427,7 +449,9 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         if (req.method === 'POST' && parsedBody?.bank && parsedBody?.accountNumber && result?.id) {
           requestBackend(new URL('/api/v1/admin/account-links', bankIntegrationBackend), {
             method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
-            headers: { 'Content-Type': 'application/json' },
+            // The customer's own token: the bank service lets a customer link only
+            // an account accounts-service holds for them.
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.token },
             body: JSON.stringify({
               bankId: parsedBody.bank, accountNumber: parsedBody.accountNumber,
               userId: session.userId, accountName: parsedBody.accountName, accountId: result.id,
@@ -530,6 +554,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
               amountMinor: toMinor(tx.amount),
               description: tx.counterparty || describedNarrative(tx.description, account.institution),
               date: tx.transactionDate,
+              bank: account.institution,
             });
             for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(message);
           }
@@ -539,7 +564,9 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       }
     }
   }
-  const pollTimer = setInterval(pollForUpdates, 8000);
+  // Short enough that a payment shows on screen within seconds of the bank
+  // reporting it; each tick is a few local service calls per connected user.
+  const pollTimer = setInterval(pollForUpdates, 4000);
   server.on('close', () => clearInterval(pollTimer));
 
   return server.listen(port, '127.0.0.1');
