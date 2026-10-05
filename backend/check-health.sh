@@ -9,6 +9,7 @@ services=(
   "forecasts-service:8087"
   "notifications-service:8088"
   "audit-service:8089"
+  "bank-integration-service:8090"
 )
 
 for item in "${services[@]}"; do

@@ -16,12 +16,14 @@ data class HomeUiState(
     val isSyncing: Boolean = false,
     val isSimulatingInflow: Boolean = false,
     val isSimulatingOutflow: Boolean = false,
-    val totalBalance: BigDecimal = BigDecimal("23590.73"),
-    val totalCashIn: BigDecimal = BigDecimal("45000.00"),
-    val totalCashOut: BigDecimal = BigDecimal("12500.00"),
-    val trend: List<TrendPoint> = TransactionTrendCalculator.DefaultTrend,
+    val totalBalance: BigDecimal = BigDecimal.ZERO,
+    val totalCashIn: BigDecimal = BigDecimal.ZERO,
+    val totalCashOut: BigDecimal = BigDecimal.ZERO,
+    val trend: List<TrendPoint> = emptyList(),
     val bankAccounts: List<BankAccount> = emptyList(),
     val hasTransactions: Boolean = false,
+    val isOnboardingActive: Boolean = false,
+    val shouldShowWelcomeSheet: Boolean = false,
     val unreadNotificationCount: Int = 0,
     val errorMessage: String? = null
 ) {

@@ -4,6 +4,14 @@ set -e
 # Change to backend directory
 cd "$(dirname "$0")"
 
+# Load environment variables from ../.env if present
+if [ -f ../.env ]; then
+  echo "Loading environment variables from ../.env..."
+  set -a
+  eval $(grep -v '^#' ../.env | grep '=' | sed -E 's/^[[:space:]]*([A-Za-z0-9_]+)[[:space:]]*=[[:space:]]*(.*)$/\1="\2"/')
+  set +a
+fi
+
 # Generate JWT secret if not set
 export JWT_SECRET="${JWT_SECRET:-$(openssl rand -base64 48)}"
 
