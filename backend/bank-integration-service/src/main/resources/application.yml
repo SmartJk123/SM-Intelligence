@@ -65,10 +65,13 @@ smartmoney:
   stanbic:
     environment: ${STANBIC_ENV:SANDBOX}
     portal-url: https://sandbox.stanbicbank.co.ke/
-    # Endpoints taken from the Stanbic "Register Your Payment Result URL for
-    # Real-time Credit Alerts - Sandbox" 1.0.2 specification.
-    api-base-url: ${STANBIC_API_BASE_URL:https://api.connect.stanbicbank.co.ke/api/sandbox}
-    token-url: ${STANBIC_TOKEN_URL:https://api.connect.stanbicbank.co.ke/api/sandbox/auth/oauth2/token}
+    # Endpoints from the Stanbic "Register Your Payment Result URL for Real-time
+    # Credit Alerts" 1.0.2 specification. Left empty, they follow STANBIC_ENV:
+    #   SANDBOX     https://api.connect.stanbicbank.co.ke/api/sandbox
+    #   PRODUCTION  https://api.connect.stanbicbank.co.ke/api/prod
+    # with the token at <base>/auth/oauth2/token. Set them only to override.
+    api-base-url: ${STANBIC_API_BASE_URL:}
+    token-url: ${STANBIC_TOKEN_URL:}
     oauth-scope: ${STANBIC_OAUTH_SCOPE:payments}
     registration-path: ${STANBIC_REGISTRATION_PATH:/registerurl/}
     client-key: ${STANBIC_CLIENT_KEY:}
@@ -85,9 +88,11 @@ smartmoney:
     retry-delay-seconds: 5
     webhook-path: /api/v1/webhooks/stanbic
     signature-verification: ${STANBIC_SIGNATURE_VERIFICATION:true}
-    # Set both once Stanbic confirms how the callback is authenticated.
+    # Set both once Stanbic confirms how the callback is authenticated. There is
+    # deliberately no default secret: a published one would let anyone forge a
+    # notification, so with verification on and no secret every one is refused.
     signature-header: ${STANBIC_SIGNATURE_HEADER:X-Stanbic-Signature}
-    signature-secret: ${STANBIC_SIGNATURE_SECRET:test-secret-key-stanbic-987}
+    signature-secret: ${STANBIC_SIGNATURE_SECRET:}
 
   kcb:
     environment: ${KCB_ENV:SANDBOX}
