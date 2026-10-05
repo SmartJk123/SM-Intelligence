@@ -14,6 +14,10 @@ public interface NormalizedTransactionRepository extends JpaRepository<Normalize
     List<NormalizedTransactionEntity> findByReferenceStartingWithOrderByCreatedAtDesc(String prefix);
 
     /** Real movements on one account not yet sent to transactions-service, oldest first. */
+    /** Waiting movements including simulated ones, for a link on the reserved demonstration account. */
+    List<NormalizedTransactionEntity> findByBankIdAndAccountNumberAndForwardedAtIsNullOrderByCreatedAtAsc(
+            String bankId, String accountNumber);
+
     List<NormalizedTransactionEntity> findByBankIdAndAccountNumberAndForwardedAtIsNullAndSimulatedFalseOrderByCreatedAtAsc(
             String bankId, String accountNumber);
 

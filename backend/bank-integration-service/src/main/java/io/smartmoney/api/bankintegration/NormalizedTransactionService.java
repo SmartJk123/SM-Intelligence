@@ -82,7 +82,7 @@ public class NormalizedTransactionService {
     private NormalizedTransactionEntity draft(WebhookEventEntity event) {
         String payload = event.getPayload();
         String trimmed = payload == null ? "" : payload.stripLeading();
-        if (trimmed.startsWith("{") && "equity".equals(event.getBankId())) {
+        if (trimmed.startsWith("{") && "equity".equals(event.getBankId()) && isJenga(payload)) {
             return fromJenga(event, payload);
         }
         if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
@@ -178,6 +178,15 @@ public class NormalizedTransactionService {
         movement.setCounterpartyName(blankToNull(root.at("/customer/name").asText("")));
         movement.setCounterpartyPhone(blankToNull(root.at("/customer/mobileNumber").asText("")));
         return movement;
+    }
+
+    /** A Jenga IPN nests the payment under "transaction"; a demonstration movement is flat. */
+    private boolean isJenga(String payload) {
+        try {
+            return mapper.readTree(payload).path("transaction").isObject();
+        } catch (Exception notJson) {
+            return true; // let fromJenga report the unreadable body
+        }
     }
 
     private static String firstNonBlank(String... values) {

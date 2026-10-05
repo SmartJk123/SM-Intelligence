@@ -1,5 +1,6 @@
 package io.smartmoney.api.accountlink;
 
+import io.smartmoney.api.bankintegration.DemoTransactionService;
 import io.smartmoney.api.bankintegration.NormalizedTransactionEntity;
 import io.smartmoney.api.bankintegration.NormalizedTransactionRepository;
 import io.smartmoney.api.bankintegration.NormalizedTransactionService;
@@ -140,7 +141,8 @@ public class AccountLinkService {
 
     /** Called for every processed notification. Never throws: delivery is retried later. */
     public void deliver(NormalizedTransactionEntity movement) {
-        if (movement.getAccountNumber() == null || movement.getForwardedAt() != null || movement.isSimulated()) {
+        if (movement.getAccountNumber() == null || movement.getForwardedAt() != null
+                || (movement.isSimulated() && !isDemoAccount(movement.getAccountNumber()))) {
             return;
         }
         links.findByBankIdAndAccountNumber(movement.getBankId(), movement.getAccountNumber())
@@ -165,8 +167,20 @@ public class AccountLinkService {
     }
 
     private List<NormalizedTransactionEntity> pending(AccountLinkEntity link) {
-        return transactions.findByBankIdAndAccountNumberAndForwardedAtIsNullAndSimulatedFalseOrderByCreatedAtAsc(
-                link.getBankId(), link.getAccountNumber());
+        return isDemoAccount(link.getAccountNumber())
+                ? transactions.findByBankIdAndAccountNumberAndForwardedAtIsNullOrderByCreatedAtAsc(
+                        link.getBankId(), link.getAccountNumber())
+                : transactions.findByBankIdAndAccountNumberAndForwardedAtIsNullAndSimulatedFalseOrderByCreatedAtAsc(
+                        link.getBankId(), link.getAccountNumber());
+    }
+
+    /**
+     * Simulated movements reach a customer only on the reserved demonstration
+     * account number, which a customer links on purpose to try the platform.
+     * Every real account keeps receiving real bank movements only.
+     */
+    private static boolean isDemoAccount(String accountNumber) {
+        return DemoTransactionService.DEMO_ACCOUNT_NUMBER.equals(accountNumber);
     }
 
     private void send(AccountLinkEntity link, NormalizedTransactionEntity movement) {
