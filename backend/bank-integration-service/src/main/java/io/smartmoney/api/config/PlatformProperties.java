@@ -5,11 +5,47 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Platform level settings. publicBaseUrl is the address the bank can reach, so
  * it is what appears in the callback URL shown in the admin interface.
+ *
+ * A mutable class rather than a record, so the admin interface can change
+ * publicBaseUrl on the running service (see PublicBaseUrlService, which also
+ * stores it so it survives a restart). The get/set pairs are for Spring's
+ * JavaBean binder; the rest of the code keeps the no-prefix accessors.
  */
 @ConfigurationProperties(prefix = "smartmoney")
-public record PlatformProperties(String publicBaseUrl, Security security) {
+public class PlatformProperties {
 
-    public record Security(boolean permitAll) {
+    private volatile String publicBaseUrl;
+    private Security security = new Security();
+
+    public PlatformProperties() {
+    }
+
+    public PlatformProperties(String publicBaseUrl, Security security) {
+        this.publicBaseUrl = publicBaseUrl;
+        this.security = security == null ? new Security() : security;
+    }
+
+    public String getPublicBaseUrl() { return publicBaseUrl; }
+    public void setPublicBaseUrl(String publicBaseUrl) { this.publicBaseUrl = publicBaseUrl; }
+    public String publicBaseUrl() { return publicBaseUrl; }
+
+    public Security getSecurity() { return security; }
+    public void setSecurity(Security security) { this.security = security; }
+    public Security security() { return security; }
+
+    public static class Security {
+        private boolean permitAll;
+
+        public Security() {
+        }
+
+        public Security(boolean permitAll) {
+            this.permitAll = permitAll;
+        }
+
+        public boolean isPermitAll() { return permitAll; }
+        public void setPermitAll(boolean permitAll) { this.permitAll = permitAll; }
+        public boolean permitAll() { return permitAll; }
     }
 
     public String callbackUrl(String bankId) {

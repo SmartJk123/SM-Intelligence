@@ -360,6 +360,38 @@
 
       @case ('Bank Integration Settings') {
         <div class="space-y-4 max-w-3xl">
+          <app-surface-card class="p-5" animDelay="">
+            <label class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">
+              Webhook base address
+            </label>
+            <div class="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                [value]="platformUrlDraft()"
+                (input)="onPlatformUrlInput($any($event.target).value)"
+                placeholder="https://your-tunnel.trycloudflare.com"
+                class="flex-1 px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none font-mono"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+              />
+              <button
+                type="button"
+                data-self-reporting
+                [disabled]="platformUrlSaving()"
+                (click)="savePlatformUrl()"
+                class="px-4 py-2.5 text-[13px] font-semibold rounded-xl transition-all hover:opacity-90 disabled:opacity-60"
+                style="background: var(--primary); color: #fff"
+              >{{ platformUrlSaving() ? 'Saving…' : platformUrlSaved() ? 'Saved' : 'Save' }}</button>
+            </div>
+            @if (platformUrlError()) {
+              <p class="text-[12px] mt-2" style="color: var(--red)">{{ platformUrlError() }}</p>
+            } @else {
+              <p class="text-[12px] mt-2" style="color: var(--text-3)">
+                Every bank's webhook endpoint below is this address followed by /api/v1/webhooks/&lt;bank&gt;.
+                For production use https://sm-intelligence.globalsmartspaces.com. Saving applies immediately and is kept
+                across restarts.
+              </p>
+            }
+          </app-surface-card>
           @for (bank of banks; track bank.id; let i = $index) {
             <app-surface-card class="p-5" [animDelay]="delayFor(i)">
               <app-bank-connection-panel [bank]="bank" />

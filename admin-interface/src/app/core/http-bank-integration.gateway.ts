@@ -8,6 +8,7 @@ import {
   BankIntegrationGateway,
   CallbackRegistration,
   CredentialStatus,
+  PlatformBaseUrlInfo,
   PlatformStats,
   ConnectionStep,
   ConnectionTestResult,
@@ -83,6 +84,24 @@ export class HttpBankIntegrationGateway implements BankIntegrationGateway {
       ),
     );
     return info ?? null;
+  }
+
+  async loadPublicBaseUrl(): Promise<PlatformBaseUrlInfo | null> {
+    const info = await firstValueFrom(
+      this.http.get<PlatformBaseUrlInfo | null>(
+        `${API_BASE_URL}/admin/bank-integrations/platform/public-base-url`,
+      ),
+    );
+    return info ?? null;
+  }
+
+  async updatePublicBaseUrl(publicBaseUrl: string): Promise<PlatformBaseUrlInfo> {
+    return firstValueFrom(
+      this.http.put<PlatformBaseUrlInfo>(
+        `${API_BASE_URL}/admin/bank-integrations/platform/public-base-url`,
+        { publicBaseUrl },
+      ),
+    );
   }
 
   async loadStats(): Promise<PlatformStats | null> {

@@ -7,6 +7,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { CredentialStatus } from '../core/bank-integration.gateway';
 import { Bank } from '../core/data';
 import { BankEnvironment } from '../core/bank-integration.gateway';
@@ -162,5 +163,11 @@ export class BankConnectionPanel {
 }
 
 function errorMessage(error: unknown): string {
+  if (error instanceof HttpErrorResponse) {
+    if (error.status === 0) {
+      return 'The bank integration service on port 8090 is not running, so nothing can be saved or tested.';
+    }
+    if (typeof error.error?.message === 'string') return error.error.message;
+  }
   return error instanceof Error ? error.message : 'The backend could not complete the request.';
 }
