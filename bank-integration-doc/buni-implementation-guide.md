@@ -39,66 +39,29 @@ To receive webhooks from BUNI on your local machine, you must expose your local 
 
 BUNI will now route transaction notifications to your local running service.
 
-## 3. Implementation Details
+## 3. Cryptographic Verification & Security
 
-### Sandbox Configuration (`.env`)
-In the BUNI sandbox, cryptographic signatures sent with IPNs might not match production RSA keys. To prevent our backend from rejecting these payloads with a `401 Unauthorized` error, we disable signature verification locally:
+### SHA256withRSA Signature Verification
+KCB BUNI delivers an HTTP `Signature` header containing a Base64-encoded `SHA256withRSA` signature of the raw request body.
 
+The `bank-integration-service` verifies incoming IPNs against the configured KCB public key:
 ```env
 # Inside SM-Intelligence/backend/.env
-KCB_SIGNATURE_VERIFICATION=false
+KCB_SIGNATURE_VERIFICATION=true
+KCB_SIGNATURE_HEADER=Signature
+KCB_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n..."
 ```
 
-### How the Service Processes IPNs
-1. **Ingestion:** `KcbWebhookController` receives the POST request.
-2. **Validation:** If `KCB_SIGNATURE_VERIFICATION` is true, it verifies the RSA signature using KCB's public key. If false, it bypasses this check.
-3. **Parsing:** The JSON payload is parsed to extract core details like `transactionId`, `amount`, `currency`, `accountNumber`, etc.
-4. **Normalization:** The raw data is converted into a standard `NormalizedTransactionEntity`.
-5. **Persistence & Broadcasting:** The transaction is saved to the local database and broadcasted to other microservices (or synced to the mobile app) via message queues or REST API calls.
+### Ingestion & Processing Pipeline
+1. **Ingestion:** `KcbWebhookController` receives `POST /api/v1/webhooks/kcb`.
+2. **Cryptographic Validation:** `KcbSignatureVerifier` verifies the RSA signature using `SHA256withRSA`. If invalid or missing, it fails closed with `401 Unauthorized`.
+3. **Idempotency & Deduplication:** `WebhookIngestionService` checks `externalEventId` (from `transactionReference` or `transactionID`). Repeated bank redeliveries are acknowledged idempotently without double-posting to the ledger.
+4. **Normalization:** `NormalizedTransactionService` parses the JSON body into a standard `NormalizedTransactionEntity` (supporting numeric amounts, comma-formatted strings, and multi-tenant account resolution).
+5. **Downstream Propagation:** The normalized transaction is recorded and dispatched asynchronously to downstream ledger and notification services.
 
-## 4. Replicating This Implementation in Another App (e.g., Admin Portal)
+## 4. Single-Gateway Architectural Principle
 
-If you are building a separate admin portal, a web app backend, or a new microservice that needs to listen to KCB webhooks independently, follow these steps:
-
-### A. Create the Webhook Endpoint
-Your application needs an unauthenticated, publicly accessible `POST` endpoint to receive JSON payloads.
-
-**Example (Node.js / Express):**
-```javascript
-const express = require('express');
-const app = express();
-app.use(express.json());
-
-app.post('/api/webhooks/kcb', (req, res) => {
-    const payload = req.body;
-    
-    console.log('Received BUNI IPN:', payload);
-    
-    // 1. (Optional for Sandbox) Verify Signature here
-    // if (process.env.VERIFY_KCB_SIGNATURES === 'true') { ... }
-    
-    // 2. Extract Data
-    const amount = payload.amount;
-    const account = payload.accountIdentifier;
-    const txRef = payload.transactionReference;
-    
-    // 3. Process business logic (e.g., update dashboard metrics)
-    
-    // 4. Respond with 200 OK quickly to prevent KCB from retrying
-    res.status(200).json({ status: 'success' });
-});
-
-app.listen(3000, () => console.log('Server running on port 3000'));
-```
-
-### B. Handle Security & Signatures
-For production, you **must** verify the cryptographic signature sent in the request. For the sandbox environment (BUNI), you must implement a toggle in your environment variables to conditionally disable this check, just like we did with `KCB_SIGNATURE_VERIFICATION=false`.
-
-### C. Acknowledge Promptly
-Bank webhooks expect a very fast response (typically a `200 OK` within seconds). If your processing takes a long time, save the raw payload to a database or queue, return `200 OK` immediately, and process it asynchronously in the background.
-
-### D. Ngrok for Testing
-Developers working on the admin portal will need to run `ngrok http <PORT>` (matching their service's port) and update the BUNI portal with their own temporary ngrok URL to receive live sandbox notifications during development.
-
----
-**Mobile Troubleshooting Tip:** If the mobile app fails to connect to the backend while testing with an Android device over USB tethering, the `RetrofitClient` has been configured to automatically fall back from `127.0.0.1` (adb reverse) to the host machine's LAN IP. Make sure both devices are on the same Wi-Fi network if adb drops.
+In our microservices architecture, **`bank-integration-service` is the sole, authoritative gateway for all bank webhooks.**
+* External banks (KCB, NCBA, Stanbic, Equity) communicate **exclusively** with `bank-integration-service:8090`.
+* Downstream services (such as `accounts-service`, `transactions-service`, web apps, and admin portals) **must never** expose independent webhook endpoints.
+* Instead, downstream services consume verified, deduplicated, and normalized financial movements via internal REST APIs or asynchronous event channels.

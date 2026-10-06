@@ -260,7 +260,7 @@ public class NormalizedTransactionService {
         if (value == null || value.isBlank()) {
             return null;
         }
-        return new BigDecimal(value);
+        return parse(value);
     }
 
     private static String text(JsonNode root, List<String> fields, String fallback) {

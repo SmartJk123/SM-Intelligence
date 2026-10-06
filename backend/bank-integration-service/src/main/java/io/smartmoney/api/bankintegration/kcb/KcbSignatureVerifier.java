@@ -99,6 +99,8 @@ public class KcbSignatureVerifier {
                 String base64 = material
                         .replace("-----BEGIN PUBLIC KEY-----", "")
                         .replace("-----END PUBLIC KEY-----", "")
+                        .replace("\\n", "")
+                        .replace("\\r", "")
                         .replaceAll("\\s+", "");
 
                 byte[] der = Base64.getDecoder().decode(base64);

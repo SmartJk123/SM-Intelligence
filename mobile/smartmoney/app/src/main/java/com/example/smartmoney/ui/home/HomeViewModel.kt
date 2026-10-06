@@ -117,20 +117,6 @@ class HomeViewModel(
 
     init {
         refresh()
-        startPeriodicSync()
-    }
-
-    private fun startPeriodicSync() {
-        viewModelScope.launch(dispatchers.io) {
-            while (isActive) {
-                delay(6_000)
-                try {
-                    transactionRepository.syncTransactions(userId = userId)
-                } catch (_: Exception) {
-                    // Gracefully tolerate temporary network errors
-                }
-            }
-        }
     }
 
     /**
