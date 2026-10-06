@@ -90,6 +90,16 @@ public class AccountLinkController {
         return view(link);
     }
 
+    /**
+     * Removes the links to an account its owner is removing from the web app.
+     * A customer may only remove links to their own account; an admin any.
+     */
+    @DeleteMapping("/by-account/{accountId}")
+    public ResponseEntity<Map<String, Object>> unlinkAccount(@PathVariable String accountId, Authentication caller) {
+        int removed = service.unlinkAccount(accountId, isCustomer(caller) ? String.valueOf(caller.getPrincipal()) : null);
+        return ResponseEntity.ok(Map.of("removed", removed));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> unlink(@PathVariable Long id) {
         service.unlink(id);

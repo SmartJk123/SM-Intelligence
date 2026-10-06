@@ -224,7 +224,20 @@ interface DashboardData {
                     {{ account.accountType === 'CREDIT' ? 'owed' : '' }}</span
                   >
                 </div>
+                <div class="account-remove">
+                  @if (confirming() === account.id) {
+                    <button class="button danger small" type="button" [disabled]="removing()" (click)="remove(account.id)"
+                      [attr.aria-label]="'Remove ' + account.accountName">{{ removing() ? 'Removing…' : 'Yes, remove' }}</button>
+                    <button class="button secondary small" type="button" [disabled]="removing()" (click)="confirming.set('')">Cancel</button>
+                  } @else {
+                    <button class="button secondary small" type="button" (click)="confirming.set(account.id); removeError.set('')"
+                      [attr.aria-label]="'Remove ' + account.accountName">Remove</button>
+                  }
+                </div>
               </div>
+            }
+            @if (removeError()) {
+              <p role="alert" class="alert">{{ removeError() }}</p>
             }
           </article>
         <article class="dashboard-panel hybrid-transactions">
@@ -303,6 +316,23 @@ export class Dashboard {
   readonly error = signal('');
   readonly days = signal(30);
   readonly bank = signal('');
+  readonly confirming = signal('');
+  readonly removing = signal(false);
+  readonly removeError = signal('');
+  /** Removes an account, then reloads the overview so its figures leave the totals. */
+  async remove(id: string) {
+    this.removing.set(true);
+    this.removeError.set('');
+    try {
+      await this.api.removeAccount(id);
+      this.confirming.set('');
+      await this.load();
+    } catch {
+      this.removeError.set('The account could not be removed right now. Please try again.');
+    } finally {
+      this.removing.set(false);
+    }
+  }
   readonly view = computed<DashboardData>(() => {
     if (this.data()) return this.data()!;
     const accounts = this.api.accounts().filter(a => !this.bank() || a.institution === this.bank()).map(a => ({

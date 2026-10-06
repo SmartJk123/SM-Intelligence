@@ -9,7 +9,7 @@ async function fixture(fetchAuth) {
   const server = startAuthServer(0, 4200, { fetchAuth, identityUrl: 'http://localhost:8080' });
   await once(server, 'listening');
   const base = 'http://127.0.0.1:' + server.address().port;
-  return { server, async call(route, body, cookie, origin) {
+  return { server, base, async call(route, body, cookie, origin) {
     const response = await fetch(base + route, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
     return { status: response.status, body: await response.json(), cookie: response.headers.get('set-cookie') };
   }, async close() { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
@@ -218,5 +218,40 @@ test('forgot and reset password pass through without a session and hide whether 
     const refused = await fx.call('/api/auth/reset-password', { token: 'used-token', password: 'BrandNewPassword2!' });
     assert.equal(refused.status, 400);
     assert.equal(refused.body.error, 'invalid-token');
+  } finally { await fx.close(); }
+});
+
+test('removing an account unlinks it at the bank service first, then deletes it', async () => {
+  const token = jwt(); const calls = []; let bankUp = true;
+  const accountId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const fx = await fixture(async (url, init) => {
+    if (url.pathname.endsWith('/me')) return Response.json(profile);
+    if (url.pathname.endsWith('/login')) return Response.json({ token, userId });
+    calls.push([init.method, url.pathname + url.search, init.headers?.Authorization]);
+    if (url.pathname.startsWith('/api/v1/admin/account-links/by-account/'))
+      return bankUp ? Response.json({ removed: 1 }) : new Response('down', { status: 502 });
+    if (url.pathname === '/api/accounts/' + accountId) return Response.json({ id: accountId });
+    return new Response(null, { status: 404 });
+  });
+  try {
+    const cookie = (await fx.call('/api/auth/login', input)).cookie.split(';')[0];
+    const remove = () => fetch(fx.base + '/api/accounts/' + accountId, { method: 'DELETE', headers: { Cookie: cookie } });
+
+    // The bank service cannot confirm the unlink: the account is kept.
+    bankUp = false;
+    assert.equal((await remove()).status, 503);
+    assert.equal(calls.filter(([m, p]) => m === 'DELETE' && p.startsWith('/api/accounts/')).length, 0);
+
+    // Normal removal: unlink first, then delete permanently, both with the customer's token.
+    bankUp = true; calls.length = 0;
+    assert.equal((await remove()).status, 204);
+    assert.deepEqual(calls.map(([m, p]) => m + ' ' + p), [
+      'DELETE /api/v1/admin/account-links/by-account/' + accountId,
+      'DELETE /api/accounts/' + accountId + '?permanent=true',
+    ]);
+    assert.ok(calls.every(([, , auth]) => auth === 'Bearer ' + token));
+
+    // Without a session nothing is removed.
+    assert.equal((await fetch(fx.base + '/api/accounts/' + accountId, { method: 'DELETE' })).status, 401);
   } finally { await fx.close(); }
 });
