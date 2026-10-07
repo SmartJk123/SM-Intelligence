@@ -32,10 +32,8 @@ public class AccountIdentity {
      * the account owner directly in the request body instead.
      */
     public boolean isInternalService(String providedToken) {
-        if (internalServiceToken == null || internalServiceToken.isBlank()) {
-            return true;
-        }
-        return internalServiceToken.equals(providedToken);
+        return internalServiceToken != null && !internalServiceToken.isBlank()
+                && internalServiceToken.equals(providedToken);
     }
 
     public UUID owner(String authorization) {
