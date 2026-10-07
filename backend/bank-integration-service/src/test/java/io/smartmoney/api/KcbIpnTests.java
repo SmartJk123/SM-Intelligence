@@ -124,4 +124,62 @@ class KcbIpnTests {
                 .andExpect(status().isUnauthorized());
         assertThat(transactions.findFirstByBankIdAndExternalEventId("kcb", "FT-KCB-IPN-2")).isEmpty();
     }
+
+    @Test
+    void refusesNotificationWhenSignatureHeaderIsMissing() throws Exception {
+        String body = notification("FT-KCB-IPN-NO-SIG");
+        mvc.perform(post("/api/v1/webhooks/kcb").contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isUnauthorized());
+        assertThat(transactions.findFirstByBankIdAndExternalEventId("kcb", "FT-KCB-IPN-NO-SIG")).isEmpty();
+    }
+
+    @Test
+    void acceptsDuplicateNotificationIdempotentlyWithoutDoubleLedgerPosting() throws Exception {
+        String body = notification("FT-KCB-IPN-DUP");
+        String signature = sign(body);
+
+        // First delivery
+        mvc.perform(post("/api/v1/webhooks/kcb").contentType(MediaType.APPLICATION_JSON)
+                        .header("Signature", signature).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value("0"));
+
+        // Wait for first processing
+        var stored = transactions.findFirstByBankIdAndExternalEventId("kcb", "FT-KCB-IPN-DUP");
+        for (int attempt = 0; stored.isEmpty() && attempt < 50; attempt++) {
+            Thread.sleep(100);
+            stored = transactions.findFirstByBankIdAndExternalEventId("kcb", "FT-KCB-IPN-DUP");
+        }
+        assertThat(stored).isPresent();
+
+        // Duplicate redelivery from bank retry engine
+        mvc.perform(post("/api/v1/webhooks/kcb").contentType(MediaType.APPLICATION_JSON)
+                        .header("Signature", signature).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value("0"));
+
+        // Verify only 1 normalized transaction exists
+        long count = transactions.findAll().stream()
+                .filter(t -> "kcb".equals(t.getBankId()) && "FT-KCB-IPN-DUP".equals(t.getExternalEventId()))
+                .count();
+        assertThat(count).isEqualTo(1L);
+    }
+
+    @Test
+    void acceptsNotificationWithFormattedAmountContainingCommas() throws Exception {
+        String body = notification("FT-KCB-IPN-COMMA").replace("\"100.00\"", "\"2,750.50\"");
+        mvc.perform(post("/api/v1/webhooks/kcb").contentType(MediaType.APPLICATION_JSON)
+                        .header("Signature", sign(body)).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value("0"));
+
+        var stored = transactions.findFirstByBankIdAndExternalEventId("kcb", "FT-KCB-IPN-COMMA");
+        for (int attempt = 0; stored.isEmpty() && attempt < 50; attempt++) {
+            Thread.sleep(100);
+            stored = transactions.findFirstByBankIdAndExternalEventId("kcb", "FT-KCB-IPN-COMMA");
+        }
+        var movement = stored.orElseThrow();
+        assertThat(movement.getAmount()).isEqualByComparingTo("2750.50");
+    }
 }

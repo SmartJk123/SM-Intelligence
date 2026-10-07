@@ -12,8 +12,8 @@ if [ -f ../.env ]; then
   set +a
 fi
 
-# Ensure sandbox signature verification is disabled unless explicitly set to true
-export KCB_SIGNATURE_VERIFICATION="${KCB_SIGNATURE_VERIFICATION:-false}"
+# Signature verification is enabled by default per institutional policy
+export KCB_SIGNATURE_VERIFICATION="${KCB_SIGNATURE_VERIFICATION:-true}"
 export PERMIT_ALL="${PERMIT_ALL:-false}"
 export PORT="${PORT_BANK_INTEGRATION_SERVICE:-8090}"
 

@@ -82,12 +82,13 @@ class DemoAccountDeliveryTests {
     @Test
     void aRealAccountNeverReceivesASimulatedMovement() throws Exception {
         String userId = UUID.randomUUID().toString();
-        when(platform.ensureAccount(any(), any(), eq("0170299999999"), any())).thenReturn("real-account");
-        link("equity", "0170299999999", userId);
+        String realAccountNumber = "0170298888888";
+        when(platform.ensureAccount(any(), any(), eq(realAccountNumber), any())).thenReturn("real-account");
+        link("equity", realAccountNumber, userId);
 
         mvc.perform(post("/api/v1/admin/demo/transactions").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"bankId\":\"equity\",\"direction\":\"Credit\",\"amount\":700,"
-                                + "\"accountNumber\":\"0170299999999\"}"))
+                                + "\"accountNumber\":\"" + realAccountNumber + "\"}"))
                 .andExpect(status().is2xxSuccessful());
 
         verify(platform, after(1500).never()).recordTransaction(eq("real-account"),
