@@ -26,8 +26,23 @@ import { RouterLink } from '@angular/router';
                 <p>{{ account.accountType === 'CREDIT' ? 'Credit outstanding' : 'Available balance' }}:
                   {{ (account.accountType === 'CREDIT' ? account.creditOutstanding : account.availableBalance) | currency:account.currency }}</p>
               </div>
+              <div class="account-remove">
+                @if (confirming() === account.id) {
+                  <span>Remove this account?</span>
+                  <button class="button danger small" type="button" [disabled]="removing()" (click)="remove(account.id)">
+                    {{ removing() ? 'Removing…' : 'Yes, remove' }}</button>
+                  <button class="button secondary small" type="button" [disabled]="removing()" (click)="confirming.set('')">Cancel</button>
+                } @else {
+                  <button class="button secondary small" type="button" (click)="confirming.set(account.id); removeError.set('')">Remove</button>
+                }
+              </div>
             </article>
           }
+          @if (removeError()) {
+            <p role="alert" class="alert">{{ removeError() }}</p>
+          }
+          <p class="muted">Removing an account stops its bank payments reaching you and takes its balance and
+            transactions off your dashboard. You can add the same account again later.</p>
           <div class="actions"><a class="button" routerLink="/invoices">Manage invoices →</a>
             <a class="button secondary" routerLink="/accounts/new">Add another account</a></div>
           <p class="muted">Saved invoices are pending expenses and do not change your account balances.</p>
@@ -46,6 +61,21 @@ export class ConnectionPending {
   readonly page = this.route.snapshot.data['page'] || 'dashboard';
   readonly title = this.route.snapshot.title?.split(' | ')[0] || 'Financial Overview';
   readonly dark = signal(document.documentElement.dataset['theme'] === 'dark');
+  readonly confirming = signal('');
+  readonly removing = signal(false);
+  readonly removeError = signal('');
+  async remove(id: string) {
+    this.removing.set(true);
+    this.removeError.set('');
+    try {
+      await this.api.removeAccount(id);
+      this.confirming.set('');
+    } catch {
+      this.removeError.set('The account could not be removed right now. Please try again.');
+    } finally {
+      this.removing.set(false);
+    }
+  }
   toggleTheme() {
     this.dark.update(v => !v);
     const theme = this.dark() ? 'dark' : 'light';

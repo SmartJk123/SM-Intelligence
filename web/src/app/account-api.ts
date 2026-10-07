@@ -125,6 +125,16 @@ export class AccountApi {
     this.setupCompleted.set(true);
     this.accountsError.set('');
   }
+  /**
+   * Removes one of the customer's accounts. Its bank link is removed first, so
+   * the bank's notifications stop reaching this customer, and the account number
+   * becomes free to add again. Its balance and transactions leave the dashboard.
+   */
+  async removeAccount(id: string) {
+    await firstValueFrom(this.http.delete(`/api/accounts/${encodeURIComponent(id)}`).pipe(timeout(20000)));
+    this.accounts.update(accounts => accounts.filter(account => account.id !== id));
+    this.setupCompleted.set(this.accounts().length > 0);
+  }
   async logout() {
     await firstValueFrom(this.http.post('/api/auth/logout', {}).pipe(timeout(95000)));
     this.authenticated.set(false);

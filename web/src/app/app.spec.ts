@@ -127,6 +127,25 @@ describe('Account API contract', () => {
     expect(api.accounts()).toEqual([]);
     expect(api.accountsError()).not.toBe('');
   });
+  it('removes an account and keeps onboarding state in step', async () => {
+    const api = TestBed.inject(AccountApi);
+    const http = TestBed.inject(HttpTestingController);
+    let pending = api.refreshAccounts();
+    http.expectOne('/api/accounts').flush([{id:'a',accountStatus:'ACTIVE'},{id:'b',accountStatus:'ACTIVE'}]);
+    await pending;
+    pending = api.removeAccount('a');
+    const request = http.expectOne('/api/accounts/a');
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null, {status:204,statusText:'No Content'});
+    await pending;
+    expect(api.accounts().map(account => account.id)).toEqual(['b']);
+    expect(api.setupCompleted()).toBe(true);
+    // A failed removal keeps the account.
+    pending = api.removeAccount('b');
+    http.expectOne('/api/accounts/b').flush({}, {status:503,statusText:'Unavailable'});
+    await expect(pending).rejects.toBeTruthy();
+    expect(api.accounts().map(account => account.id)).toEqual(['b']);
+  });
   it('requires sign-in again when the accounts service rejects the session', async () => {
     const api = TestBed.inject(AccountApi);
     api.authenticated.set(true);

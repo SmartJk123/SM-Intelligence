@@ -19,6 +19,7 @@ import java.util.Base64;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -114,5 +115,36 @@ class AdminApiSecurityTests {
         // Every other admin endpoint stays admin only.
         mvc.perform(get("/api/v1/admin/account-links").header("Authorization", bearer("USER")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aCustomerCanRemoveOnlyTheirOwnLink() throws Exception {
+        String otherCustomer = "00000000-0000-0000-0000-000000000002";
+        String othersAccount = "2a1b0c9d-8e7f-6a5b-4c3d-2e1f0a9b8c7d";
+        when(platform.ensureAccount(eq(otherCustomer), eq("KCB"), eq("5566778899"), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(othersAccount);
+        // An admin links an account to another customer.
+        mvc.perform(post("/api/v1/admin/account-links").header("Authorization", bearer("PLATFORM_ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bankId\":\"kcb\",\"accountNumber\":\"5566778899\",\"userId\":\""
+                                + otherCustomer + "\",\"accountName\":\"Theirs\"}"))
+                .andExpect(status().isCreated());
+
+        // This customer cannot remove it.
+        mvc.perform(delete("/api/v1/admin/account-links/by-account/" + othersAccount)
+                        .header("Authorization", bearer("USER")))
+                .andExpect(status().isForbidden());
+        // No token at all is refused too.
+        mvc.perform(delete("/api/v1/admin/account-links/by-account/" + othersAccount))
+                .andExpect(status().isUnauthorized());
+        // An account with no links is a harmless no-op for its owner.
+        mvc.perform(delete("/api/v1/admin/account-links/by-account/3b2c1d0e-9f8a-7b6c-5d4e-3f2a1b0c9d8e")
+                        .header("Authorization", bearer("USER")))
+                .andExpect(status().isOk());
+        // The other customer's owner (here, an admin) can remove it.
+        mvc.perform(delete("/api/v1/admin/account-links/by-account/" + othersAccount)
+                        .header("Authorization", bearer("PLATFORM_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.removed").value(1));
     }
 }
