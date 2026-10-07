@@ -570,6 +570,7 @@ fun BankAccountCard(
                     }
                 }
 
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
