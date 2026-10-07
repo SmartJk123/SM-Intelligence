@@ -50,7 +50,12 @@ import com.example.smartmoney.ui.theme.SmartMoneyColors
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.geometry.Rect
 import com.example.smartmoney.domain.model.Notification
+import com.example.smartmoney.ui.raha.RahaBottomSheet
+import com.example.smartmoney.ui.raha.RahaViewModel
+import com.example.smartmoney.ui.raha.animation.AiChatTransition
+import com.example.smartmoney.ui.raha.components.RahaFloatingButton
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -62,6 +67,7 @@ import kotlin.math.abs
  */
 val LocalTopBarVisible = compositionLocalOf { true }
 
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 fun MainResponsiveShell(
     navController: NavHostController = rememberNavController(),
@@ -72,6 +78,7 @@ fun MainResponsiveShell(
     onBannerDismiss: () -> Unit = {},
     onBannerClick: (Notification) -> Unit = {},
     onSignOut: () -> Unit = {},
+    rahaViewModel: RahaViewModel? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -108,6 +115,7 @@ fun MainResponsiveShell(
     var isTopBarVisible by rememberSaveable { mutableStateOf(true) }
     var isScrolling by remember { mutableStateOf(false) }
     var scrollStopJob by remember { mutableStateOf<Job?>(null) }
+    var rahaIconBounds by remember { mutableStateOf(Rect.Zero) }
 
     val density = LocalDensity.current
     val scrollThresholdPx = remember(density) { with(density) { 6.dp.toPx() } }
@@ -250,6 +258,20 @@ fun MainResponsiveShell(
                                 modifier = Modifier.align(Alignment.BottomCenter)
                             )
                         }
+
+                        // Raha AI Assistant Floating Button - Bottom Left
+                        if (rahaViewModel != null) {
+                            val rahaUiState by rahaViewModel.uiState.collectAsState()
+                            RahaFloatingButton(
+                                onClick = { rahaViewModel.openSheet() },
+                                hasUnreadAlert = rahaUiState.hasUnreadAlert,
+                                isBottomBarVisible = isBottomBarScreen && !isBottomBarCollapsed,
+                                modifier = Modifier.align(Alignment.BottomStart),
+                                onPositioned = { rect ->
+                                    rahaIconBounds = rect
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -284,6 +306,31 @@ fun MainResponsiveShell(
                     .padding(horizontal = 16.dp, vertical = 6.dp)
                     .zIndex(100f)
             )
+
+            // Raha AI Assistant Floating Bordered Chatbox Window with Apple Genie Transition
+            if (rahaViewModel != null) {
+                val rahaUiState by rahaViewModel.uiState.collectAsState()
+                AiChatTransition(
+                    isOpen = rahaUiState.isOpen,
+                    originRect = rahaIconBounds,
+                    onDismiss = { rahaViewModel.closeSheet() },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(200f)
+                ) { contentAlpha ->
+                    RahaBottomSheet(
+                        uiState = rahaUiState,
+                        onDismiss = { rahaViewModel.closeSheet() },
+                        onSendMessage = { rahaViewModel.sendMessage(it) },
+                        onActionClick = { action ->
+                            rahaViewModel.closeSheet()
+                            navigateTo(action.targetRoute)
+                        },
+                        onClearChat = { rahaViewModel.clearConversation() },
+                        contentAlpha = contentAlpha
+                    )
+                }
+            }
         }
     }
 }

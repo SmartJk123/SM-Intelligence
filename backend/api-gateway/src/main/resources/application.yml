@@ -48,6 +48,10 @@ spring:
               uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
               predicates:
                 - Path=/api/v1/admin/stats/**
+            - id: assistant-service
+              uri: ${ASSISTANT_SERVICE_URL:http://localhost:8091}
+              predicates:
+                - Path=/api/assistant/**
 management:
   endpoints:
     web:

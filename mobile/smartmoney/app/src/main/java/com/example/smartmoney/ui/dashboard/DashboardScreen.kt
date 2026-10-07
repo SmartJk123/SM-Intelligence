@@ -74,11 +74,13 @@ import com.example.smartmoney.ui.navigation.Screen
 import com.example.smartmoney.ui.notifications.NotificationViewModel
 import com.example.smartmoney.ui.notifications.NotificationsScreen
 import com.example.smartmoney.ui.onboarding.AccountOnboardingBottomSheet
+import com.example.smartmoney.ui.raha.RahaViewModel
 import com.example.smartmoney.ui.theme.SmartMoneyColors
 import com.example.smartmoney.ui.transactions.TransactionScreen
 import com.example.smartmoney.ui.transactions.TransactionViewModel
 import kotlinx.coroutines.launch
 
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 fun DashboardScreen(
     userName: String,
@@ -90,6 +92,7 @@ fun DashboardScreen(
     investmentViewModel: InvestmentViewModel,
     notificationViewModel: NotificationViewModel? = null,
     homeViewModel: HomeViewModel? = null,
+    rahaViewModel: RahaViewModel? = null,
     isDarkMode: Boolean = false,
     onToggleDarkMode: (Boolean) -> Unit = {},
     onLogout: () -> Unit
@@ -140,7 +143,8 @@ fun DashboardScreen(
                 navController.navigate(Screen.Notifications.route)
             }
         },
-        onSignOut = onLogout
+        onSignOut = onLogout,
+        rahaViewModel = rahaViewModel
     ) { paddingValues ->
         NavHost(
             navController = navController,
@@ -195,17 +199,15 @@ fun DashboardScreen(
                             0 -> HomeScreen(
                                 uiState = homeUiState,
                                 userName = userName,
-                                onSimulateInflow = { onSuccess, onError ->
-                                    homeViewModel?.simulateKcbInflow(onSuccess = onSuccess, onError = onError)
-                                },
-                                onSimulateOutflow = { onSuccess, onError ->
-                                    homeViewModel?.simulateKcbOutflow(onSuccess = onSuccess, onError = onError)
-                                },
                                 onLinkAccountClick = { showLinkDialog = true },
                                 unreadNotificationCount = unreadNotifCount,
                                 onNotificationsClick = { navController.navigate(Screen.Notifications.route) },
                                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                                onProfileClick = { navController.navigate(Screen.Settings.route) }
+                                onProfileClick = { navController.navigate(Screen.Settings.route) },
+                                onGlowFinished = { homeViewModel?.clearGlow() },
+                                onPreviousMonth = { homeViewModel?.previousMonth() },
+                                onNextMonth = { homeViewModel?.nextMonth() },
+                                onOpenBudgetsClick = { navController.navigate(Screen.Budgets.route) }
                             )
                             1 -> AccountScreen(viewModel = accountViewModel)
                             2 -> TransactionScreen(
