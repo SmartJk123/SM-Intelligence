@@ -19,10 +19,7 @@ import java.util.Base64;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-<<<<<<< HEAD
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-=======
->>>>>>> 33f848efaf0a872418c1f0e9953c50840df45da6
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -119,7 +116,6 @@ class AdminApiSecurityTests {
         mvc.perform(get("/api/v1/admin/account-links").header("Authorization", bearer("USER")))
                 .andExpect(status().isForbidden());
     }
-<<<<<<< HEAD
 
     @Test
     void aCustomerCanRemoveOnlyTheirOwnLink() throws Exception {
@@ -151,6 +147,4 @@ class AdminApiSecurityTests {
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.removed").value(1));
     }
-=======
->>>>>>> 33f848efaf0a872418c1f0e9953c50840df45da6
 }
