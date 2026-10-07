@@ -79,6 +79,7 @@ dist/
 *.trace.db
 data/
 **/data/
+!**/src/**/data/
 
 # ============================================================
 # Mobile & Android build outputs & local workstation configs
