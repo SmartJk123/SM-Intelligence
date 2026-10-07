@@ -80,15 +80,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountScreen(
     viewModel: AccountViewModel,
     modifier: Modifier = Modifier
 ) {
-    val accounts by viewModel.accounts.collectAsState()
-    val bankAccounts by viewModel.bankAccounts.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val bankAccounts = uiState.bankAccounts
+    val isLoading = uiState.isLoading
     var showLinkDialog by remember { mutableStateOf(false) }
     var accountToDelete by remember { mutableStateOf<Pair<String, String>?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -96,7 +98,9 @@ fun AccountScreen(
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topClearance = statusBarTop + 64.dp
 
-    Box(
+    PullToRefreshBox(
+        isRefreshing = isLoading,
+        onRefresh = { viewModel.refreshAccounts(force = true) },
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
@@ -565,6 +569,7 @@ fun BankAccountCard(
                         )
                     }
                 }
+
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
