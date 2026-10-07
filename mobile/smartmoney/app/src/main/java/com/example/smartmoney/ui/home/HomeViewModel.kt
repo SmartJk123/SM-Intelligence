@@ -173,44 +173,6 @@ class HomeViewModel(
 
     init {
         refresh()
-        startPeriodicSync()
-    }
-
-    /**
-     * Updates the selected month for the Overview analytics section.
-     */
-    fun selectMonth(month: YearMonth) {
-        _selectedMonth.value = month
-    }
-
-    /**
-     * Shifts the selected analytics month one month into the past.
-     */
-    fun previousMonth() {
-        _selectedMonth.value = _selectedMonth.value.minusMonths(1)
-    }
-
-    /**
-     * Shifts the selected analytics month one month into the future.
-     */
-    fun nextMonth() {
-        _selectedMonth.value = _selectedMonth.value.plusMonths(1)
-    }
-
-    private fun startPeriodicSync() {
-        viewModelScope.launch(dispatchers.io) {
-            while (isActive) {
-                delay(6_000)
-                try {
-                    transactionRepository.syncTransactions(userId = userId)
-                    if (userId.isNotBlank()) {
-                        accountRepository.syncAccounts(userId)
-                    }
-                } catch (_: Exception) {
-                    // Gracefully tolerate temporary network errors
-                }
-            }
-        }
     }
 
     /**
