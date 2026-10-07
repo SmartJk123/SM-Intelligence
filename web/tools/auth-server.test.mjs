@@ -220,6 +220,7 @@ test('forgot and reset password pass through without a session and hide whether 
     assert.equal(refused.body.error, 'invalid-token');
   } finally { await fx.close(); }
 });
+<<<<<<< HEAD
 
 test('removing an account unlinks it at the bank service first, then deletes it', async () => {
   const token = jwt(); const calls = []; let bankUp = true;
@@ -255,3 +256,5 @@ test('removing an account unlinks it at the bank service first, then deletes it'
     assert.equal((await fetch(fx.base + '/api/accounts/' + accountId, { method: 'DELETE' })).status, 401);
   } finally { await fx.close(); }
 });
+=======
+>>>>>>> 33f848efaf0a872418c1f0e9953c50840df45da6

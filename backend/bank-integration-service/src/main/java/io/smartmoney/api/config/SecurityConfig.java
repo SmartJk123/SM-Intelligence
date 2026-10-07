@@ -30,8 +30,12 @@ import java.util.List;
  *
  * One exception: a signed-in customer may POST /api/v1/admin/account-links to
  * link an account they saved themselves, which the web app does after
+<<<<<<< HEAD
  * onboarding, and DELETE /api/v1/admin/account-links/by-account/{id} when they
  * remove it. AccountLinkController checks that the account is really theirs.
+=======
+ * onboarding. AccountLinkController checks that the account is really theirs.
+>>>>>>> 33f848efaf0a872418c1f0e9953c50840df45da6
  *
  * PERMIT_ALL=true switches all of this off. It exists for tests and isolated
  * debugging only, and is off by default.
@@ -75,8 +79,11 @@ public class SecurityConfig {
                 .permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/admin/account-links")
                 .hasAnyRole(AdminTokenVerifier.ADMIN_ROLE, CUSTOMER_ROLE)
+<<<<<<< HEAD
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/account-links/by-account/*")
                 .hasAnyRole(AdminTokenVerifier.ADMIN_ROLE, CUSTOMER_ROLE)
+=======
+>>>>>>> 33f848efaf0a872418c1f0e9953c50840df45da6
                 .requestMatchers("/api/v1/admin/**").hasRole(AdminTokenVerifier.ADMIN_ROLE)
                 .anyRequest().denyAll());
         http.exceptionHandling(errors -> errors.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));

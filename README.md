@@ -35,7 +35,8 @@ reference, not an automatically loaded file.
 ## Features at a glance
 
 - **Customer app:** sign up, sign in, "Forgot password?" by email (SMTP settings in
-  [backend setup](backend/README.md#forgot-password-emails)), account onboarding, dashboard, invoices.
+  [backend setup](backend/README.md#forgot-password-emails)), account onboarding, removing an account
+  (it is unlinked from the bank first, and the number can be added again), dashboard, invoices.
 - **One account number, one user:** a bank account number can be registered by only one user, whether
   the customer enters it or an admin links it.
 - **Admin portal:** real sign in for `ADMIN_EMAILS` accounts; suspend, restore, edit and send a
