@@ -74,12 +74,14 @@ dist/
 # Project-local Java/tool downloads
 .tools/
 
-# Embedded database files
+# Embedded database files. Only the services' own data folders are ignored:
+# a bare "data/" pattern also hid the mobile app's source package
+# com/example/smartmoney/data, so it was never committed.
 *.mv.db
 *.trace.db
-data/
-**/data/
-!**/src/**/data/
+/data/
+backend/*/data/
+admin-interface/backend/data/
 
 # ============================================================
 # Mobile & Android build outputs & local workstation configs

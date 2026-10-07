@@ -12,4 +12,6 @@ public interface AccountLinkRepository extends JpaRepository<AccountLinkEntity, 
     List<AccountLinkEntity> findByUserIdOrderByCreatedAtAsc(String userId);
 
     List<AccountLinkEntity> findAllByOrderByCreatedAtAsc();
+
+    List<AccountLinkEntity> findByAccountId(String accountId);
 }

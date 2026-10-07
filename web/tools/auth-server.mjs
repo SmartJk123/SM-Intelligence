@@ -422,6 +422,30 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         if (!response.ok && response.status !== 404) return send(503, { error: 'Unable to remove the budget. Please retry.' });
         return send(204, null);
       }
+      // Removes one of the customer's own accounts: first its bank link, so the bank's
+      // notifications stop reaching this customer, then the account itself. If the
+      // bank service cannot confirm the unlink, the account is kept and the customer
+      // is asked to retry, so a link is never left pointing at a deleted account.
+      if (/^\/api\/accounts\/[0-9a-f-]{36}$/i.test(route) && req.method === 'DELETE') {
+        const id = route.split('/').pop();
+        const auth = { Authorization: 'Bearer ' + session.token };
+        let unlinked;
+        try {
+          unlinked = await requestBackend(new URL('/api/v1/admin/account-links/by-account/' + id, bankIntegrationBackend), {
+            method: 'DELETE', redirect: 'error', signal: AbortSignal.timeout(15000), headers: auth,
+          });
+        } catch { unlinked = null; }
+        if (!unlinked || !unlinked.ok) {
+          if (unlinked?.status === 403) return send(404, { error: 'Account not found' });
+          return send(503, { error: 'Unable to remove the account right now. Please retry.' });
+        }
+        const response = await requestBackend(new URL('/api/accounts/' + id + '?permanent=true', accountsBackend), {
+          method: 'DELETE', redirect: 'error', signal: AbortSignal.timeout(15000), headers: auth,
+        });
+        if (response.status === 404) return send(404, { error: 'Account not found' });
+        if (!response.ok) return send(503, { error: 'Unable to remove the account right now. Please retry.' });
+        return send(204, null);
+      }
       if (route === '/api/accounts' && ['GET', 'POST'].includes(req.method)) {
         let body; let parsedBody;
         if (req.method === 'POST') {
