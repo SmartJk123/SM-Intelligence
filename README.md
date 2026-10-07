@@ -8,29 +8,38 @@ Invoice capture is also available: upload a photo/PDF, review extracted details 
 
 ## Run locally
 
-Every Java service needs JDK 25 and is started from the repository root, one terminal each. Maven does
-not read `.env.local` files, so load a service's file into the terminal first (see
-[backend setup](backend/README.md)).
+**First time:** run `.\backend\new-local-env.ps1` from the repository root. It creates every service's
+`.env.local` (ignored by git) from its `.env.example`, and gives the two pairs of services that must share a
+secret the same value: `JWT_SECRET` (identity-service and bank-integration-service) and
+`INTERNAL_SERVICE_TOKEN` (accounts-service and bank-integration-service). Then add your own sandbox bank keys
+and `ADMIN_EMAILS`. Never use or share production values.
 
-| Service | Port | Start | Needed for |
-| --- | --- | --- | --- |
-| PostgreSQL | 5432 | local PostgreSQL service with `smi_identity`, `smi_accounts`, `smi_transactions` | everything |
-| identity-service | 8081 | `./backend/mvn.ps1 -pl identity-service spring-boot:run` | sign in, users, password reset |
-| api-gateway | 8080 | `./backend/mvn.ps1 -pl api-gateway spring-boot:run` | everything the browsers call |
-| accounts-service | 8082 | `$env:DB_URL = 'jdbc:postgresql://localhost:5432/smi_accounts'` then `./backend/mvn.ps1 -pl accounts-service spring-boot:run` | customer accounts and balances |
-| transactions-service | 8083 | `$env:DB_URL = 'jdbc:postgresql://localhost:5432/smi_transactions'` then `./backend/mvn.ps1 -pl transactions-service spring-boot:run` | customer transactions |
-| bank-integration-service | 8090 | `./backend/mvn.ps1 -pl bank-integration-service spring-boot:run` | bank webhooks, admin bank screens |
-| web | 4200 | `npm start` in `web/` | customer app |
-| admin-interface | 4300 | `npm start -- --port 4300` in `admin-interface/` | admin portal |
+Each Java service needs JDK 25 and is started from the repository root, one terminal each. Maven does not
+read `.env.local`, so load the service's file first:
 
-Start bank-integration-service exactly as shown. Its H2 database is a folder relative to where it starts,
-and this command uses `backend/bank-integration-service/data`, which holds the real data. Starting it
-from anywhere else opens an empty or older database, and transactions appear to vanish.
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot'
+Get-Content backend/<service>/.env.local | Where-Object { $_ -match '^\s*[A-Za-z_]+\s*=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item "Env:$($k.Trim())" $v.Trim() }
+./backend/mvn.ps1 -pl <service> spring-boot:run
+```
 
-With Docker (`backend/docker-compose.yml`) the accounts and transactions databases are on 5433 and 5434 instead, and the `DB_URL` lines are not needed.
+| Service | Port | Needed for |
+| --- | --- | --- |
+| PostgreSQL | 5432 | `smi_identity`, `smi_accounts`, `smi_transactions` (with Docker: 5432, 5433, 5434) |
+| identity-service | 8081 | sign in, users, password reset, organisations |
+| api-gateway | 8080 | everything the browsers and the mobile app call |
+| accounts-service | 8082 | accounts and balances |
+| transactions-service | 8083 | transactions and the activity feed |
+| bank-integration-service | 8090 | bank webhooks, admin bank screens. Start it with `.\backend\bank-integration-service\run-local.ps1` |
+| web | 4200 | `npm start` in `web/` |
+| admin-interface | 4300 | `npm start -- --port 4300` in `admin-interface/` |
 
-Environment variables must be set in the terminal running each service; the root `.env.example` is a
-reference, not an automatically loaded file.
+If bank payments arrive but balances do not move, `INTERNAL_SERVICE_TOKEN` differs between accounts-service and
+bank-integration-service. If the admin bank screens say the service refused your sign-in, `JWT_SECRET` differs
+between identity-service and bank-integration-service. Running the script again reports either mismatch.
+
+Start bank-integration-service as shown: its H2 database is a folder relative to where it starts, and the
+script uses `backend/bank-integration-service/data`.
 
 ## Features at a glance
 
