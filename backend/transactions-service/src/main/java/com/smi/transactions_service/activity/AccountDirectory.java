@@ -33,7 +33,7 @@ public class AccountDirectory {
 
     private final RestClient client;
 
-    public AccountDirectory(@Value("${ACCOUNTS_SERVICE_URL:http://localhost:8082}") String accountsUrl) {
+    public AccountDirectory(@Value("${ACCOUNTS_SERVICE_URL:http://${ACCOUNTS_SERVICE_HOSTPORT:localhost:8082}}") String accountsUrl) {
         var factory = new JdkClientHttpRequestFactory(
                 java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
         factory.setReadTimeout(Duration.ofSeconds(10));

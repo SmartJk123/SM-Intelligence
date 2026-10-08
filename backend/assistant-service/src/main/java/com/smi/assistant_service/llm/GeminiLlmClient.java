@@ -174,7 +174,7 @@ public class GeminiLlmClient implements LlmClient {
                     Map<String, String> payload = new HashMap<>();
                     JsonNode payloadNode = actionNode.path("payload");
                     if (payloadNode.isObject()) {
-                        payloadNode.fields().forEachRemaining(entry -> payload.put(entry.getKey(), entry.getValue().asText()));
+                        payloadNode.properties().forEach(entry -> payload.put(entry.getKey(), entry.getValue().asText()));
                     }
                     action = new RahaActionDto(type, targetRoute, payload);
                 }

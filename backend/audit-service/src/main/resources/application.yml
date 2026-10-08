@@ -6,7 +6,9 @@ spring:
     name: audit-service
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5440/smi_audit}
+    # Locally DB_URL wins. On Render the address is built from DB_HOST, DB_PORT and DB_NAME,
+    # and DB_SCHEMA keeps each service in its own schema of one shared database.
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5440}/${DB_NAME:smi_audit}?currentSchema=${DB_SCHEMA:public}}
     username: ${DB_USER:admin}
     password: ${DB_PASSWORD:secretpassword}
     driver-class-name: org.postgresql.Driver
@@ -22,4 +24,6 @@ spring:
 
   flyway:
     enabled: true
+    # Created on first start when it does not exist yet.
+    schemas: ${DB_SCHEMA:public}
     locations: classpath:db/migration

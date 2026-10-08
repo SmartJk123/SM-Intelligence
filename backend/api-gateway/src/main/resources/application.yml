@@ -13,47 +13,51 @@ spring:
         webmvc:
           routes:
             - id: invoices
-              uri: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
+              uri: ${TRANSACTIONS_SERVICE_URL:http://${TRANSACTIONS_SERVICE_HOSTPORT:localhost:8083}}
               predicates:
                 - Path=/api/invoices,/api/invoices/**
             - id: identity-service
-              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              uri: ${IDENTITY_SERVICE_URL:http://${IDENTITY_SERVICE_HOSTPORT:localhost:8081}}
               predicates:
                 - Path=/api/auth/**
             - id: identity-service-organizations
-              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              uri: ${IDENTITY_SERVICE_URL:http://${IDENTITY_SERVICE_HOSTPORT:localhost:8081}}
               predicates:
                 - Path=/api/organizations,/api/organizations/**
             - id: identity-admin-users
-              uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+              uri: ${IDENTITY_SERVICE_URL:http://${IDENTITY_SERVICE_HOSTPORT:localhost:8081}}
               predicates:
                 - Path=/api/v1/admin/users/**
             - id: accounts-service
-              uri: ${ACCOUNTS_SERVICE_URL:http://localhost:8082}
+              uri: ${ACCOUNTS_SERVICE_URL:http://${ACCOUNTS_SERVICE_HOSTPORT:localhost:8082}}
               predicates:
                 - Path=/api/accounts/**
             - id: transactions-service
-              uri: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
+              uri: ${TRANSACTIONS_SERVICE_URL:http://${TRANSACTIONS_SERVICE_HOSTPORT:localhost:8083}}
               predicates:
                 - Path=/api/transactions/**
             - id: bank-integration-webhooks
-              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
               predicates:
                 - Path=/api/v1/webhooks/**
             - id: bank-integration-admin
-              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
               predicates:
                 - Path=/api/v1/admin/bank-integrations/**
             - id: bank-integration-stats
-              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
               predicates:
                 - Path=/api/v1/admin/stats/**
             - id: assistant-service
-              uri: ${ASSISTANT_SERVICE_URL:http://localhost:8091}
+              uri: ${ASSISTANT_SERVICE_URL:http://${ASSISTANT_SERVICE_HOSTPORT:localhost:8091}}
               predicates:
                 - Path=/api/assistant/**
+            - id: bank-integration-demo
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
+              predicates:
+                - Path=/api/v1/admin/demo/**
             - id: bank-integration-account-links
-              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
               predicates:
                 # Customers link and remove their own accounts here (the bank service checks ownership).
                 - Path=/api/v1/admin/account-links,/api/v1/admin/account-links/**

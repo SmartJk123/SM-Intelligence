@@ -96,9 +96,17 @@ object RetrofitClient {
         .writeTimeout(120, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * The deployed api-gateway (API_BASE_URL in local.properties, e.g. the Render
+     * address). When set, every API goes through it over HTTPS, so the app reads
+     * the same data as the web app and the admin portal. Empty means local
+     * services on [host], as before.
+     */
+    private val deployedGateway: String = com.example.smartmoney.BuildConfig.API_BASE_URL.trim().trimEnd('/')
+
     private fun buildRetrofit(servicePort: Int): Retrofit {
         val port = gatewayPort ?: servicePort
-        val baseUrl = "http://$host:$port/"
+        val baseUrl = if (deployedGateway.isNotEmpty()) "$deployedGateway/" else "http://$host:$port/"
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(okHttpClient)

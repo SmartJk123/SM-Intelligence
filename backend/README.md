@@ -225,3 +225,46 @@ use the demo account (`1000000001`) from the admin portal.
 
 notifications-service has no code yet. Notifications come from the activity feed above.
 
+## Deploying on Render (one shared system)
+
+`render.yaml` at the repository root deploys everything as one system. Only **api-gateway** is public;
+every other service is a private service that only the gateway and the other services can reach. All apps
+use the gateway's URL, so signing in as the same user shows the same accounts and transactions on the web
+app, the admin portal and the mobile app.
+
+| Piece | How it is set up |
+| --- | --- |
+| Database | The team's **Supabase** PostgreSQL (`smi-database` group). Use the **session pooler, port 5432**; the transaction pooler (6543) breaks Hibernate's and Flyway's prepared statements. Each service keeps its own schema (`DB_SCHEMA`: identity, accounts, transactions, budgets), created on first start; bank-integration-service keeps `public`, where its existing data is |
+| Service addresses | Each service's private `host:port` from Render (`*_SERVICE_HOSTPORT`); locally the old `*_SERVICE_URL` defaults still apply |
+| Shared secrets | `JWT_SECRET` and `INTERNAL_SERVICE_TOKEN` are generated once in the `smi-shared` environment group, so the services that must agree always do |
+| Other secrets | Marked `sync: false`: enter them in the Render dashboard (bank keys, export tokens, SMTP, `ADMIN_EMAILS`, `GEMINI_API_KEY`) |
+| Bank data | bank-integration-service runs with `SPRING_PROFILES_ACTIVE=postgres`, so nothing is lost on redeploy |
+| Live bank payments | Still arrive on cPanel; the bank service on Render imports them from the cPanel export feeds |
+
+**Deploying:**
+1. Render dashboard → New → Blueprint → this repository. Render reads `render.yaml`. The existing web service
+   `bank-integration-service` (https://bank-integration-service.onrender.com) is adopted by name. Remove any
+   `DB_URL` set on it by hand (it would override the blueprint and keep port 6543). Private services need a paid
+   Render instance type.
+2. Fill in every value it asks for (the `sync: false` ones): `DB_USER` is the Supabase pooler user
+   (`postgres.<project ref>`), `DB_PASSWORD` the database password. Use the same export tokens as in cPanel's
+   `smi-private/*-config.php`.
+3. Set `APP_CORS_ALLOWED_ORIGINS` on api-gateway to the deployed web app and admin portal addresses.
+4. Point each app at the gateway URL:
+   - **Admin portal:** `gatewayUrl` in `admin-interface/src/environments/environment.production.ts`, then `npm run build`.
+   - **Web app:** run its server (`web/tools`) with `IDENTITY_API_URL`, `ACCOUNTS_API_URL`, `INVOICE_API_URL` and
+     `BANK_INTEGRATION_API_URL` set to the gateway URL. Deploy it on Render as well so `BUDGETS_API_URL` can use
+     budgets-service's private address (budgets-service trusts the user id it is given, so it is not public).
+   - **Mobile app:** `API_BASE_URL=<gateway URL>` in `mobile/smartmoney/local.properties`, then rebuild.
+   - **Bruno:** the `render` environment; set its `baseUrl` to the gateway URL.
+5. Move existing data once: dump each local database (`smi_identity`, `smi_accounts`, `smi_transactions`) and
+   restore it into the matching schema in Supabase (identity, accounts, transactions).
+
+**Checked locally on 2026-10-08:** identity-service, accounts-service and bank-integration-service started in
+one database with separate schemas, created their schemas and tables, and reported healthy.
+
+**Known limits:** `GET /api/transactions?accountId=` has no sign-in check yet (prefer
+`/api/transactions/activity`, which has). Some mobile calls use admin-only endpoints (listing account links,
+deleting a link by id, the bank-integrations list, the demo) and are refused for customers; customers should use
+`/api/transactions/activity` and `DELETE /api/v1/admin/account-links/by-account/{accountId}`.
+

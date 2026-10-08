@@ -14,7 +14,7 @@ import java.util.UUID;
 @Component
 public class InvoiceIdentity {
     private final RestClient client;
-    public InvoiceIdentity(@Value("${IDENTITY_SERVICE_URL:http://localhost:8081}") String identityUrl) {
+    public InvoiceIdentity(@Value("${IDENTITY_SERVICE_URL:http://${IDENTITY_SERVICE_HOSTPORT:localhost:8081}}") String identityUrl) {
         var factory = new JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
         factory.setReadTimeout(Duration.ofSeconds(10));
         client = RestClient.builder().baseUrl(identityUrl).requestFactory(factory).build();

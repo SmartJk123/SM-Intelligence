@@ -17,6 +17,8 @@ val localProperties = Properties().apply {
 val supabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
     ?: "https://lhizwzqkpshwmpqlbffm.supabase.co"
 val supabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
+// The deployed api-gateway, e.g. https://api-gateway-xxxx.onrender.com. Empty uses local services.
+val apiBaseUrl: String = localProperties.getProperty("API_BASE_URL") ?: ""
     ?: "sb_publishable_PeXsVtIFu1lsECKVbIp2cA_-Z5Wzu3V"
 
 android {
@@ -34,6 +36,7 @@ android {
 
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {

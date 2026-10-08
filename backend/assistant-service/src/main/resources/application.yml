@@ -17,10 +17,10 @@ raha:
     endpoint: ${DEEPSEEK_ENDPOINT:https://api.deepseek.com/chat/completions}
 
 services:
-  identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
-  accounts-url: ${ACCOUNTS_SERVICE_URL:http://localhost:8082}
-  transactions-url: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
-  budgets-url: ${BUDGETS_SERVICE_URL:http://localhost:8085}
+  identity-url: ${IDENTITY_SERVICE_URL:http://${IDENTITY_SERVICE_HOSTPORT:localhost:8081}}
+  accounts-url: ${ACCOUNTS_SERVICE_URL:http://${ACCOUNTS_SERVICE_HOSTPORT:localhost:8082}}
+  transactions-url: ${TRANSACTIONS_SERVICE_URL:http://${TRANSACTIONS_SERVICE_HOSTPORT:localhost:8083}}
+  budgets-url: ${BUDGETS_SERVICE_URL:http://${BUDGETS_SERVICE_HOSTPORT:localhost:8085}}
 
 management:
   endpoints:
