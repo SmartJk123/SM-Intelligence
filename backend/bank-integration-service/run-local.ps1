@@ -56,6 +56,18 @@ Write-Host ("  NCBA account        : " + $(if ($env:NCBA_ACCOUNT_NUMBER) { $env:
 
 $publicBase = if ($env:PUBLIC_BASE_URL) { $env:PUBLIC_BASE_URL.TrimEnd('/') } else { '' }
 Write-Host ""
+# The cPanel receivers live on the same site as the webhooks. An export URL on
+# another host (the old https://globalsmartspaces.com/ncba-webhook.php?export,
+# say) answers 404, and that bank's payments silently stop reaching the app.
+foreach ($bank in 'NCBA', 'KCB', 'EQUITY') {
+    $exportUrl = [Environment]::GetEnvironmentVariable("$($bank)_CPANEL_EXPORT_URL")
+    $expected = "$publicBase/api/v1/webhooks/$($bank.ToLower())/export"
+    if ($exportUrl -and $publicBase -and $exportUrl.TrimEnd('/') -ne $expected) {
+        Write-Host ("WARNING: $($bank)_CPANEL_EXPORT_URL is " + $exportUrl) -ForegroundColor Red
+        Write-Host ("         expected " + $expected + " (fix it in .env.local)") -ForegroundColor Red
+    }
+}
+
 Write-Host "URLs to give the bank" -ForegroundColor Green
 if ($publicBase -eq '') {
     Write-Host "  PUBLIC_BASE_URL is empty, so only this machine can reach the endpoints:" -ForegroundColor Yellow
