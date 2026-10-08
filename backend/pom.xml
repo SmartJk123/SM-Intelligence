@@ -35,6 +35,7 @@
         <module>notifications-service</module>
         <module>audit-service</module>
         <module>bank-integration-service</module>
+        <module>assistant-service</module>
     </modules>
 
     <dependencyManagement>

@@ -13,12 +13,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
+
+/**
+ * Immutable UI state for the Accounts screen.
+ * Consolidates all state into a single stream to eliminate fragmented Compose recompositions.
+ */
+data class AccountUiState(
+    val bankAccounts: List<BankAccount> = emptyList(),
+    val isLoading: Boolean = false,
+    val isAddingBankAccount: Boolean = false,
+    val errorMessage: String? = null
+)
 
 class AccountViewModel(
     private val repository: AccountRepository,
@@ -36,14 +49,38 @@ class AccountViewModel(
     private val _bankAccountError = MutableStateFlow<String?>(null)
     val bankAccountError: StateFlow<String?> = _bankAccountError.asStateFlow()
 
-    val accounts: StateFlow<List<Account>> = repository.getAccountsFlow(userId)
+    // 30-second freshness guard to prevent redundant HTTP calls when warm-up has already synced Room
+    private var lastSyncTimestamp: Long = 0L
+    private val SYNC_COOLDOWN_MS = 30_000L
+
+    val bankAccounts: StateFlow<List<BankAccount>> = bankAccountRepository.getBankAccounts()
+        .distinctUntilChanged()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList()
         )
 
-    val bankAccounts: StateFlow<List<BankAccount>> = bankAccountRepository.getBankAccounts()
+    val uiState: StateFlow<AccountUiState> = combine(
+        bankAccounts,
+        _isLoading,
+        _isAddingBankAccount,
+        _bankAccountError
+    ) { banks, loading, adding, error ->
+        AccountUiState(
+            bankAccounts = banks,
+            isLoading = loading,
+            isAddingBankAccount = adding,
+            errorMessage = error
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = AccountUiState()
+    )
+
+    // Backward-compatible flows for external consumers if any
+    val accounts: StateFlow<List<Account>> = repository.getAccountsFlow(userId)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -60,15 +97,25 @@ class AccountViewModel(
     )
 
     init {
-        refreshAccounts()
+        refreshAccounts(force = false)
     }
 
-    fun refreshAccounts() {
+    /**
+     * Refreshes accounts with a 30-second freshness guard to prevent duplicate HTTP traffic
+     * post-authentication. Setting [force] = true bypasses throttling (e.g. pull-to-refresh).
+     */
+    fun refreshAccounts(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && (now - lastSyncTimestamp < SYNC_COOLDOWN_MS)) {
+            return // Local Room cache is warm and authoritative
+        }
+
         if (userId.isNotBlank()) {
             viewModelScope.launch(dispatchers.io) {
                 _isLoading.value = true
                 try {
                     val result = repository.syncAccounts(userId)
+                    lastSyncTimestamp = System.currentTimeMillis()
                     result.onFailure { e ->
                         _bankAccountError.value = e.localizedMessage ?: "Failed to sync accounts"
                     }

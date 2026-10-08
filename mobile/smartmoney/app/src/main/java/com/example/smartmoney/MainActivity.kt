@@ -23,6 +23,7 @@ import com.example.smartmoney.ui.dashboard.DashboardScreen
 import com.example.smartmoney.ui.home.HomeViewModel
 import com.example.smartmoney.ui.investment.InvestmentViewModel
 import com.example.smartmoney.ui.notifications.NotificationViewModel
+import com.example.smartmoney.ui.raha.RahaViewModel
 import com.example.smartmoney.ui.theme.EnergyTheme
 import com.example.smartmoney.ui.transactions.TransactionViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    @androidx.compose.material3.ExperimentalMaterial3Api
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -85,6 +87,13 @@ class MainActivity : ComponentActivity() {
                     }
                     else -> {
                         val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
+                        var isWarmUpCompleted by rememberSaveable { mutableStateOf(startDestination == "dashboard") }
+
+                        LaunchedEffect(isLoggedIn) {
+                            if (!isLoggedIn) {
+                                isWarmUpCompleted = false
+                            }
+                        }
 
                         if (isLoggedIn) {
                             val currentUserId = authViewModel.currentUserId() ?: "default-user"
@@ -142,37 +151,60 @@ class MainActivity : ComponentActivity() {
                                     accountRepository = appContainer.accountRepository,
                                     bankAccountRepository = appContainer.bankAccountRepository,
                                     transactionRepository = appContainer.transactionRepository,
+                                    budgetRepository = appContainer.budgetRepository,
                                     userId = currentUserId
                                 )
                             )
 
-                            DashboardScreen(
-                                userName = userName,
-                                userEmail = userEmail,
-                                userId = currentUserId,
-                                accountViewModel = accountViewModel,
-                                transactionViewModel = transactionViewModel,
-                                budgetViewModel = budgetViewModel,
-                                investmentViewModel = investmentViewModel,
-                                notificationViewModel = notificationViewModel,
-                                homeViewModel = homeViewModel,
-                                isDarkMode = isDarkMode,
-                                onToggleDarkMode = { isDarkMode = it },
-                                onLogout = {
-                                    val db = appContainer.database
-                                    CoroutineScope(Dispatchers.IO).launch {
-                                        try {
-                                            db.clearAllTables()
-                                        } catch (e: Exception) {
-                                            e.printStackTrace()
-                                        }
-                                        UserProfileManager.clearSession()
-                                    }
-                                    authViewModel.signOut()
-                                    // After logout, showLogin will default based on what it was last, let's force true
-                                    showLogin = true 
-                                }
+                            val rahaViewModel: RahaViewModel = viewModel(
+                                key = "raha_$currentUserId",
+                                factory = RahaViewModel.Factory(appContainer.rahaRepository)
                             )
+
+                            if (!isWarmUpCompleted) {
+                                val warmUpViewModel: com.example.smartmoney.ui.warmup.WarmUpSyncViewModel = viewModel(
+                                    key = "warmup_$currentUserId",
+                                    factory = com.example.smartmoney.ui.warmup.WarmUpSyncViewModel.Factory(
+                                        accountRepository = appContainer.accountRepository,
+                                        transactionRepository = appContainer.transactionRepository,
+                                        userId = currentUserId
+                                    )
+                                )
+                                com.example.smartmoney.ui.warmup.WarmUpSyncScreen(
+                                    viewModel = warmUpViewModel,
+                                    onWarmUpComplete = { isWarmUpCompleted = true }
+                                )
+                            } else {
+                                DashboardScreen(
+                                    userName = userName,
+                                    userEmail = userEmail,
+                                    userId = currentUserId,
+                                    accountViewModel = accountViewModel,
+                                    transactionViewModel = transactionViewModel,
+                                    budgetViewModel = budgetViewModel,
+                                    investmentViewModel = investmentViewModel,
+                                    notificationViewModel = notificationViewModel,
+                                    homeViewModel = homeViewModel,
+                                    rahaViewModel = rahaViewModel,
+                                    isDarkMode = isDarkMode,
+                                    onToggleDarkMode = { isDarkMode = it },
+                                    onLogout = {
+                                        val db = appContainer.database
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            try {
+                                                db.clearAllTables()
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                            }
+                                            UserProfileManager.clearSession()
+                                        }
+                                        authViewModel.signOut()
+                                        isWarmUpCompleted = false
+                                        // After logout, showLogin will default based on what it was last, let's force true
+                                        showLogin = true 
+                                    }
+                                )
+                            }
                         } else if (showLogin) {
                             LoginScreen(
                                 authViewModel = authViewModel,

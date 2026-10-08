@@ -16,11 +16,12 @@ fi
 export JWT_SECRET="${JWT_SECRET:-$(openssl rand -base64 48)}"
 
 echo "========================================================"
-echo "Starting Identity, Accounts, Transactions, and Bank Integration services"
+echo "Starting Identity, Accounts, Transactions, Bank Integration, and Assistant services"
 echo "Identity:         http://localhost:8081"
 echo "Accounts:         http://localhost:8082"
 echo "Transactions:     http://localhost:8083"
 echo "Bank Integration: http://localhost:8090"
+echo "Assistant (Raha): http://localhost:8091"
 echo "Press Ctrl+C to stop all services."
 echo "========================================================"
 
@@ -31,5 +32,6 @@ trap 'echo ""; echo "Stopping all services..."; kill $(jobs -p) 2>/dev/null; exi
 ./mvnw -pl accounts-service spring-boot:run &
 ./mvnw -pl transactions-service spring-boot:run &
 ./mvnw -pl bank-integration-service spring-boot:run &
+./mvnw -pl assistant-service spring-boot:run &
 
 wait

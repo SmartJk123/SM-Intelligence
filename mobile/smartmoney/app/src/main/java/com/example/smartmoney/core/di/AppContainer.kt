@@ -38,6 +38,7 @@ interface AppContainer {
     val budgetRepository: BudgetRepository
     val investmentRepository: InvestmentRepository
     val userPreferencesRepository: UserPreferencesRepository
+    val rahaRepository: com.example.smartmoney.domain.repository.RahaRepository
 
     /**
      * Creates or provides a [BankAccountRepository] scoped to a specific user ID.
@@ -125,5 +126,15 @@ class DefaultAppContainer(
 
     override val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(context)
+    }
+
+    override val rahaRepository: com.example.smartmoney.domain.repository.RahaRepository by lazy {
+        com.example.smartmoney.data.repository.RahaRepositoryImpl(
+            rahaApi = com.example.smartmoney.data.remote.RetrofitClient.rahaApi,
+            accountDao = database.accountDao(),
+            userIdProvider = { authRepository.currentUserId() },
+            investmentRepository = investmentRepository,
+            dispatchers = dispatchers
+        )
     }
 }
