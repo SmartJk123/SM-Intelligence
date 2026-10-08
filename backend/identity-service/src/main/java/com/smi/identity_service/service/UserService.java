@@ -1,8 +1,11 @@
 package com.smi.identity_service.service;
 
 import com.smi.identity_service.domain.User;
+import com.smi.identity_service.dto.ChangePasswordRequest;
 import com.smi.identity_service.dto.LoginRequest;
 import com.smi.identity_service.dto.RegisterRequest;
+import com.smi.identity_service.dto.TokenIntrospectionResponse;
+import com.smi.identity_service.dto.UpdateProfileRequest;
 import com.smi.identity_service.dto.UpdateUserRequest;
 import com.smi.identity_service.exception.AccountSuspendedException;
 import com.smi.identity_service.exception.InvalidCredentialsException;
@@ -10,6 +13,7 @@ import com.smi.identity_service.exception.UserAlreadyExistsException;
 import com.smi.identity_service.exception.UserNotFoundException;
 import com.smi.identity_service.repository.UserRepository;
 import com.smi.identity_service.security.AdminAccounts;
+import com.smi.identity_service.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,11 +33,16 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AdminAccounts adminAccounts;
+    private final JwtService jwtService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, AdminAccounts adminAccounts) {
+    public UserService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       AdminAccounts adminAccounts,
+                       JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.adminAccounts = adminAccounts;
+        this.jwtService = jwtService;
     }
 
     public User registerUser(RegisterRequest request) {
@@ -189,6 +198,107 @@ public class UserService {
         user.setIndustry(blankToNull(request.getIndustry()));
         user.setUpdatedAt(OffsetDateTime.now());
         return userRepository.save(user);
+    }
+
+    /**
+     * Updates an authenticated user's own profile fields.
+     */
+    public User updateSelfProfile(UUID userId, UpdateProfileRequest request) {
+        User user = getActiveUser(userId);
+        if (user.isSuspended()) {
+            throw new AccountSuspendedException();
+        }
+        if (request.getName() != null && !request.getName().isBlank()) {
+            user.setName(request.getName().trim());
+        }
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(normalizeAndValidatePhoneNumber(request.getPhoneNumber()));
+        }
+        if (request.getOrganizationName() != null) {
+            user.setOrganizationName(blankToNull(request.getOrganizationName()));
+        }
+        if (request.getBusinessType() != null) {
+            user.setBusinessType(blankToNull(request.getBusinessType()));
+        }
+        if (request.getIndustry() != null) {
+            user.setIndustry(blankToNull(request.getIndustry()));
+        }
+        if (request.getTimezone() != null && !request.getTimezone().isBlank()) {
+            user.setTimezone(request.getTimezone().trim());
+        }
+        if (request.getLocale() != null && !request.getLocale().isBlank()) {
+            user.setLocale(request.getLocale().trim());
+        }
+        if (request.getReportingCurrency() != null && !request.getReportingCurrency().isBlank()) {
+            String curr = request.getReportingCurrency().trim().toUpperCase();
+            if (curr.length() != 3) {
+                throw new IllegalArgumentException("Reporting currency must be a 3-letter ISO code");
+            }
+            user.setReportingCurrency(curr);
+        }
+        user.setUpdatedAt(OffsetDateTime.now());
+        return userRepository.save(user);
+    }
+
+    /**
+     * Changes an authenticated user's password, verifying their existing password first.
+     */
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = getActiveUser(userId);
+        if (user.isSuspended()) {
+            throw new AccountSuspendedException();
+        }
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new InvalidCredentialsException("Current password does not match");
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new IllegalArgumentException("New password must be different from current password");
+        }
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setUpdatedAt(OffsetDateTime.now());
+        userRepository.save(user);
+    }
+
+    /**
+     * Introspects an access token according to RFC 7662 standards.
+     * Verifies cryptographic signature, expiration, and ensures user is active.
+     */
+    @Transactional(readOnly = true)
+    public TokenIntrospectionResponse introspectToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return TokenIntrospectionResponse.inactive();
+        }
+        String token = rawToken.startsWith("Bearer ") ? rawToken.substring(7).trim() : rawToken.trim();
+        Optional<io.jsonwebtoken.Claims> claimsOpt = jwtService.extractClaims(token);
+        if (claimsOpt.isEmpty()) {
+            return TokenIntrospectionResponse.inactive();
+        }
+        var claims = claimsOpt.get();
+        UUID userId;
+        try {
+            userId = UUID.fromString(claims.getSubject());
+        } catch (Exception e) {
+            return TokenIntrospectionResponse.inactive();
+        }
+
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return TokenIntrospectionResponse.inactive();
+        }
+        User user = userOpt.get();
+        if (user.getDeletedAt() != null || user.isSuspended()) {
+            return TokenIntrospectionResponse.inactive();
+        }
+
+        long expSeconds = claims.getExpiration() != null ? claims.getExpiration().getTime() / 1000 : 0;
+        return TokenIntrospectionResponse.active(
+                user.getId(),
+                user.getEmailAddress(),
+                user.getRole(),
+                user.getStatus(),
+                user.getAccountType(),
+                expSeconds
+        );
     }
 
     private static String blankToNull(String value) {
