@@ -12,7 +12,7 @@
 #>
 param(
     [string]$EnvFile = (Join-Path $PSScriptRoot '.env.local'),
-    [int]$Port = 8080,
+    [int]$Port = 8090,
     [switch]$Offline
 )
 
@@ -81,7 +81,7 @@ if ($inUse) {
     Write-Host ("Port " + $Port + " is already in use by process " + $owner + ".") -ForegroundColor Yellow
     Write-Host "The API is probably already running in another window. Either:" -ForegroundColor Yellow
     Write-Host "  - press Ctrl+C in that window to stop it, then run this again, or" -ForegroundColor Yellow
-    Write-Host ("  - start this one on another port:  .\run-local.ps1 -Port 8081") -ForegroundColor Yellow
+    Write-Host ("  - start this one on another port:  .\run-local.ps1 -Port 8092") -ForegroundColor Yellow
     exit 1
 }
 
