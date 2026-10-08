@@ -5,22 +5,34 @@
 # accounts and sees the same transactions. Every other service is private:
 # only the gateway and the other services can reach it.
 #
-# One PostgreSQL instance holds all data. Each service keeps its own schema
-# (DB_SCHEMA), so their tables and migration histories never collide.
+# All data lives in the team's Supabase PostgreSQL. Each service keeps its own
+# schema (DB_SCHEMA), so their tables and migration histories never collide
+# with each other or with the Supabase tables the mobile app uses.
+# bank-integration-service keeps the public schema it already uses there.
 #
 # Secrets are never in this file:
 #   - JWT_SECRET and INTERNAL_SERVICE_TOKEN are generated once in the smi-shared
 #     group, so every service that needs them gets the same value.
 #   - Values marked "sync: false" are entered in the Render dashboard.
 
-databases:
-  - name: smi-postgres
-    databaseName: smi
-    user: smi
-    postgresMajorVersion: "16"
-    plan: starter
-
 envVarGroups:
+  # The Supabase database every service uses. Use the SESSION pooler (port
+  # 5432): the transaction pooler (6543) breaks the prepared statements that
+  # Hibernate and Flyway rely on.
+  - name: smi-database
+    envVars:
+      - key: DB_HOST
+        value: aws-0-eu-west-2.pooler.supabase.com
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        value: postgres
+      # The Supabase pooler user, postgres.<project ref>.
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
   - name: smi-shared
     envVars:
       # Signs sign-in tokens (identity-service) and checks admin tokens
@@ -57,7 +69,7 @@ services:
       - key: TRANSACTIONS_SERVICE_HOSTPORT
         fromService: { type: pserv, name: transactions-service, property: hostport }
       - key: BANK_INTEGRATION_SERVICE_HOSTPORT
-        fromService: { type: pserv, name: bank-integration-service, property: hostport }
+        fromService: { type: web, name: bank-integration-service, property: hostport }
       - key: ASSISTANT_SERVICE_HOSTPORT
         fromService: { type: pserv, name: assistant-service, property: hostport }
 
@@ -76,16 +88,7 @@ services:
         value: "8081"
       - key: DB_SCHEMA
         value: identity
-      - key: DB_HOST
-        fromDatabase: { name: smi-postgres, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: smi-postgres, property: port }
-      - key: DB_NAME
-        fromDatabase: { name: smi-postgres, property: database }
-      - key: DB_USER
-        fromDatabase: { name: smi-postgres, property: user }
-      - key: DB_PASSWORD
-        fromDatabase: { name: smi-postgres, property: password }
+      - fromGroup: smi-database
       - fromGroup: smi-shared
       # Comma-separated addresses that get admin portal access.
       - key: ADMIN_EMAILS
@@ -121,16 +124,7 @@ services:
         value: "8082"
       - key: DB_SCHEMA
         value: accounts
-      - key: DB_HOST
-        fromDatabase: { name: smi-postgres, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: smi-postgres, property: port }
-      - key: DB_NAME
-        fromDatabase: { name: smi-postgres, property: database }
-      - key: DB_USER
-        fromDatabase: { name: smi-postgres, property: user }
-      - key: DB_PASSWORD
-        fromDatabase: { name: smi-postgres, property: password }
+      - fromGroup: smi-database
       - fromGroup: smi-shared
       - key: IDENTITY_SERVICE_HOSTPORT
         fromService: { type: pserv, name: identity-service, property: hostport }
@@ -149,23 +143,16 @@ services:
         value: "8083"
       - key: DB_SCHEMA
         value: transactions
-      - key: DB_HOST
-        fromDatabase: { name: smi-postgres, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: smi-postgres, property: port }
-      - key: DB_NAME
-        fromDatabase: { name: smi-postgres, property: database }
-      - key: DB_USER
-        fromDatabase: { name: smi-postgres, property: user }
-      - key: DB_PASSWORD
-        fromDatabase: { name: smi-postgres, property: password }
+      - fromGroup: smi-database
       - key: IDENTITY_SERVICE_HOSTPORT
         fromService: { type: pserv, name: identity-service, property: hostport }
       - key: ACCOUNTS_SERVICE_HOSTPORT
         fromService: { type: pserv, name: accounts-service, property: hostport }
 
   # ---------------------------------------------------------------- banks
-  - type: pserv
+  # Already running on Render as a web service of this name; the blueprint
+  # adopts it. Public, because it is reached at bank-integration-service.onrender.com.
+  - type: web
     name: bank-integration-service
     runtime: docker
     dockerfilePath: backend/Dockerfile
@@ -174,24 +161,17 @@ services:
       - key: SERVICE
         value: bank-integration-service
     plan: starter
+    healthCheckPath: /actuator/health
     envVars:
       - key: PORT
         value: "8090"
       # Store everything in PostgreSQL; the local H2 file would be wiped on each deploy.
       - key: SPRING_PROFILES_ACTIVE
         value: postgres
+      # The schema its existing data is in.
       - key: DB_SCHEMA
-        value: bank
-      - key: DB_HOST
-        fromDatabase: { name: smi-postgres, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: smi-postgres, property: port }
-      - key: DB_NAME
-        fromDatabase: { name: smi-postgres, property: database }
-      - key: DB_USER
-        fromDatabase: { name: smi-postgres, property: user }
-      - key: DB_PASSWORD
-        fromDatabase: { name: smi-postgres, property: password }
+        value: public
+      - fromGroup: smi-database
       - fromGroup: smi-shared
       - key: PERMIT_ALL
         value: "false"
@@ -301,13 +281,4 @@ services:
         value: "8085"
       - key: DB_SCHEMA
         value: budgets
-      - key: DB_HOST
-        fromDatabase: { name: smi-postgres, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: smi-postgres, property: port }
-      - key: DB_NAME
-        fromDatabase: { name: smi-postgres, property: database }
-      - key: DB_USER
-        fromDatabase: { name: smi-postgres, property: user }
-      - key: DB_PASSWORD
-        fromDatabase: { name: smi-postgres, property: password }
+      - fromGroup: smi-database
