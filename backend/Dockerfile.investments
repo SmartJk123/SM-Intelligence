@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Stage 1: Build the multi-module Maven project
+# Stage 1: Build investments-service
 FROM maven:3.9-eclipse-temurin-25 AS builder
 WORKDIR /workspace
 
@@ -25,9 +25,8 @@ RUN mvn dependency:go-offline -B || true
 # Copy the full source trees
 COPY . .
 
-# Which service to build (default: bank-integration-service)
-ARG SERVICE=identity-service
-RUN mvn clean package -pl ${SERVICE} -am -DskipTests
+# Build investments-service explicitly
+RUN mvn clean package -pl investments-service -am -DskipTests
 
 # Stage 2: Production JRE image
 FROM eclipse-temurin:25-jre
@@ -35,8 +34,7 @@ WORKDIR /app
 
 RUN mkdir -p /app/data && chown -R 1001:1001 /app
 
-ARG SERVICE=identity-service
-COPY --from=builder --chown=1001:1001 /workspace/${SERVICE}/target/*.jar app.jar
+COPY --from=builder --chown=1001:1001 /workspace/investments-service/target/*.jar app.jar
 
 # Run as non-root user
 USER 1001:1001
