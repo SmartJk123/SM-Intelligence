@@ -68,6 +68,12 @@ public class User {
     @Column(name = "mfa_enabled", nullable = false)
     private Boolean mfaEnabled = false;
 
+    @Column(name = "mfa_secret")
+    private String mfaSecret;
+
+    @Column(name = "mfa_backup_codes", columnDefinition = "TEXT")
+    private String mfaBackupCodes;
+
     @Column(name = "terms_accepted_version", nullable = false)
     private String termsAcceptedVersion = "1.0";
 
@@ -236,6 +242,22 @@ public class User {
 
     public void setMfaEnabled(Boolean mfaEnabled) {
         this.mfaEnabled = mfaEnabled;
+    }
+
+    public String getMfaSecret() {
+        return mfaSecret;
+    }
+
+    public void setMfaSecret(String mfaSecret) {
+        this.mfaSecret = mfaSecret;
+    }
+
+    public String getMfaBackupCodes() {
+        return mfaBackupCodes;
+    }
+
+    public void setMfaBackupCodes(String mfaBackupCodes) {
+        this.mfaBackupCodes = mfaBackupCodes;
     }
 
     public String getTermsAcceptedVersion() {

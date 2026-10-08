@@ -15,19 +15,33 @@ public class AuthResponse {
     private String accountType;
     /** USER or PLATFORM_ADMIN, so the admin interface can refuse a customer account. */
     private String role;
+    private String refreshToken;
+    private Boolean mfaRequired = false;
+    private String mfaToken;
 
     public AuthResponse() {
     }
 
+    public static AuthResponse mfaChallenge(String mfaToken) {
+        AuthResponse response = new AuthResponse();
+        response.setMfaRequired(true);
+        response.setMfaToken(mfaToken);
+        return response;
+    }
+
     public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String accountType) {
-        this(token, expiresIn, userId, name, emailAddress, null, accountType, null);
+        this(token, expiresIn, userId, name, emailAddress, null, accountType, null, null);
     }
 
     public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String phoneNumber, String accountType) {
-        this(token, expiresIn, userId, name, emailAddress, phoneNumber, accountType, null);
+        this(token, expiresIn, userId, name, emailAddress, phoneNumber, accountType, null, null);
     }
 
     public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String phoneNumber, String accountType, String role) {
+        this(token, expiresIn, userId, name, emailAddress, phoneNumber, accountType, role, null);
+    }
+
+    public AuthResponse(String token, long expiresIn, UUID userId, String name, String emailAddress, String phoneNumber, String accountType, String role, String refreshToken) {
         this.token = token;
         this.tokenType = "Bearer";
         this.expiresIn = expiresIn;
@@ -37,6 +51,7 @@ public class AuthResponse {
         this.phoneNumber = phoneNumber;
         this.accountType = accountType;
         this.role = role;
+        this.refreshToken = refreshToken;
     }
 
     public String getToken() {
@@ -132,5 +147,30 @@ public class AuthResponse {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    @JsonProperty("refreshToken")
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+
+    public Boolean getMfaRequired() {
+        return mfaRequired;
+    }
+
+    public void setMfaRequired(Boolean mfaRequired) {
+        this.mfaRequired = mfaRequired;
+    }
+
+    public String getMfaToken() {
+        return mfaToken;
+    }
+
+    public void setMfaToken(String mfaToken) {
+        this.mfaToken = mfaToken;
     }
 }
