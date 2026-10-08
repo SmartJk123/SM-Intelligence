@@ -37,7 +37,7 @@ import { LiveUpdates } from './live-updates';
               </span>
               <div class="notif-body">
                 <strong>{{ item.description }}</strong>
-                <small>{{ item.date | date: 'd MMM y, HH:mm' : 'UTC' }}</small>
+                <small>{{ item.date | date: 'd MMM y, HH:mm' }}</small>
               </div>
               <span class="amount-cell" [class.positive]="item.direction === 'CREDIT'">
                 {{ item.direction === 'CREDIT' ? '+' : '−' }}{{ item.amountMinor / 100 | currency: 'KES' : '' : '1.2-2' }}

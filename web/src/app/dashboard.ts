@@ -267,7 +267,7 @@ interface DashboardData {
                 <tbody>
                   @for (tx of d.transactions; track tx.id) {
                     <tr [class.just-arrived]="arrived().has(tx.id)">
-                      <td>{{ tx.date | date: 'd MMM y' : 'UTC' }}<small>{{ tx.date | date: 'HH:mm' : 'UTC' }}</small></td>
+                      <td>{{ tx.date | date: 'd MMM y' }}<small>{{ tx.date | date: 'HH:mm' }}</small></td>
                       <td>
                         <strong>{{ tx.description }}</strong
                         ><small>{{ tx.category }}</small>

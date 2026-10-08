@@ -1,33 +1,40 @@
+import { environment } from '../../environments/environment';
+
 /**
- * Base URL of the Spring Boot API.
+ * Where the admin portal finds the backend.
  *
- * Development default is the local Spring Boot port. Change this to the
- * deployed API host when you release, for example
- * `https://api.smartmoney.io/api/v1`.
+ * Deployed, everything goes through one api-gateway (environment.gatewayUrl,
+ * set in src/environments/environment.production.ts), so the admin portal, the
+ * web app and the mobile app all read the same data. Locally the gatewayUrl is
+ * empty: identity calls go to the gateway on 8080 and bank calls straight to
+ * bank-integration-service on 8090.
+ */
+const gateway = environment.gatewayUrl.replace(/\/+$/, '');
+const localGateway = 'http://localhost:8080';
+
+/**
+ * bank-integration-service's admin API.
  *
  *   POST {API_BASE_URL}/admin/bank-integrations/{bankId}/test
  *   GET  {API_BASE_URL}/admin/bank-integrations
  *   PUT  {API_BASE_URL}/admin/bank-integrations/{bankId}
  *   GET  {API_BASE_URL}/admin/stats
  */
-export const API_BASE_URL = 'http://localhost:8090/api/v1';
+export const API_BASE_URL = gateway ? `${gateway}/api/v1` : 'http://localhost:8090/api/v1';
 
 /**
- * Base URL of identity-service, reached through api-gateway (port 8080), not
- * the bank-integration service above. Separate from API_BASE_URL because they
- * are two different Spring Boot services on two different ports.
+ * identity-service's admin API, reached through api-gateway.
  *
  *   GET {IDENTITY_API_BASE_URL}/admin/users
  */
-export const IDENTITY_API_BASE_URL = 'http://localhost:8080/api/v1';
+export const IDENTITY_API_BASE_URL = `${gateway || localGateway}/api/v1`;
 
 /**
- * identity-service's auth endpoints sit directly under /api, not /api/v1 like
- * its admin routes above, so login needs its own base URL.
+ * identity-service's auth endpoints sit directly under /api, not /api/v1.
  *
  *   POST {IDENTITY_AUTH_BASE_URL}/login
  */
-export const IDENTITY_AUTH_BASE_URL = 'http://localhost:8080/api/auth';
+export const IDENTITY_AUTH_BASE_URL = `${gateway || localGateway}/api/auth`;
 
 /**
  * identity-service's organisations API, also under /api rather than /api/v1.
@@ -37,4 +44,4 @@ export const IDENTITY_AUTH_BASE_URL = 'http://localhost:8080/api/auth';
  *   GET  {IDENTITY_ORGANIZATIONS_URL}/{id}/members
  *   POST {IDENTITY_ORGANIZATIONS_URL}/{id}/members
  */
-export const IDENTITY_ORGANIZATIONS_URL = 'http://localhost:8080/api/organizations';
+export const IDENTITY_ORGANIZATIONS_URL = `${gateway || localGateway}/api/organizations`;

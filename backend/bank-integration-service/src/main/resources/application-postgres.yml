@@ -1,10 +1,18 @@
-# Activate with: --spring.profiles.active=postgres
+# Activate with SPRING_PROFILES_ACTIVE=postgres (Render does). Without it the
+# service keeps its local H2 file, which a Render deploy would wipe.
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/smartmoney}
+    # DB_URL wins when set; on Render the address is built from DB_HOST, DB_PORT,
+    # DB_NAME, and DB_SCHEMA keeps this service in its own schema.
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:smartmoney}?currentSchema=${DB_SCHEMA:public}}
     driver-class-name: org.postgresql.Driver
     username: ${DB_USER:smartmoney}
     password: ${DB_PASSWORD:smartmoney}
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: ${DB_SCHEMA:public}
+        hbm2ddl:
+          create_namespaces: true

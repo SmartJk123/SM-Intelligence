@@ -14,7 +14,13 @@ secret the same value: `JWT_SECRET` (identity-service and bank-integration-servi
 `INTERNAL_SERVICE_TOKEN` (accounts-service and bank-integration-service). Then add your own sandbox bank keys
 and `ADMIN_EMAILS`. Never use or share production values.
 
-Each Java service needs JDK 25 and is started from the repository root, one terminal each. Maven does not
+**Quickest way:** from the repository root run `.\start-local.ps1`. It opens one window per service in the
+order sign-in needs them (identity, accounts, transactions, api-gateway, bank-integration, web, admin), finds
+Java 25 by itself, loads each service's `.env.local`, skips anything already running and waits for each service
+to be healthy. Stop everything with `.\start-local.ps1 -Stop`. If sign-in says "Unable to sign in ... the account
+service may be unavailable" or "Could not reach the identity service", the api-gateway (8080) is not running.
+
+To start a service by hand instead: Each Java service needs JDK 25 and is started from the repository root, one terminal each. Maven does not
 read `.env.local`, so load the service's file first:
 
 ```powershell
