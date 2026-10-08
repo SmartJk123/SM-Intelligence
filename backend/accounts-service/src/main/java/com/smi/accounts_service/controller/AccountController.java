@@ -1,8 +1,10 @@
 package com.smi.accounts_service.controller;
 
 import com.smi.accounts_service.dto.AccountResponse;
+import com.smi.accounts_service.dto.AccountSummaryResponse;
 import com.smi.accounts_service.dto.AdjustBalanceRequest;
 import com.smi.accounts_service.dto.CreateAccountRequest;
+import com.smi.accounts_service.dto.UpdateAccountRequest;
 import com.smi.accounts_service.dto.UpdateBalanceRequest;
 import com.smi.accounts_service.dto.UpdateStatusRequest;
 import com.smi.accounts_service.service.AccountService;
@@ -53,10 +55,23 @@ public class AccountController {
             @RequestHeader(value="Authorization", required=false) String authorization,
             @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
             @RequestParam(required = false) String userId,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String accountType,
+            @RequestParam(required = false) String institution,
+            @RequestParam(required = false) String connectionStatus) {
         UUID owner = identity.isInternalService(internalToken) ? UUID.fromString(userId) : identity.owner(authorization);
-        List<AccountResponse> accounts = accountService.getAccountsByUserId(owner, status);
+        List<AccountResponse> accounts = accountService.getAccountsByUserId(owner, status, accountType, institution, connectionStatus);
         return ResponseEntity.ok(accounts);
+    }
+
+    @GetMapping("/summary")
+    public ResponseEntity<AccountSummaryResponse> getAccountSummary(
+            @RequestHeader(value="Authorization", required=false) String authorization,
+            @RequestHeader(value="X-Internal-Token", required=false) String internalToken,
+            @RequestParam(required = false) String userId) {
+        UUID owner = identity.isInternalService(internalToken) ? UUID.fromString(userId) : identity.owner(authorization);
+        AccountSummaryResponse summary = accountService.getAccountSummary(owner);
+        return ResponseEntity.ok(summary);
     }
 
     @GetMapping("/{id}")
@@ -166,4 +181,32 @@ public ResponseEntity<AccountResponse> deleteAccount(
         return ResponseEntity.ok(deleted);
     }
 }
+
+    @RequestMapping(value = "/{id}/rename", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<AccountResponse> renameAccount(
+            @PathVariable UUID id,
+            @RequestHeader(value="Authorization", required=false) String authorization,
+            @Valid @RequestBody UpdateAccountRequest request) {
+        UUID owner = identity.owner(authorization);
+        AccountResponse updated = accountService.renameAccount(id, owner, request.getAccountName());
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/{id}/sync")
+    public ResponseEntity<AccountResponse> syncAccount(
+            @PathVariable UUID id,
+            @RequestHeader(value="Authorization", required=false) String authorization) {
+        UUID owner = identity.owner(authorization);
+        AccountResponse updated = accountService.syncAccount(id, owner);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/{id}/reopen")
+    public ResponseEntity<AccountResponse> reopenAccount(
+            @PathVariable UUID id,
+            @RequestHeader(value="Authorization", required=false) String authorization) {
+        UUID owner = identity.owner(authorization);
+        AccountResponse updated = accountService.reopenAccount(id, owner);
+        return ResponseEntity.ok(updated);
+    }
 }
