@@ -17,7 +17,7 @@ public class AccountIdentity {
     private final String internalServiceToken;
 
     public AccountIdentity(
-            @Value("${IDENTITY_SERVICE_URL:http://localhost:8081}") String identityUrl,
+            @Value("${IDENTITY_SERVICE_URL:http://${IDENTITY_SERVICE_HOSTPORT:localhost:8081}}") String identityUrl,
             @Value("${INTERNAL_SERVICE_TOKEN:}") String internalServiceToken) {
         var factory = new JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
         factory.setReadTimeout(Duration.ofSeconds(10));

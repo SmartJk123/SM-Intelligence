@@ -17,6 +17,7 @@ COPY forecasts-service/pom.xml forecasts-service/
 COPY notifications-service/pom.xml notifications-service/
 COPY audit-service/pom.xml audit-service/
 COPY bank-integration-service/pom.xml bank-integration-service/
+COPY assistant-service/pom.xml assistant-service/
 
 # Cache Maven dependencies
 RUN mvn dependency:go-offline -B || true

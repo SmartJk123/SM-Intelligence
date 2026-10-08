@@ -59,8 +59,8 @@ smartmoney:
   # Where a linked customer's bank movements are delivered, so they show on the
   # web dashboard. Private addresses: these services have no authentication.
   platform-services:
-    accounts-url: ${ACCOUNTS_API_URL:http://localhost:8082}
-    transactions-url: ${TRANSACTIONS_API_URL:http://localhost:8083}
+    accounts-url: ${ACCOUNTS_API_URL:http://${ACCOUNTS_SERVICE_HOSTPORT:localhost:8082}}
+    transactions-url: ${TRANSACTIONS_API_URL:http://${TRANSACTIONS_SERVICE_HOSTPORT:localhost:8083}}
 
   # Pulls NCBA notifications stored by the cPanel receiver (deploy/cpanel).
   # Off unless both are set; the token is export_token in cPanel's ncba-config.php.

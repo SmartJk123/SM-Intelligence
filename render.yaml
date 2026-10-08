@@ -1,10 +1,39 @@
+# SmartMoney Intelligence on Render.
+#
+# One public entry point, the api-gateway. The web app, the admin portal, the
+# mobile app and Bruno all use its URL, so everyone signs in to the same
+# accounts and sees the same transactions. Every other service is private:
+# only the gateway and the other services can reach it.
+#
+# One PostgreSQL instance holds all data. Each service keeps its own schema
+# (DB_SCHEMA), so their tables and migration histories never collide.
+#
+# Secrets are never in this file:
+#   - JWT_SECRET and INTERNAL_SERVICE_TOKEN are generated once in the smi-shared
+#     group, so every service that needs them gets the same value.
+#   - Values marked "sync: false" are entered in the Render dashboard.
+
 databases:
   - name: smi-postgres
-    databaseName: smi_identity
-    user: admin
+    databaseName: smi
+    user: smi
+    postgresMajorVersion: "16"
     plan: starter
 
+envVarGroups:
+  - name: smi-shared
+    envVars:
+      # Signs sign-in tokens (identity-service) and checks admin tokens
+      # (bank-integration-service). Must be the same in both.
+      - key: JWT_SECRET
+        generateValue: true
+      # Lets bank-integration-service create linked accounts and move balances
+      # in accounts-service. Must be the same in both.
+      - key: INTERNAL_SERVICE_TOKEN
+        generateValue: true
+
 services:
+  # ---------------------------------------------------------------- public
   - type: web
     name: api-gateway
     runtime: docker
@@ -14,11 +43,26 @@ services:
       - key: SERVICE
         value: api-gateway
     plan: starter
+    healthCheckPath: /actuator/health
     envVars:
       - key: PORT
         value: "8080"
+      # Browser origins of the deployed web app and admin portal, comma separated.
+      - key: APP_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: IDENTITY_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: identity-service, property: hostport }
+      - key: ACCOUNTS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: accounts-service, property: hostport }
+      - key: TRANSACTIONS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: transactions-service, property: hostport }
+      - key: BANK_INTEGRATION_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: bank-integration-service, property: hostport }
+      - key: ASSISTANT_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: assistant-service, property: hostport }
 
-  - type: web
+  # ---------------------------------------------------------------- core
+  - type: pserv
     name: identity-service
     runtime: docker
     dockerfilePath: backend/Dockerfile
@@ -30,12 +74,40 @@ services:
     envVars:
       - key: PORT
         value: "8081"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
+      - key: DB_SCHEMA
+        value: identity
+      - key: DB_HOST
+        fromDatabase: { name: smi-postgres, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: smi-postgres, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: smi-postgres, property: database }
+      - key: DB_USER
+        fromDatabase: { name: smi-postgres, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: smi-postgres, property: password }
+      - fromGroup: smi-shared
+      # Comma-separated addresses that get admin portal access.
+      - key: ADMIN_EMAILS
+        sync: false
+      # Password reset and invitation emails. Leave SMTP_HOST empty to send none.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      # The deployed web app's pages named in emails.
+      - key: PASSWORD_RESET_URL
+        sync: false
+      - key: FRONTEND_LOGIN_URL
+        sync: false
 
-  - type: web
+  - type: pserv
     name: accounts-service
     runtime: docker
     dockerfilePath: backend/Dockerfile
@@ -47,12 +119,23 @@ services:
     envVars:
       - key: PORT
         value: "8082"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
+      - key: DB_SCHEMA
+        value: accounts
+      - key: DB_HOST
+        fromDatabase: { name: smi-postgres, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: smi-postgres, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: smi-postgres, property: database }
+      - key: DB_USER
+        fromDatabase: { name: smi-postgres, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: smi-postgres, property: password }
+      - fromGroup: smi-shared
+      - key: IDENTITY_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: identity-service, property: hostport }
 
-  - type: web
+  - type: pserv
     name: transactions-service
     runtime: docker
     dockerfilePath: backend/Dockerfile
@@ -64,29 +147,147 @@ services:
     envVars:
       - key: PORT
         value: "8083"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
+      - key: DB_SCHEMA
+        value: transactions
+      - key: DB_HOST
+        fromDatabase: { name: smi-postgres, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: smi-postgres, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: smi-postgres, property: database }
+      - key: DB_USER
+        fromDatabase: { name: smi-postgres, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: smi-postgres, property: password }
+      - key: IDENTITY_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: identity-service, property: hostport }
+      - key: ACCOUNTS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: accounts-service, property: hostport }
 
-  - type: web
-    name: categories-service
+  # ---------------------------------------------------------------- banks
+  - type: pserv
+    name: bank-integration-service
     runtime: docker
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
     dockerBuildArgs:
       - key: SERVICE
-        value: categories-service
+        value: bank-integration-service
     plan: starter
     envVars:
       - key: PORT
-        value: "8084"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
+        value: "8090"
+      # Store everything in PostgreSQL; the local H2 file would be wiped on each deploy.
+      - key: SPRING_PROFILES_ACTIVE
+        value: postgres
+      - key: DB_SCHEMA
+        value: bank
+      - key: DB_HOST
+        fromDatabase: { name: smi-postgres, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: smi-postgres, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: smi-postgres, property: database }
+      - key: DB_USER
+        fromDatabase: { name: smi-postgres, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: smi-postgres, property: password }
+      - fromGroup: smi-shared
+      - key: PERMIT_ALL
+        value: "false"
+      - key: PUBLIC_BASE_URL
+        value: https://sm-intelligence.globalsmartspaces.com
+      - key: ACCOUNTS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: accounts-service, property: hostport }
+      - key: TRANSACTIONS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: transactions-service, property: hostport }
+      # Live notifications arrive on cPanel and are imported from there.
+      - key: NCBA_CPANEL_EXPORT_URL
+        value: https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/ncba/export
+      - key: NCBA_CPANEL_EXPORT_TOKEN
+        sync: false
+      - key: KCB_CPANEL_EXPORT_URL
+        value: https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/kcb/export
+      - key: KCB_CPANEL_EXPORT_TOKEN
+        sync: false
+      - key: EQUITY_CPANEL_EXPORT_URL
+        value: https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/equity/export
+      - key: EQUITY_CPANEL_EXPORT_TOKEN
+        sync: false
+      # Bank credentials, entered in the dashboard. See backend/bank-integration-service/.env.example.
+      - key: NCBA_ENV
+        value: PRODUCTION
+      - key: NCBA_SECRET_KEY
+        sync: false
+      - key: NCBA_USERNAME
+        sync: false
+      - key: NCBA_PASSWORD
+        sync: false
+      - key: NCBA_ACCOUNT_NUMBER
+        sync: false
+      - key: KCB_ENV
+        sync: false
+      - key: KCB_CLIENT_KEY
+        sync: false
+      - key: KCB_CLIENT_SECRET
+        sync: false
+      - key: KCB_PUBLIC_KEY
+        sync: false
+      - key: EQUITY_ENV
+        sync: false
+      - key: EQUITY_MERCHANT_CODE
+        sync: false
+      - key: EQUITY_API_KEY
+        sync: false
+      - key: EQUITY_CONSUMER_SECRET
+        sync: false
+      - key: EQUITY_ACCOUNT_NUMBER
+        sync: false
+      - key: EQUITY_IPN_USERNAME
+        sync: false
+      - key: EQUITY_IPN_PASSWORD
+        sync: false
+      - key: STANBIC_ENV
+        sync: false
+      - key: STANBIC_CLIENT_KEY
+        sync: false
+      - key: STANBIC_CLIENT_SECRET
+        sync: false
+      - key: STANBIC_API_KEY
+        sync: false
+      - key: STANBIC_ACCOUNT_NUMBER
+        sync: false
 
-  - type: web
+  # ---------------------------------------------------------------- assistant
+  - type: pserv
+    name: assistant-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: assistant-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8091"
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: IDENTITY_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: identity-service, property: hostport }
+      - key: ACCOUNTS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: accounts-service, property: hostport }
+      - key: TRANSACTIONS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: transactions-service, property: hostport }
+      - key: BUDGETS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: budgets-service, property: hostport }
+
+  # ---------------------------------------------------------------- supporting
+  # Not yet called by any app; kept so the assistant and future features can
+  # reach them. Each has its own schema in the shared database.
+  - type: pserv
     name: budgets-service
     runtime: docker
     dockerfilePath: backend/Dockerfile
@@ -98,75 +299,15 @@ services:
     envVars:
       - key: PORT
         value: "8085"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
-
-  - type: web
-    name: investments-service
-    runtime: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
-    dockerBuildArgs:
-      - key: SERVICE
-        value: investments-service
-    plan: starter
-    envVars:
-      - key: PORT
-        value: "8086"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
-
-  - type: web
-    name: forecasts-service
-    runtime: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
-    dockerBuildArgs:
-      - key: SERVICE
-        value: forecasts-service
-    plan: starter
-    envVars:
-      - key: PORT
-        value: "8087"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
-
-  - type: web
-    name: notifications-service
-    runtime: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
-    dockerBuildArgs:
-      - key: SERVICE
-        value: notifications-service
-    plan: starter
-    envVars:
-      - key: PORT
-        value: "8088"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
-
-  - type: web
-    name: audit-service
-    runtime: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
-    dockerBuildArgs:
-      - key: SERVICE
-        value: audit-service
-    plan: starter
-    envVars:
-      - key: PORT
-        value: "8089"
-      - key: DB_URL
-        fromDatabase:
-          name: smi-postgres
-          property: connectionString
+      - key: DB_SCHEMA
+        value: budgets
+      - key: DB_HOST
+        fromDatabase: { name: smi-postgres, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: smi-postgres, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: smi-postgres, property: database }
+      - key: DB_USER
+        fromDatabase: { name: smi-postgres, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: smi-postgres, property: password }
