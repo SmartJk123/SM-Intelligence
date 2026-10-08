@@ -64,9 +64,10 @@ import { AccountApi, AccountKind } from './account-api';
           <label for="email">Email address</label
           ><input
             id="email"
+            name="email"
             type="email"
             formControlName="email"
-            autocomplete="email"
+            autocomplete="username"
             placeholder="you@example.com"
             [attr.aria-invalid]="invalid('email')"
           />
@@ -90,6 +91,7 @@ import { AccountApi, AccountKind } from './account-api';
           <div class="password-field">
             <input
               id="password"
+              name="password"
               [type]="showPassword() ? 'text' : 'password'"
               formControlName="password"
               [autocomplete]="register ? 'new-password' : 'current-password'"
