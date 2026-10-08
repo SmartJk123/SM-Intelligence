@@ -41,7 +41,17 @@ public class AccountIdentity {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in required");
         try {
             var profile = client.get().uri("/api/auth/me").header("Authorization", authorization).retrieve().body(Map.class);
-            return UUID.fromString((String) profile.get("id"));
+            if (profile == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User profile not found");
+            }
+            Object idVal = profile.get("id");
+            if (idVal == null) {
+                idVal = profile.get("userId");
+            }
+            if (idVal == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User id missing in profile");
+            }
+            return UUID.fromString(idVal.toString());
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 403)
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session expired");

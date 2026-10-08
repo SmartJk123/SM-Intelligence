@@ -2,6 +2,7 @@ package com.smi.accounts_service.service;
 
 import com.smi.accounts_service.domain.Account;
 import com.smi.accounts_service.dto.AccountResponse;
+import com.smi.accounts_service.dto.AccountSummaryResponse;
 import com.smi.accounts_service.dto.CreateAccountRequest;
 import com.smi.accounts_service.dto.UpdateBalanceRequest;
 import com.smi.accounts_service.dto.UpdateStatusRequest;
@@ -131,20 +132,29 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccountsByUserId(UUID userId, String status) {
+        return getAccountsByUserId(userId, status, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccountResponse> getAccountsByUserId(
+            UUID userId,
+            String status,
+            String accountType,
+            String institution,
+            String connectionStatus
+    ) {
         if (userId == null) {
             return Collections.emptyList();
         }
 
-        List<Account> accounts;
-        if (status != null && !status.isBlank()) {
-            accounts = accountRepository.findByUserIdAndAccountStatus(userId, status.toUpperCase());
-        } else {
-            accounts = accountRepository.findByUserId(userId);
-        }
-
+        List<Account> accounts = accountRepository.findByUserId(userId);
         return accounts.stream()
-            .map(AccountResponse::fromEntity)
-            .collect(Collectors.toList());
+                .filter(a -> status == null || status.isBlank() || a.getAccountStatus().equalsIgnoreCase(status.trim()))
+                .filter(a -> accountType == null || accountType.isBlank() || a.getAccountType().equalsIgnoreCase(accountType.trim()))
+                .filter(a -> institution == null || institution.isBlank() || a.getInstitution().equalsIgnoreCase(institution.trim()))
+                .filter(a -> connectionStatus == null || connectionStatus.isBlank() || a.getConnectionStatus().equalsIgnoreCase(connectionStatus.trim()))
+                .map(AccountResponse::fromEntity)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -251,5 +261,102 @@ public class AccountService {
         AccountResponse response = AccountResponse.fromEntity(account);
         accountRepository.delete(account);
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public AccountSummaryResponse getAccountSummary(UUID userId) {
+        if (userId == null) {
+            return new AccountSummaryResponse(
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                    BigDecimal.ZERO, BigDecimal.ZERO, 0, 0,
+                    "KES", Collections.emptyMap(), Collections.emptyMap()
+            );
+        }
+
+        List<Account> accounts = accountRepository.findByUserId(userId);
+        BigDecimal totalDeposits = BigDecimal.ZERO;
+        BigDecimal totalCreditDebt = BigDecimal.ZERO;
+        BigDecimal totalCreditLimit = BigDecimal.ZERO;
+        int activeCount = 0;
+        String currency = "KES";
+
+        java.util.Map<String, BigDecimal> instMap = new java.util.HashMap<>();
+        java.util.Map<String, BigDecimal> typeMap = new java.util.HashMap<>();
+
+        for (Account a : accounts) {
+            if (a.getCurrency() != null && !a.getCurrency().isBlank()) {
+                currency = a.getCurrency();
+            }
+            boolean isActive = "ACTIVE".equalsIgnoreCase(a.getAccountStatus());
+            if (isActive) {
+                activeCount++;
+            }
+
+            BigDecimal bal = a.getAvailableBalance() != null ? a.getAvailableBalance() : BigDecimal.ZERO;
+            if ("CREDIT".equalsIgnoreCase(a.getAccountType())) {
+                BigDecimal debt = a.getCreditOutstanding() != null ? a.getCreditOutstanding() : BigDecimal.ZERO;
+                BigDecimal limit = a.getCreditLimit() != null ? a.getCreditLimit() : BigDecimal.ZERO;
+                totalCreditDebt = totalCreditDebt.add(debt);
+                totalCreditLimit = totalCreditLimit.add(limit);
+                typeMap.merge("CREDIT", debt, BigDecimal::add);
+            } else {
+                totalDeposits = totalDeposits.add(bal);
+                typeMap.merge("DEPOSIT", bal, BigDecimal::add);
+            }
+
+            instMap.merge(a.getInstitution(), bal, BigDecimal::add);
+        }
+
+        BigDecimal netWorth = totalDeposits.subtract(totalCreditDebt);
+        BigDecimal totalAvailableCredit = totalCreditLimit.subtract(totalCreditDebt).max(BigDecimal.ZERO);
+
+        return new AccountSummaryResponse(
+                netWorth,
+                totalDeposits,
+                totalCreditDebt,
+                totalCreditLimit,
+                totalAvailableCredit,
+                accounts.size(),
+                activeCount,
+                currency,
+                instMap,
+                typeMap
+        );
+    }
+
+    public AccountResponse renameAccount(UUID id, UUID userId, String newName) {
+        Account account = findAccountByIdentifier(id.toString());
+        if (userId != null && !account.getUserId().equals(userId)) {
+            throw new AccountNotFoundException("Account not found with ID: " + id);
+        }
+        if (newName != null && !newName.isBlank()) {
+            account.setAccountName(newName.trim());
+            account.setLastUpdated(OffsetDateTime.now());
+        }
+        Account updated = accountRepository.save(account);
+        return AccountResponse.fromEntity(updated);
+    }
+
+    public AccountResponse syncAccount(UUID id, UUID userId) {
+        Account account = findAccountByIdentifier(id.toString());
+        if (userId != null && !account.getUserId().equals(userId)) {
+            throw new AccountNotFoundException("Account not found with ID: " + id);
+        }
+        account.setConnectionStatus("CONNECTED");
+        account.setLastUpdated(OffsetDateTime.now());
+        Account updated = accountRepository.save(account);
+        return AccountResponse.fromEntity(updated);
+    }
+
+    public AccountResponse reopenAccount(UUID id, UUID userId) {
+        Account account = findAccountByIdentifier(id.toString());
+        if (userId != null && !account.getUserId().equals(userId)) {
+            throw new AccountNotFoundException("Account not found with ID: " + id);
+        }
+        account.setAccountStatus("ACTIVE");
+        account.setConnectionStatus("CONNECTED");
+        account.setLastUpdated(OffsetDateTime.now());
+        Account updated = accountRepository.save(account);
+        return AccountResponse.fromEntity(updated);
     }
 }

@@ -151,7 +151,7 @@ class AccountControllerTest {
     @Test
     void getAccounts_Success() throws Exception {
         AccountResponse response = createSampleResponse();
-        when(accountService.getAccountsByUserId(eq(userId), any())).thenReturn(List.of(response));
+        when(accountService.getAccountsByUserId(eq(userId), any(), any(), any(), any())).thenReturn(List.of(response));
 
         mockMvc.perform(get("/api/accounts")
                 .param("userId", userId.toString()))
@@ -227,5 +227,69 @@ class AccountControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accountStatus").value("CLOSED"))
             .andExpect(jsonPath("$.connectionStatus").value("DISCONNECTED"));
+    }
+
+    @Test
+    void getAccountSummary_Success() throws Exception {
+        com.smi.accounts_service.dto.AccountSummaryResponse summary = new com.smi.accounts_service.dto.AccountSummaryResponse(
+                new BigDecimal("150000.00"),
+                new BigDecimal("200000.00"),
+                new BigDecimal("50000.00"),
+                new BigDecimal("100000.00"),
+                new BigDecimal("50000.00"),
+                2,
+                2,
+                "KES",
+                java.util.Map.of("Equity", new BigDecimal("200000.00")),
+                java.util.Map.of("DEPOSIT", new BigDecimal("200000.00"), "CREDIT", new BigDecimal("50000.00"))
+        );
+
+        when(accountService.getAccountSummary(eq(userId))).thenReturn(summary);
+
+        mockMvc.perform(get("/api/accounts/summary")
+                .header("Authorization", "Bearer valid-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.netWorth").value(150000.0))
+            .andExpect(jsonPath("$.totalDeposits").value(200000.0))
+            .andExpect(jsonPath("$.totalCreditDebt").value(50000.0))
+            .andExpect(jsonPath("$.totalAccounts").value(2));
+    }
+
+    @Test
+    void renameAccount_Success() throws Exception {
+        AccountResponse response = createSampleResponse();
+        response.setAccountName("My Emergency Fund");
+
+        when(accountService.renameAccount(eq(accountId), eq(userId), eq("My Emergency Fund"))).thenReturn(response);
+
+        mockMvc.perform(patch("/api/accounts/{id}/rename", accountId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"accountName\": \"My Emergency Fund\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.accountName").value("My Emergency Fund"));
+    }
+
+    @Test
+    void syncAccount_Success() throws Exception {
+        AccountResponse response = createSampleResponse();
+        response.setConnectionStatus("CONNECTED");
+
+        when(accountService.syncAccount(eq(accountId), eq(userId))).thenReturn(response);
+
+        mockMvc.perform(post("/api/accounts/{id}/sync", accountId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connectionStatus").value("CONNECTED"));
+    }
+
+    @Test
+    void reopenAccount_Success() throws Exception {
+        AccountResponse response = createSampleResponse();
+        response.setAccountStatus("ACTIVE");
+
+        when(accountService.reopenAccount(eq(accountId), eq(userId))).thenReturn(response);
+
+        mockMvc.perform(post("/api/accounts/{id}/reopen", accountId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.accountStatus").value("ACTIVE"));
     }
 }
