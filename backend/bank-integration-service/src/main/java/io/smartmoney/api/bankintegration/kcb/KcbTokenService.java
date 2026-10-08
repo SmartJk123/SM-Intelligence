@@ -124,7 +124,7 @@ public class KcbTokenService implements TokenStateProvider {
         return new TokenSnapshot(status, (int) Math.max(0, minutes), refreshedAt);
     }
 
-    private TokenResponse parse(String raw) {
+    TokenResponse parse(String raw) {
         String body = raw == null ? "" : raw.strip();
         if (body.isEmpty()) {
             throw new IllegalStateException("The KCB token endpoint returned an empty response.");
@@ -176,6 +176,6 @@ public class KcbTokenService implements TokenStateProvider {
         return trimmed.length() > 240 ? trimmed.substring(0, 240) + "..." : trimmed;
     }
 
-    private record TokenResponse(String accessToken, Long expiresIn) {
+    record TokenResponse(String accessToken, Long expiresIn) {
     }
 }

@@ -30,7 +30,8 @@ import java.util.List;
  *
  * One exception: a signed-in customer may POST /api/v1/admin/account-links to
  * link an account they saved themselves, which the web app does after
- * onboarding. AccountLinkController checks that the account is really theirs.
+ * onboarding, and DELETE /api/v1/admin/account-links/by-account/{id} when they
+ * remove it. AccountLinkController checks that the account is really theirs.
  *
  * PERMIT_ALL=true switches all of this off. It exists for tests and isolated
  * debugging only, and is off by default.
@@ -73,6 +74,8 @@ public class SecurityConfig {
                         "/actuator/info")
                 .permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/admin/account-links")
+                .hasAnyRole(AdminTokenVerifier.ADMIN_ROLE, CUSTOMER_ROLE)
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/account-links/by-account/*")
                 .hasAnyRole(AdminTokenVerifier.ADMIN_ROLE, CUSTOMER_ROLE)
                 .requestMatchers("/api/v1/admin/**").hasRole(AdminTokenVerifier.ADMIN_ROLE)
                 .anyRequest().denyAll());

@@ -199,3 +199,29 @@ onboarding). Any other customer request is refused.
 accounts-service refuses a bank and account number already held by another user, whether it was
 entered by the customer (stored as a fingerprint) or linked by an admin (stored as the number).
 `AccountService.findHolder` checks both forms, including fingerprints saved before 5 October 2026.
+
+## One money flow for every app
+
+Every app reads the same money through the gateway (`http://localhost:8080` locally), so a payment that shows
+on the admin portal also shows on the web dashboard and in the mobile app.
+
+| Call (Bearer token from sign-in) | What it gives |
+| --- | --- |
+| `GET /api/accounts` | The user's accounts and balances |
+| `GET /api/transactions/activity` | All money in and out across the user's accounts, newest first, with bank, account, sender, amount and dates |
+| `GET /api/transactions/activity?since=<receivedAt>` | Only what arrived after that moment. Poll this for notifications (the web app polls every few seconds) |
+| `GET /api/transactions?accountId=<id>` | One account's transactions |
+| `POST /api/v1/admin/account-links` | Link a saved account so its bank's payments reach the user (the bank service accepts a customer only for their own account) |
+| `DELETE /api/v1/admin/account-links/by-account/<id>` | Unlink before removing an account |
+
+`/api/transactions/activity` asks accounts-service for the user's accounts with the user's own token, so it
+can only ever return that user's money. A movement's `direction` is `CREDIT` (money in) or `DEBIT` (money out),
+and `receivedAt` is when it reached SmartMoney.
+
+**Seeing the same data as someone else.** Each machine that runs the backend has its own databases, so a
+teammate's local run starts empty. To see the same accounts and payments, point the app at the same running
+backend (the shared server's gateway URL) instead of running a separate copy. To produce payments locally,
+use the demo account (`1000000001`) from the admin portal.
+
+notifications-service has no code yet. Notifications come from the activity feed above.
+

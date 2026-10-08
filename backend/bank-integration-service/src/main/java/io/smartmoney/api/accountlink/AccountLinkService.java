@@ -139,6 +139,27 @@ public class AccountLinkService {
                 link.getUserId());
     }
 
+    /**
+     * Removes the links to one accounts-service account, when its owner removes
+     * the account from the web app. The account itself is deleted by the caller,
+     * so it is not closed here. Recorded history is kept.
+     *
+     * @param ownerId the customer making the request, or null for an admin
+     * @return how many links were removed
+     */
+    public int unlinkAccount(String accountId, String ownerId) {
+        List<AccountLinkEntity> found = links.findByAccountId(accountId);
+        if (ownerId != null && found.stream().anyMatch(link -> !ownerId.equals(link.getUserId()))) {
+            throw new AccountLinkException(HttpStatus.FORBIDDEN, "You can only remove your own account");
+        }
+        for (AccountLinkEntity link : found) {
+            links.delete(link);
+            log.info("Unlinked {} account ending {} from user {} (account removed by its owner)",
+                    link.getBankId(), last4(link.getAccountNumber()), link.getUserId());
+        }
+        return found.size();
+    }
+
     /** Called for every processed notification. Never throws: delivery is retried later. */
     public void deliver(NormalizedTransactionEntity movement) {
         if (movement.getAccountNumber() == null || movement.getForwardedAt() != null

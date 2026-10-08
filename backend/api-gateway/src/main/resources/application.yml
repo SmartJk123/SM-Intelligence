@@ -48,6 +48,15 @@ spring:
               uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
               predicates:
                 - Path=/api/v1/admin/stats/**
+            - id: assistant-service
+              uri: ${ASSISTANT_SERVICE_URL:http://localhost:8091}
+              predicates:
+                - Path=/api/assistant/**
+            - id: bank-integration-account-links
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://localhost:8090}
+              predicates:
+                # Customers link and remove their own accounts here (the bank service checks ownership).
+                - Path=/api/v1/admin/account-links,/api/v1/admin/account-links/**
 management:
   endpoints:
     web:

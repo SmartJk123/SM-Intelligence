@@ -1,6 +1,9 @@
 package com.example.smartmoney.ui.home
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -39,7 +42,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoGraph
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Visibility
@@ -47,7 +49,6 @@ import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -65,17 +66,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -100,6 +107,8 @@ import java.text.DecimalFormat
 import java.util.Locale
 
 
+import com.example.smartmoney.ui.home.analytics.components.OverviewAnalyticsSection
+
 private val MutedSageCard = SmartMoneyColors.PaleMintGreen      // #DAEBE3: Pale Mint Green
 private val DarkContrastColor = SmartMoneyColors.DarkSlateGreen // #657166: Dark Slate Green
 private val DarkGreenPillBadge = SmartMoneyColors.DarkSlateGreen // #657166: Dark Slate Green
@@ -113,13 +122,15 @@ private val DarkGreenPillBadge = SmartMoneyColors.DarkSlateGreen // #657166: Dar
 fun HomeScreen(
     uiState: HomeUiState = HomeUiState.DEFAULT,
     userName: String = "User",
-    onSimulateInflow: (onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit = { _, _ -> },
-    onSimulateOutflow: (onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit = { _, _ -> },
     onLinkAccountClick: () -> Unit = {},
     unreadNotificationCount: Int = uiState.unreadNotificationCount,
     onNotificationsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onProfileClick: () -> Unit = onSettingsClick,
+    onGlowFinished: () -> Unit = {},
+    onPreviousMonth: () -> Unit = {},
+    onNextMonth: () -> Unit = {},
+    onOpenBudgetsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalDarkTheme.current
@@ -130,6 +141,31 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var isBalanceVisible by remember { mutableStateOf(true) }
+
+    // Ambient glow animation controller for top card bottom contour
+    val glowProgress = remember { Animatable(0f) }
+    var activeGlowType by remember { mutableStateOf(TopCardGlowType.NONE) }
+
+    LaunchedEffect(uiState.glowEvent?.eventId) {
+        val event = uiState.glowEvent ?: return@LaunchedEffect
+        if (event.type == TopCardGlowType.NONE) return@LaunchedEffect
+
+        activeGlowType = event.type
+        // 1. Snappy ignite / surge in (280ms)
+        glowProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+        )
+        // 2. Hold peak illumination (1200ms)
+        delay(1200L)
+        // 3. Graceful smooth fade away (1800ms)
+        glowProgress.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(durationMillis = 1800, easing = LinearOutSlowInEasing)
+        )
+        activeGlowType = TopCardGlowType.NONE
+        onGlowFinished()
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -206,6 +242,16 @@ fun HomeScreen(
                     )
                 }
             }
+
+            // Glowing Bottom Accent Line (lights up light green on money received, red on money leaving)
+            if (glowProgress.value > 0.001f && activeGlowType != TopCardGlowType.NONE) {
+                TopCardBottomGlowLine(
+                    glowType = activeGlowType,
+                    glowAlpha = glowProgress.value,
+                    isDark = isDark,
+                    modifier = Modifier.matchParentSize()
+                )
+            }
         }
 
         // =========================================================================
@@ -221,55 +267,24 @@ fun HomeScreen(
 
             // =========================================================================
             // ONBOARDING GET STARTED CARD (when onboarding is active off Main thread)
-            // OR SIMULATION ACTION BAR (when user has active accounts)
             // =========================================================================
             if (uiState.isOnboardingActive) {
                 OnboardingGetStartedCard(
                     onLinkAccountClick = onLinkAccountClick
                 )
-            } else {
-                SimulationActionBar(
-                    isSimulatingInflow = uiState.isSimulatingInflow,
-                    isSimulatingOutflow = uiState.isSimulatingOutflow,
-                    onSimulateInflow = {
-                        if (uiState.isSimulatingInflow) return@SimulationActionBar
-                        onSimulateInflow(
-                            {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("⚡ Simulated KCB inflow of KES 1,000 received!")
-                                }
-                            },
-                            { error ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Simulation failed: $error")
-                                }
-                            }
-                        )
-                    },
-                    onSimulateOutflow = {
-                        if (uiState.isSimulatingOutflow) return@SimulationActionBar
-                        onSimulateOutflow(
-                            {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("⚡ Simulated KCB outflow of KES 500 debited!")
-                                }
-                            },
-                            { error ->
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Simulation failed: $error")
-                                }
-                            }
-                        )
-                    }
-                )
+                Spacer(modifier = Modifier.height(18.dp))
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            // 4-Dimension Financial Analytics Section (Cash Flow, Spending Donut, Heatmap, Budget Pacing)
+            OverviewAnalyticsSection(
+                analyticsData = uiState.analytics,
+                selectedMonth = uiState.selectedMonth,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+                onOpenBudgetsClick = onOpenBudgetsClick
+            )
 
-            // Cash In Trend (Income Trend Graph Card) - detached from banner
-            CashFlowTrendGraphCard(trendPoints = uiState.trend)
-
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Linked Accounts Summary Section
             LinkedAccountsSummarySection(
@@ -289,6 +304,130 @@ fun HomeScreen(
             .navigationBarsPadding()
             .padding(bottom = 96.dp)
     )
+    }
+}
+
+/**
+ * Luminous multi-pass ambient glow line hugging the rounded bottom contour
+ * (bottomStart = 32.dp, bottomEnd = 32.dp) of the Overview top card.
+ *
+ * Renders:
+ * 1. Interior Card Backlight Reflection (soft vertical gradient wash clipped to bottom rounded corners).
+ * 2. Outer Atmospheric Halo (wide diffuse bloom).
+ * 3. Intermediate Bloom Layer (concentrated radiance).
+ * 4. Crisp Neon Core Filament Line (bright pastel core with rounded stroke caps).
+ */
+@Composable
+private fun TopCardBottomGlowLine(
+    glowType: TopCardGlowType,
+    glowAlpha: Float,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val cornerRadius = 32.dp
+
+    val (glowColor, coreColor) = when (glowType) {
+        TopCardGlowType.INFLOW_GREEN -> {
+            if (isDark) {
+                Color(0xFF34C759) to Color(0xFFD1FAE5) // Apple Mint / Emerald with bright neon core
+            } else {
+                Color(0xFF22C55E) to Color(0xFF86EFAC) // Fresh bright green with light core
+            }
+        }
+        TopCardGlowType.OUTFLOW_RED -> {
+            if (isDark) {
+                Color(0xFFFF453A) to Color(0xFFFFD1D1) // Apple Coral Red with luminous core
+            } else {
+                Color(0xFFEF4444) to Color(0xFFFECACA) // Crisp bright red with light core
+            }
+        }
+        TopCardGlowType.NONE -> return
+    }
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val r = cornerRadius.toPx()
+
+        // Construct the bottom contour path:
+        // Starts at (0, h - r), sweeps 90 deg around bottom-left arc to (r, h),
+        // runs horizontally to (w - r, h), sweeps 90 deg around bottom-right arc to (w, h - r).
+        val path = Path().apply {
+            moveTo(0f, h - r)
+            arcTo(
+                rect = Rect(left = 0f, top = h - 2 * r, right = 2 * r, bottom = h),
+                startAngleDegrees = 180f,
+                sweepAngleDegrees = -90f,
+                forceMoveTo = false
+            )
+            lineTo(w - r, h)
+            arcTo(
+                rect = Rect(left = w - 2 * r, top = h - 2 * r, right = w, bottom = h),
+                startAngleDegrees = 90f,
+                sweepAngleDegrees = -90f,
+                forceMoveTo = false
+            )
+        }
+
+        // 1. Subtle interior card bottom backlight reflection
+        val washHeight = 36.dp.toPx()
+        val washBrush = Brush.verticalGradient(
+            colors = listOf(
+                Color.Transparent,
+                glowColor.copy(alpha = glowAlpha * 0.16f)
+            ),
+            startY = h - washHeight,
+            endY = h
+        )
+        val clipPath = Path().apply {
+            addRoundRect(
+                RoundRect(
+                    rect = Rect(0f, 0f, w, h),
+                    bottomLeft = CornerRadius(r, r),
+                    bottomRight = CornerRadius(r, r)
+                )
+            )
+        }
+        clipPath(clipPath) {
+            drawRect(
+                brush = washBrush,
+                topLeft = Offset(0f, h - washHeight),
+                size = Size(w, washHeight)
+            )
+        }
+
+        // 2. Wide atmospheric halo / ambient bloom
+        drawPath(
+            path = path,
+            color = glowColor.copy(alpha = glowAlpha * 0.25f),
+            style = Stroke(
+                width = 14.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // 3. Concentrated inner bloom layer
+        drawPath(
+            path = path,
+            color = glowColor.copy(alpha = glowAlpha * 0.55f),
+            style = Stroke(
+                width = 6.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // 4. Razor-sharp luminous core filament line
+        drawPath(
+            path = path,
+            color = coreColor.copy(alpha = glowAlpha * 0.95f),
+            style = Stroke(
+                width = 2.5.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
     }
 }
 
@@ -1476,196 +1615,6 @@ private fun LinkedAccountMiniCard(bankAccount: BankAccount) {
         }
     }
 }
-
-/**
- * Quick Simulation Action Bar placed prominently between the main card and the cash flow graph.
- * Allows instant triggering of KCB Inflow (+ KES 1,000) and Outflow (- KES 500) transactions.
- */
-@Composable
-private fun SimulationActionBar(
-    isSimulatingInflow: Boolean,
-    isSimulatingOutflow: Boolean,
-    onSimulateInflow: () -> Unit,
-    onSimulateOutflow: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isDark = LocalDarkTheme.current
-
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = if (isDark) SmartMoneyColors.DarkSurfaceElevated else MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp)
-        ) {
-            // Header Row: Lightning Icon + Title + Live Sandbox Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isDark) SmartMoneyColors.DarkSlateGreen.copy(alpha = 0.5f)
-                                else SmartMoneyColors.PaleMintGreen
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bolt,
-                            contentDescription = null,
-                            tint = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Transaction Simulation",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (isDark) Color(0xFF1B3828) else SmartMoneyColors.PaleMintGreen
-                ) {
-                    Text(
-                        text = "KCB Sandbox",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isDark) Color(0xFF4ADE80) else SmartMoneyColors.DarkSlateGreen,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Action Buttons Row: Inflow (+1,000) & Outflow (-500)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                SimulationButton(
-                    modifier = Modifier.weight(1f),
-                    label = "+ Inflow",
-                    amountSubtitle = "+ KES 1,000",
-                    isCredit = true,
-                    isLoading = isSimulatingInflow,
-                    onClick = onSimulateInflow
-                )
-
-                SimulationButton(
-                    modifier = Modifier.weight(1f),
-                    label = "- Outflow",
-                    amountSubtitle = "- KES 500",
-                    isCredit = false,
-                    isLoading = isSimulatingOutflow,
-                    onClick = onSimulateOutflow
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SimulationButton(
-    modifier: Modifier = Modifier,
-    label: String,
-    amountSubtitle: String,
-    isCredit: Boolean,
-    isLoading: Boolean,
-    onClick: () -> Unit
-) {
-    val isDark = LocalDarkTheme.current
-    val accentColor = if (isCredit) {
-        if (isDark) Color(0xFF4ADE80) else Color(0xFF1B6A3E)
-    } else {
-        if (isDark) Color(0xFFFF6B6B) else Color(0xFFB3261E)
-    }
-
-    val containerColor = if (isCredit) {
-        if (isDark) Color(0xFF143321) else SmartMoneyColors.PaleMintGreen.copy(alpha = 0.55f)
-    } else {
-        if (isDark) Color(0xFF381A1A) else SmartMoneyColors.LightSalmon.copy(alpha = 0.45f)
-    }
-
-    val borderColor = if (isCredit) {
-        if (isDark) Color(0xFF225B36) else Color(0xFF4CAF50).copy(alpha = 0.4f)
-    } else {
-        if (isDark) Color(0xFF5E2727) else Color(0xFFF44336).copy(alpha = 0.4f)
-    }
-
-    Surface(
-        onClick = onClick,
-        enabled = !isLoading,
-        shape = RoundedCornerShape(12.dp),
-        color = containerColor,
-        border = BorderStroke(1.dp, borderColor),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(accentColor.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        strokeWidth = 2.dp,
-                        color = accentColor
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (isCredit) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor
-                )
-                Text(
-                    text = amountSubtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                )
-            }
-        }
-    }
-}
-
 
 /**
  * Formats monetary amounts in Kenyan Shillings (KES):
