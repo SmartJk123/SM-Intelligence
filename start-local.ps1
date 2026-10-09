@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     Opens one window per service, in the order sign-in needs them:
-      identity (8081), accounts (8082), transactions (8083), api-gateway (8080),
+      identity (8081), accounts (8082), transactions (8083), budgets (8085), investments (8086),
+      api-gateway (8080),
       bank-integration (8090), web app (4200), admin portal (4300).
     Each Java service gets its own .env.local and Java 25. A service whose port is
     already in use is left alone, so running this twice is safe. The script waits
@@ -27,6 +28,8 @@ $services = @(
     @{ Name = 'identity-service';         Port = 8081; Kind = 'java' }
     @{ Name = 'accounts-service';         Port = 8082; Kind = 'java' }
     @{ Name = 'transactions-service';     Port = 8083; Kind = 'java' }
+    @{ Name = 'budgets-service';          Port = 8085; Kind = 'java' }
+    @{ Name = 'investments-service';      Port = 8086; Kind = 'java' }
     @{ Name = 'api-gateway';              Port = 8080; Kind = 'java' }
     @{ Name = 'bank-integration-service'; Port = 8090; Kind = 'bank' }
     @{ Name = 'web';                      Port = 4200; Kind = 'npm'  }

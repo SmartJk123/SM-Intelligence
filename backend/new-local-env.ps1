@@ -24,7 +24,7 @@ $backend = $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($backend)) {
     $backend = Split-Path -Path $MyInvocation.MyCommand.Path -Parent
 }
-$services = 'identity-service', 'accounts-service', 'transactions-service', 'bank-integration-service', 'api-gateway'
+$services = 'identity-service', 'accounts-service', 'transactions-service', 'budgets-service', 'investments-service', 'bank-integration-service', 'api-gateway'
 
 function New-Secret {
     $bytes = New-Object byte[] 48
