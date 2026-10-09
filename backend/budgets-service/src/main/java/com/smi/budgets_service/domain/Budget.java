@@ -41,7 +41,10 @@ public class Budget {
     @Column(name = "category_name")
     private String categoryName;
 
-    @Column(name = "currency", nullable = false, length = 3)
+    // CHAR(3) in V1__initial_schema.sql; without the type code Hibernate expects
+    // VARCHAR(3) and schema validation stops the service at start.
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = "currency", nullable = false, length = 3, columnDefinition = "char(3)")
     private String currency = "KES";
 
     @Column(name = "allocated_amount", nullable = false, precision = 19, scale = 4)

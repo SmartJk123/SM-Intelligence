@@ -267,6 +267,90 @@ async function sendBudgets(send, call, callBudgets, session) {
   });
 }
 
+/**
+ * The workspace pages (Accounts, Investments, Reports, Profile and Settings)
+ * read one combined record. Accounts, transactions, budgets and investments
+ * come from their services; notification preferences, read marks and the
+ * activity log have no backend store yet, so they live in this adapter's
+ * memory (prefs) and reset when it restarts.
+ */
+async function sendWorkspace(send, call, callBudgets, callInvestments, session, prefs) {
+  const auth = { headers: { Authorization: 'Bearer ' + session.token } };
+  const [me, accountsRes, activityRes, budgetsRes, investmentsRes] = await Promise.all([
+    call('/api/auth/me', auth),
+    call('/api/accounts?userId=' + encodeURIComponent(session.userId), auth),
+    call('/api/transactions/activity?limit=200', auth),
+    callBudgets('/api/budgets?userId=' + encodeURIComponent(session.userId)).catch(() => null),
+    callInvestments('/api/investments?ownerId=' + encodeURIComponent(session.userId)).catch(() => null),
+  ]);
+  if (!me.ok) return send(503, { error: 'Identity service unavailable' });
+  if (!accountsRes.ok) return send(503, { error: 'Accounts service unavailable' });
+  if (!activityRes.ok) return send(503, { error: 'Transactions service unavailable' });
+  if (!budgetsRes?.ok) return send(503, { error: 'Budgets service unavailable. Start budgets-service and retry.' });
+  if (!investmentsRes?.ok) return send(503, { error: 'Investments service unavailable. Start investments-service and retry.' });
+  const profile = await me.json();
+  const accounts = await accountsRes.json();
+  const activity = await activityRes.json();
+  const budgets = await budgetsRes.json();
+  const investments = await investmentsRes.json();
+
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+  return send(200, {
+    source: 'live',
+    accounts: accounts.map((a) => ({
+      id: a.id,
+      bank: a.institution,
+      accountName: a.accountName,
+      maskedIdentifier: a.maskedIdentifier ?? '',
+      accountType: a.accountType === 'CREDIT' ? 'CREDIT' : 'DEPOSIT',
+      availableBalanceMinor: toMinor(a.availableBalance ?? 0),
+      creditOutstandingMinor: toMinor(a.creditOutstanding ?? 0),
+    })),
+    transactions: activity.map((t) => ({
+      id: t.id,
+      accountId: t.accountId,
+      date: String(t.transactionDate ?? t.receivedAt ?? '').slice(0, 10),
+      description: t.counterparty || describedNarrative(t.description, t.bank),
+      category: t.description || 'Uncategorized',
+      direction: t.direction,
+      amountMinor: toMinor(t.amount),
+      status: t.status ?? 'POSTED',
+    })),
+    budgets: budgets.map((b) => ({
+      id: b.id,
+      category: b.category,
+      allocatedMinor: toMinor(b.monthlyLimit),
+      start: monthStart,
+      end: monthEnd,
+      accountId: '',
+      threshold: Number(b.alertThresholdPercentage ?? 85),
+    })),
+    investments: investments.map((i) => ({
+      id: i.id,
+      name: i.name,
+      type: i.type,
+      principalMinor: toMinor(i.principal),
+      currentValueMinor: i.currentValue === null || i.currentValue === undefined ? null : toMinor(i.currentValue),
+      valuationDate: i.valuationDate ?? '',
+      maturityDate: i.maturityDate ?? '',
+    })),
+    profile: {
+      name: profile.name,
+      email: profile.emailAddress,
+      kind: profile.accountType === 'ORGANIZATION' ? 'organization' : 'individual',
+      organization: profile.organizationName ?? '',
+      lowBalanceMinor: prefs.lowBalanceMinor,
+      budgetAlerts: prefs.budgetAlerts,
+      balanceAlerts: prefs.balanceAlerts,
+      maturityAlerts: prefs.maturityAlerts,
+    },
+    read: [...prefs.read],
+    audit: prefs.audit.slice(-50).reverse(),
+  });
+}
+
 // Loopback development adapter. JWTs stay here; the browser receives an HttpOnly session cookie.
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const backend = new URL(options.identityUrl || process.env.IDENTITY_API_URL || 'http://localhost:8080');
@@ -282,6 +366,9 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   if (bankIntegrationBackend.protocol !== 'https:' && !(bankIntegrationBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(bankIntegrationBackend.hostname)))
     throw new Error('Bank integration API requires HTTPS, except on loopback.');
   const budgetsBackend = new URL(options.budgetsUrl || process.env.BUDGETS_API_URL || 'http://localhost:8085');
+  const investmentsBackend = new URL(options.investmentsUrl || process.env.INVESTMENTS_API_URL || 'http://localhost:8086');
+  if (investmentsBackend.protocol !== 'https:' && !(investmentsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(investmentsBackend.hostname)))
+    throw new Error('Investments API requires HTTPS, except on loopback.');
   if (budgetsBackend.protocol !== 'https:' && !(budgetsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(budgetsBackend.hostname)))
     throw new Error('Budgets API requires HTTPS, except on loopback.');
   if (invoiceBackend.protocol !== 'https:' && !(invoiceBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(invoiceBackend.hostname)))
@@ -290,12 +377,26 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     throw new Error('Identity API requires HTTPS, except on loopback.');
   const requestBackend = options.fetchAuth || fetch;
   const sessions = new Map();
+  // A session with no request for this long ends, even if its token is still valid,
+  // so an abandoned browser cannot be picked up later. The web app signs out on its
+  // own after the same idle time (src/app/idle-timeout.ts) and refreshes the session
+  // while the customer is active.
+  const idleMs = (Number(options.sessionIdleMinutes ?? process.env.SESSION_IDLE_MINUTES ?? 15) || 15) * 60 * 1000;
+  const isIdle = (value) => Date.now() - value.lastActive > idleMs;
   const allowedOrigins = ['http://localhost:' + webPort, 'http://127.0.0.1:' + webPort];
   if (process.env.WEB_ORIGIN) allowedOrigins.push(new URL(process.env.WEB_ORIGIN).origin);
   const cookieName = 'sm_identity_session';
   const cookie = value => cookieName + '=' + value + '; HttpOnly; SameSite=Lax; Path=/api';
   const call = (route, init) => requestBackend(new URL(route, backend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
   const callBudgets = (route, init) => requestBackend(new URL(route, budgetsBackend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
+  const callInvestments = (route, init) => requestBackend(new URL(route, investmentsBackend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
+  // Workspace preferences per user (see sendWorkspace). In memory only.
+  const workspacePrefs = new Map();
+  const prefsFor = (userId) => {
+    if (!workspacePrefs.has(userId)) workspacePrefs.set(userId, {
+      lowBalanceMinor: 0, budgetAlerts: true, balanceAlerts: true, maturityAlerts: true, read: new Set(), audit: [] });
+    return workspacePrefs.get(userId);
+  };
   const publicUser = profile => ({ id: profile.id, name: profile.name, email: profile.emailAddress,
     kind: profile.accountType === 'ORGANIZATION' ? 'organization' : 'individual', setupCompleted: false });
   const validProfile = profile => profile && typeof profile.id === 'string' && /^[0-9a-f-]{36}$/i.test(profile.id)
@@ -309,9 +410,10 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     if (req.headers.origin && !allowedOrigins.includes(req.headers.origin))
       return send(403, { error: 'Cross-origin requests are not allowed' });
     if (req.headers['sec-fetch-site'] === 'cross-site') return send(403, { error: 'Cross-site requests are not allowed' });
-    for (const [id, value] of sessions) if (value.expiresAt <= Date.now()) sessions.delete(id);
+    for (const [id, value] of sessions) if (value.expiresAt <= Date.now() || isIdle(value)) sessions.delete(id);
     const sessionId = req.headers.cookie?.split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
     const session = sessions.get(sessionId);
+    if (session) session.lastActive = Date.now();
     const url = new URL(req.url ?? '/', 'http://internal');
     const route = url.pathname;
     try {
@@ -353,7 +455,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
           if (!validProfile(profile) || profile.id !== result.userId || profile.emailAddress.toLowerCase() !== emailAddress) throw new Error('Identity mismatch');
           sessions.delete(sessionId);
           const id = randomUUID();
-          sessions.set(id, { token: result.token, userId: profile.id, expiresAt: claims.exp * 1000 });
+          sessions.set(id, { token: result.token, userId: profile.id, expiresAt: claims.exp * 1000, lastActive: Date.now() });
           res.setHeader('Set-Cookie', cookie(id));
           return send(registering ? 201 : 200, { user: publicUser(profile) });
         } catch {
@@ -388,6 +490,92 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       }
       if (route === '/api/analytics' && req.method === 'GET') {
         return await sendAnalytics(send, call, session, url.searchParams);
+      }
+      if (route === '/api/workspace' && req.method === 'GET') {
+        return await sendWorkspace(send, call, callBudgets, callInvestments, session, prefsFor(session.userId));
+      }
+      const workspaceSave = /^\/api\/workspace\/([a-z]+)$/.exec(route);
+      if (workspaceSave && req.method === 'POST') {
+        let raw = ''; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > 16384) return send(413, { error: 'Request too large' }); raw += chunk; }
+        let body;
+        try { body = JSON.parse(raw); } catch { return send(400, { error: 'Invalid JSON' }); }
+        const prefs = prefsFor(session.userId);
+        const logged = (action) => { prefs.audit.push({ at: new Date().toISOString(), action }); };
+        const collection = workspaceSave[1];
+        if (collection === 'investments') {
+          const id = typeof body?.id === 'string' && /^[0-9a-f-]{36}$/i.test(body.id) ? body.id : null;
+          const payload = {
+            ownerId: session.userId,
+            name: body?.name,
+            type: body?.type,
+            principal: Number(body?.principalMinor) / 100,
+            currentValue: body?.currentValueMinor === null || body?.currentValueMinor === undefined ? null : Number(body.currentValueMinor) / 100,
+            valuationDate: body?.valuationDate || null,
+            maturityDate: body?.maturityDate || null,
+          };
+          const response = await callInvestments('/api/investments' + (id ? '/' + id : ''), {
+            method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (response.status === 400) return send(400, { error: (await response.json().catch(() => ({}))).message || 'Check the investment details.' });
+          if (response.status === 404) return send(404, { error: 'Investment not found' });
+          if (!response.ok) return send(503, { error: 'Unable to save the investment. Please retry.' });
+          logged((id ? 'Updated' : 'Added') + ' investment ' + payload.name);
+          return send(id ? 200 : 201, await response.json());
+        }
+        if (collection === 'budgets') {
+          if (typeof body?.category !== 'string' || !body.category.trim()) return send(400, { error: 'Enter a category' });
+          const limit = Number(body?.allocatedMinor) / 100;
+          if (!Number.isFinite(limit) || limit < 0) return send(400, { error: 'Enter an allocation of 0 or more' });
+          // budgets-service has no update: an edit replaces the old budget.
+          if (typeof body?.id === 'string' && /^[0-9a-f-]{36}$/i.test(body.id)) {
+            const mine = await callBudgets('/api/budgets?userId=' + encodeURIComponent(session.userId));
+            if (!mine.ok) return send(503, { error: 'Budgets service unavailable' });
+            if (!(await mine.json()).some((x) => x.id === body.id)) return send(404, { error: 'Budget not found' });
+            await callBudgets('/api/budgets/' + body.id, { method: 'DELETE' });
+          }
+          const response = await callBudgets('/api/budgets', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: session.userId, category: body.category.trim(), monthlyLimit: limit }) });
+          if (response.status === 409) return send(409, { error: 'A budget for this category already exists.' });
+          if (!response.ok) return send(503, { error: 'Unable to save the budget. Please retry.' });
+          logged('Saved budget ' + body.category.trim());
+          return send(201, await response.json());
+        }
+        if (collection === 'profile') {
+          const low = Number(body?.lowBalanceMinor);
+          if (Number.isFinite(low) && low >= 0) prefs.lowBalanceMinor = low;
+          for (const key of ['budgetAlerts', 'balanceAlerts', 'maturityAlerts'])
+            if (typeof body?.[key] === 'boolean') prefs[key] = body[key];
+          logged('Updated notification settings');
+          return send(200, { saved: true });
+        }
+        if (collection === 'read') {
+          for (const id of Array.isArray(body?.ids) ? body.ids : []) if (typeof id === 'string') prefs.read.add(id);
+          return send(200, { saved: true });
+        }
+        if (collection === 'transactions')
+          return send(400, { error: 'Transactions come from your linked banks and cannot be added by hand.' });
+        return send(404, { error: 'Unknown workspace collection' });
+      }
+      const workspaceDelete = /^\/api\/workspace\/([a-z]+)\/([0-9a-f-]{36})$/i.exec(route);
+      if (workspaceDelete && req.method === 'DELETE') {
+        const [, collection, id] = workspaceDelete;
+        if (collection === 'investments') {
+          const response = await callInvestments('/api/investments/' + id + '?ownerId=' + encodeURIComponent(session.userId), { method: 'DELETE' });
+          if (response.status === 404) return send(404, { error: 'Investment not found' });
+          if (!response.ok) return send(503, { error: 'Unable to delete the investment. Please retry.' });
+          prefsFor(session.userId).audit.push({ at: new Date().toISOString(), action: 'Deleted an investment' });
+          return send(204, null);
+        }
+        if (collection === 'budgets') {
+          const mine = await callBudgets('/api/budgets?userId=' + encodeURIComponent(session.userId));
+          if (!mine.ok) return send(503, { error: 'Budgets service unavailable' });
+          if (!(await mine.json()).some((x) => x.id === id)) return send(404, { error: 'Budget not found' });
+          const response = await callBudgets('/api/budgets/' + id, { method: 'DELETE' });
+          if (!response.ok && response.status !== 404) return send(503, { error: 'Unable to delete the budget. Please retry.' });
+          prefsFor(session.userId).audit.push({ at: new Date().toISOString(), action: 'Deleted a budget' });
+          return send(204, null);
+        }
+        return send(404, { error: 'This record cannot be deleted here' });
       }
       if (route === '/api/budgets' && req.method === 'GET') {
         return await sendBudgets(send, call, callBudgets, session);
@@ -534,7 +722,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     if (req.headers.origin && !allowedOrigins.includes(req.headers.origin)) { socket.destroy(); return; }
     const sessionId = req.headers.cookie?.split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
     const session = sessions.get(sessionId);
-    if (!session || session.expiresAt <= Date.now()) { socket.destroy(); return; }
+    if (!session || session.expiresAt <= Date.now() || isIdle(session)) { socket.destroy(); return; }
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.userId = session.userId;
       ws.token = session.token;

@@ -19,3 +19,6 @@ jwt:
 app:
   admin:
     emails: admin@example.invalid
+  # Unit tests drive ServiceHealthMonitor directly; the scheduled checks stay off.
+  health-monitor:
+    enabled: false

@@ -57,6 +57,39 @@ class TransactionRepositoryImpl(
     override suspend fun syncTransactions(userId: String?, accountId: String?): Result<Unit> = withContext(dispatchers.io) {
         val targetUserId = userId ?: userIdProvider?.invoke() ?: "default-user"
         try {
+            // 0. The signed-in user's real transactions (every linked bank) from
+            //    transactions-service, the same ones the web dashboard shows. This is
+            //    what cash flow and the transaction list are built from.
+            try {
+                val activity = RetrofitClient.activityApi.getActivity()
+                if (activity.isSuccessful) {
+                    val entities = activity.body().orEmpty()
+                        .filter { accountId == null || it.accountId == accountId }
+                        .map { item ->
+                            val booked = item.transactionDate ?: item.receivedAt ?: java.time.Instant.now().toString()
+                            TransactionEntity(
+                                id = "activity_${item.id}",
+                                userId = targetUserId,
+                                accountId = item.accountId,
+                                amount = item.amount,
+                                transactionType = item.direction.uppercase(),
+                                timestamp = booked,
+                                description = item.description?.takeIf { it.isNotBlank() }
+                                    ?: item.counterparty
+                                    ?: "${item.bank ?: "Bank"} ${item.direction.lowercase()}",
+                                providerTransactionId = item.id,
+                                createdAt = item.receivedAt ?: booked,
+                                updatedAt = item.receivedAt ?: booked
+                            )
+                        }
+                    if (entities.isNotEmpty()) {
+                        localDao.upsertTransactions(entities)
+                    }
+                }
+            } catch (_: Exception) {
+                // Offline or the gateway is unreachable: keep what is cached.
+            }
+
             // 1. Ingest KCB transactions from bank-integration-service (:8090)
             try {
                 val kcbResponse = RetrofitClient.bankIntegrationApi.getKcbTransactions(userId = targetUserId)
