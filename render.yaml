@@ -109,6 +109,22 @@ services:
         sync: false
       - key: FRONTEND_LOGIN_URL
         sync: false
+      # Health monitor: emails ADMIN_EMAILS (or HEALTH_ALERT_EMAILS, if set) when a
+      # service below is down or degraded, hourly while it lasts, and when it recovers.
+      - key: HEALTH_ALERT_EMAILS
+        sync: false
+      - key: API_GATEWAY_HOSTPORT
+        fromService: { type: web, name: api-gateway, property: hostport }
+      - key: ACCOUNTS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: accounts-service, property: hostport }
+      - key: TRANSACTIONS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: transactions-service, property: hostport }
+      - key: BUDGETS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: budgets-service, property: hostport }
+      - key: INVESTMENTS_SERVICE_HOSTPORT
+        fromService: { type: pserv, name: investments-service, property: hostport }
+      - key: BANK_INTEGRATION_SERVICE_HOSTPORT
+        fromService: { type: web, name: bank-integration-service, property: hostport }
 
   - type: pserv
     name: accounts-service
@@ -175,6 +191,9 @@ services:
       - fromGroup: smi-shared
       - key: PERMIT_ALL
         value: "false"
+      # The deployed admin portal's address, the only browser origin allowed to call this service.
+      - key: APP_CORS_ALLOWED_ORIGINS
+        sync: false
       - key: PUBLIC_BASE_URL
         value: https://sm-intelligence.globalsmartspaces.com
       - key: ACCOUNTS_SERVICE_HOSTPORT

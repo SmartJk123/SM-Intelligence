@@ -135,6 +135,17 @@
             </div>
             -->
 
+            @if (signedOutIdle && !error()) {
+              <div
+                role="status"
+                class="flex items-start gap-2 px-3 py-2.5 rounded-lg text-[13px] border"
+                style="background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.5); color: #fde68a"
+              >
+                <span class="icon icon-sm mt-px">schedule</span>
+                <span>You were signed out after 15 minutes of inactivity. Sign in again to continue.</span>
+              </div>
+            }
+
             @if (error()) {
               <div
                 role="alert"

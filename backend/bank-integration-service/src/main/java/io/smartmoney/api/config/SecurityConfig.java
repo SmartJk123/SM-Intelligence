@@ -85,13 +85,18 @@ public class SecurityConfig {
     }
 
     /**
-     * The Angular development server uses a port of its own choosing, so every
-     * localhost port is allowed while developing. Narrow this before release.
+     * Browser origins allowed to call this service: the admin portal. Set
+     * APP_CORS_ALLOWED_ORIGINS (comma separated) to the deployed portal's
+     * address; locally every localhost port is allowed, since the Angular
+     * development server picks its own.
      */
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(
+            @org.springframework.beans.factory.annotation.Value(
+                    "${APP_CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}") String allowedOrigins) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+        configuration.setAllowedOriginPatterns(java.util.Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim).filter(origin -> !origin.isEmpty()).toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

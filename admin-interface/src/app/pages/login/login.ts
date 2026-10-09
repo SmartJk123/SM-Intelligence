@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 
 @Component({
@@ -18,6 +18,8 @@ export class LoginPage {
   protected readonly error = signal('');
   protected readonly loading = signal(false);
   protected readonly showPassword = signal(false);
+  /** Set when the idle timeout signed the administrator out (?reason=idle). */
+  protected readonly signedOutIdle = inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === 'idle';
 
   protected async submitCredentials(event: Event): Promise<void> {
     event.preventDefault();
