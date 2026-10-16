@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { AuthService } from '../core/auth.service';
+import { IdleTimeoutService } from '../core/idle-timeout.service';
 import { PAGE_LABELS, Page } from '../core/data';
 import { ThemeService } from '../core/theme.service';
 import { UiService } from '../core/ui.service';
@@ -30,6 +31,13 @@ export class AdminLayout {
 
   protected readonly theme = inject(ThemeService);
   protected readonly ui = inject(UiService);
+  /** Signs out after 15 minutes without interaction, warning a minute before. */
+  protected readonly idle = inject(IdleTimeoutService);
+
+  constructor() {
+    this.idle.start();
+    inject(DestroyRef).onDestroy(() => this.idle.stop());
+  }
 
   private readonly navigationUrl = toSignal(
     this.router.events.pipe(
@@ -54,6 +62,7 @@ export class AdminLayout {
   }
 
   protected confirmLogout(): void {
+    this.idle.stop();
     this.ui.closeLogout();
     this.auth.logout();
     void this.router.navigate(['/admin/login']);

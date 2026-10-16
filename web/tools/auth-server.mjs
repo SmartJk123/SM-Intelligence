@@ -377,6 +377,12 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     throw new Error('Identity API requires HTTPS, except on loopback.');
   const requestBackend = options.fetchAuth || fetch;
   const sessions = new Map();
+  // A session with no request for this long ends, even if its token is still valid,
+  // so an abandoned browser cannot be picked up later. The web app signs out on its
+  // own after the same idle time (src/app/idle-timeout.ts) and refreshes the session
+  // while the customer is active.
+  const idleMs = (Number(options.sessionIdleMinutes ?? process.env.SESSION_IDLE_MINUTES ?? 15) || 15) * 60 * 1000;
+  const isIdle = (value) => Date.now() - value.lastActive > idleMs;
   const allowedOrigins = ['http://localhost:' + webPort, 'http://127.0.0.1:' + webPort];
   if (process.env.WEB_ORIGIN) allowedOrigins.push(new URL(process.env.WEB_ORIGIN).origin);
   const cookieName = 'sm_identity_session';
@@ -404,9 +410,10 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     if (req.headers.origin && !allowedOrigins.includes(req.headers.origin))
       return send(403, { error: 'Cross-origin requests are not allowed' });
     if (req.headers['sec-fetch-site'] === 'cross-site') return send(403, { error: 'Cross-site requests are not allowed' });
-    for (const [id, value] of sessions) if (value.expiresAt <= Date.now()) sessions.delete(id);
+    for (const [id, value] of sessions) if (value.expiresAt <= Date.now() || isIdle(value)) sessions.delete(id);
     const sessionId = req.headers.cookie?.split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
     const session = sessions.get(sessionId);
+    if (session) session.lastActive = Date.now();
     const url = new URL(req.url ?? '/', 'http://internal');
     const route = url.pathname;
     try {
@@ -448,7 +455,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
           if (!validProfile(profile) || profile.id !== result.userId || profile.emailAddress.toLowerCase() !== emailAddress) throw new Error('Identity mismatch');
           sessions.delete(sessionId);
           const id = randomUUID();
-          sessions.set(id, { token: result.token, userId: profile.id, expiresAt: claims.exp * 1000 });
+          sessions.set(id, { token: result.token, userId: profile.id, expiresAt: claims.exp * 1000, lastActive: Date.now() });
           res.setHeader('Set-Cookie', cookie(id));
           return send(registering ? 201 : 200, { user: publicUser(profile) });
         } catch {
@@ -715,7 +722,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     if (req.headers.origin && !allowedOrigins.includes(req.headers.origin)) { socket.destroy(); return; }
     const sessionId = req.headers.cookie?.split(';').map(v => v.trim()).find(v => v.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
     const session = sessions.get(sessionId);
-    if (!session || session.expiresAt <= Date.now()) { socket.destroy(); return; }
+    if (!session || session.expiresAt <= Date.now() || isIdle(session)) { socket.destroy(); return; }
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.userId = session.userId;
       ws.token = session.token;

@@ -1844,3 +1844,39 @@ html[data-theme='dark'] .feature-icon { color:#8bb6ff; }
   border-color: #c62828;
   color: #fff;
 }
+
+/* Idle sign-out warning (IdleTimeout). Fixed above everything, workspace pages included. */
+.idle-warning {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 14px 18px;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-left: 4px solid #d9822b;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(24, 51, 79, 0.18);
+  font-size: 14px;
+}
+.idle-warning p {
+  margin: 0;
+}
+@media (max-width: 520px) {
+  .idle-warning {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+[data-theme='dark'] .idle-warning {
+  background: #16283b;
+  color: #e6eef7;
+  border-color: #2c4560;
+  border-left-color: #e0a052;
+}

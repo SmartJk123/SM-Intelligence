@@ -50,6 +50,23 @@ between identity-service and bank-integration-service. Running the script again 
 Start bank-integration-service as shown: its H2 database is a folder relative to where it starts, and the
 script uses `backend/bank-integration-service/data`.
 
+
+## Health alerts, CORS and idle sign-out
+
+- **Health alerts by email.** identity-service checks every service's `/actuator/health` each minute
+  (api-gateway, accounts, transactions, budgets, investments, bank-integration). When one fails two checks
+  in a row, or bank-integration reports `DEGRADED` (a bank or cPanel import failing), it emails
+  `ADMIN_EMAILS` (or `HEALTH_ALERT_EMAILS`), reminds every hour while the problem lasts, and sends a
+  "resolved" email with the downtime. It needs the SMTP settings in identity's `.env.local`; without them the
+  alerts are only logged. Turn it off with `HEALTH_MONITOR_ENABLED=false`.
+- **CORS.** Browsers reach the backend only through api-gateway, which allows the origins in
+  `APP_CORS_ALLOWED_ORIGINS`. accounts, transactions and the assistant no longer answer CORS themselves
+  (they allowed any website, with credentials). bank-integration, which the admin portal calls directly,
+  reads the same `APP_CORS_ALLOWED_ORIGINS` (default: any localhost port).
+- **Idle sign-out.** The web app and the admin portal sign out after 15 minutes without interaction, with a
+  one-minute warning and a "Stay signed in" button. The web app's server also ends a session after 15 idle
+  minutes (`SESSION_IDLE_MINUTES`), so an abandoned browser cannot be picked up later.
+
 ## Features at a glance
 
 - **Customer app:** sign up, sign in, "Forgot password?" by email (SMTP settings in

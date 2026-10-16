@@ -1,5 +1,6 @@
 // Root application shell.
 import { AccountApi } from './account-api';
+import { IdleTimeout } from './idle-timeout';
 import { Component, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 
@@ -28,6 +29,15 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
         </nav>
       </header>
     }
+    @if (idle.secondsLeft() !== null) {
+      <div class="idle-warning" role="alertdialog" aria-live="assertive" aria-labelledby="idle-title">
+        <p id="idle-title">
+          <strong>Still there?</strong> For your security you will be signed out in
+          {{ idle.secondsLeft() }} seconds because of inactivity.
+        </p>
+        <button class="button small" type="button" (click)="idle.stayActive()">Stay signed in</button>
+      </div>
+    }
     @if (logoutError()) {
       <p role="alert">{{ logoutError() }}</p>
     }
@@ -45,6 +55,8 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
 // Controls public navigation, workspace detection and global sign-out behavior.
 export class App {
   readonly api = inject(AccountApi);
+  /** Signs out after 15 minutes without interaction; shows the warning above first. */
+  readonly idle = inject(IdleTimeout);
   private router = inject(Router);
   readonly inWorkspace = signal(false);
   constructor() {

@@ -49,3 +49,14 @@ app:
     # The web app page the emailed link opens; the token is appended as ?token=
     url: ${PASSWORD_RESET_URL:http://localhost:4200/reset-password}
     valid-minutes: 60
+  # Emails the administrators when a service is down or degraded (see ServiceHealthMonitor).
+  # Uses the SMTP settings above; without them alerts are only logged.
+  health-monitor:
+    enabled: ${HEALTH_MONITOR_ENABLED:true}
+    interval: ${HEALTH_MONITOR_INTERVAL:PT1M}
+    initial-delay: ${HEALTH_MONITOR_INITIAL_DELAY:PT2M}
+    failures-before-alert: ${HEALTH_MONITOR_FAILURES_BEFORE_ALERT:2}
+    reminder-interval: ${HEALTH_ALERT_REMINDER:PT1H}
+    recipients: ${HEALTH_ALERT_EMAILS:${ADMIN_EMAILS:}}
+    # name=address pairs. On Render the *_SERVICE_HOSTPORT values are the private addresses.
+    targets: ${HEALTH_MONITOR_TARGETS:api-gateway=http://${API_GATEWAY_HOSTPORT:localhost:8080},accounts=http://${ACCOUNTS_SERVICE_HOSTPORT:localhost:8082},transactions=http://${TRANSACTIONS_SERVICE_HOSTPORT:localhost:8083},budgets=http://${BUDGETS_SERVICE_HOSTPORT:localhost:8085},investments=http://${INVESTMENTS_SERVICE_HOSTPORT:localhost:8086},bank-integration=http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
