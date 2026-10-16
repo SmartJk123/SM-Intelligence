@@ -265,8 +265,9 @@ services:
         fromService: { type: pserv, name: budgets-service, property: hostport }
 
   # ---------------------------------------------------------------- supporting
-  # Not yet called by any app; kept so the assistant and future features can
-  # reach them. Each has its own schema in the shared database.
+  # Called by the web app's server (BUDGETS_API_URL, INVESTMENTS_API_URL) and the
+  # assistant. Private: they trust the user id they are given, so they are never
+  # exposed publicly. Each has its own schema in the shared database.
   - type: pserv
     name: budgets-service
     runtime: docker
@@ -281,4 +282,20 @@ services:
         value: "8085"
       - key: DB_SCHEMA
         value: budgets
+      - fromGroup: smi-database
+
+  - type: pserv
+    name: investments-service
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerBuildArgs:
+      - key: SERVICE
+        value: investments-service
+    plan: starter
+    envVars:
+      - key: PORT
+        value: "8086"
+      - key: DB_SCHEMA
+        value: investments
       - fromGroup: smi-database

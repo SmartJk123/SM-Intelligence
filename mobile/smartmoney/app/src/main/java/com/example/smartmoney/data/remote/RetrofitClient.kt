@@ -129,6 +129,14 @@ object RetrofitClient {
     }
 
     /**
+     * The signed-in user's transactions from transactions-service (:8083), the same
+     * movements the web dashboard shows.
+     */
+    val activityApi: com.example.smartmoney.data.remote.api.ActivityApi by lazy {
+        buildRetrofit(TRANSACTIONS_PORT).create(com.example.smartmoney.data.remote.api.ActivityApi::class.java)
+    }
+
+    /**
      * Singleton instance of the [BankIntegrationApi] interface targeting bank-integration-service (:8090).
      */
     val bankIntegrationApi: BankIntegrationApi by lazy {

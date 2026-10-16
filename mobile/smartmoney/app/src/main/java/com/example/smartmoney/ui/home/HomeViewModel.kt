@@ -245,6 +245,19 @@ class HomeViewModel(
         _glowEvent.value = null
     }
 
+    /** Shows the month before the one on screen. */
+    fun previousMonth() {
+        _selectedMonth.value = _selectedMonth.value.minusMonths(1)
+    }
+
+    /** Shows the month after the one on screen, never beyond the current month. */
+    fun nextMonth() {
+        val next = _selectedMonth.value.plusMonths(1)
+        if (!next.isAfter(YearMonth.now())) {
+            _selectedMonth.value = next
+        }
+    }
+
     class Factory(
         private val accountRepository: AccountRepository,
         private val bankAccountRepository: BankAccountRepository,

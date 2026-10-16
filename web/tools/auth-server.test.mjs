@@ -103,7 +103,9 @@ test('maps the real identity contract, validates /me, restores profile and never
     assert.ok(result.cookie.includes('HttpOnly'));
     const cookie = result.cookie.split(';')[0];
     assert.equal((await fx.call('/api/auth/session', null, cookie)).body.user.name, profile.name);
-    assert.equal((await fx.call('/api/workspace', null, cookie)).status, 501);
+    // The workspace only reads; with no financial services behind this fixture it is unavailable,
+    // and nothing is ever written.
+    assert.equal((await fx.call('/api/workspace', null, cookie)).status, 503);
     assert.equal((await fx.call('/api/auth/login', { email: input.email, password: 'wrong' })).status, 401);
     assert.equal((await fx.call('/api/auth/logout', {}, cookie, 'https://untrusted.example')).status, 403);
     await fx.call('/api/auth/logout', {}, cookie);
@@ -253,5 +255,53 @@ test('removing an account unlinks it at the bank service first, then deletes it'
 
     // Without a session nothing is removed.
     assert.equal((await fetch(fx.base + '/api/accounts/' + accountId, { method: 'DELETE' })).status, 401);
+  } finally { await fx.close(); }
+});
+
+test('workspace combines the user’s accounts, transactions, budgets and investments, and saves investments for that user only', async () => {
+  const token = jwt();
+  const sent = [];
+  const fx = await fixture(async (url, init = {}) => {
+    sent.push({ path: url.pathname + url.search, method: init.method ?? 'GET', body: init.body });
+    if (url.pathname.endsWith('/login')) return Response.json({ token, userId });
+    if (url.pathname === '/api/auth/me') return Response.json(profile);
+    if (url.pathname === '/api/accounts') return Response.json([{ id: 'a1', institution: 'Equity', accountName: 'Business', maskedIdentifier: '•••• 9886',
+      accountType: 'DEPOSIT', availableBalance: 9200, creditOutstanding: 0 }]);
+    if (url.pathname === '/api/transactions/activity') return Response.json([{ id: 't1', accountId: 'a1', bank: 'Equity', direction: 'DEBIT',
+      amount: 300, counterparty: 'Supplier', description: 'Supplier payment', status: 'POSTED', transactionDate: '2026-10-08T09:51:36Z' }]);
+    if (url.pathname === '/api/budgets') return Response.json([{ id: 'b1', category: 'Rent', monthlyLimit: 5000, alertThresholdPercentage: 80 }]);
+    if (url.pathname.startsWith('/api/investments') && (init.method ?? 'GET') === 'GET')
+      return Response.json([{ id: 'i1', name: 'CIC Money Market', type: 'Money Market', principal: 10000, currentValue: 10450.5,
+        valuationDate: '2026-10-08', maturityDate: null }]);
+    if (url.pathname === '/api/investments' && init.method === 'POST') return Response.json({ id: 'i2' }, { status: 201 });
+    if (url.pathname.startsWith('/api/investments/') && init.method === 'DELETE') return new Response(null, { status: 204 });
+    return Response.json({}, { status: 404 });
+  });
+  try {
+    assert.equal((await fx.call('/api/workspace')).status, 401);
+    const cookie = (await fx.call('/api/auth/login', input)).cookie.split(';')[0];
+    const workspace = (await fx.call('/api/workspace', null, cookie)).body;
+    assert.deepEqual(workspace.accounts[0], { id: 'a1', bank: 'Equity', accountName: 'Business', maskedIdentifier: '•••• 9886',
+      accountType: 'DEPOSIT', availableBalanceMinor: 920000, creditOutstandingMinor: 0 });
+    assert.equal(workspace.transactions[0].amountMinor, 30000);
+    assert.equal(workspace.transactions[0].date, '2026-10-08');
+    assert.equal(workspace.budgets[0].allocatedMinor, 500000);
+    assert.equal(workspace.budgets[0].threshold, 80);
+    assert.deepEqual(workspace.investments[0], { id: 'i1', name: 'CIC Money Market', type: 'Money Market', principalMinor: 1000000,
+      currentValueMinor: 1045050, valuationDate: '2026-10-08', maturityDate: '' });
+    assert.equal(workspace.profile.email, profile.emailAddress);
+
+    const saved = await fx.call('/api/workspace/investments', { name: 'T-bill', type: 'Treasury Bill', principalMinor: 2000000,
+      currentValueMinor: null, valuationDate: '2026-10-08', maturityDate: '', ownerId: 'someone-else' }, cookie);
+    assert.equal(saved.status, 201);
+    const post = sent.find((c) => c.path === '/api/investments' && c.method === 'POST');
+    assert.deepEqual(JSON.parse(post.body), { ownerId: userId, name: 'T-bill', type: 'Treasury Bill', principal: 20000,
+      currentValue: null, valuationDate: '2026-10-08', maturityDate: null });
+
+    const base = 'http://127.0.0.1:' + fx.server.address().port;
+    const removed = await fetch(base + '/api/workspace/investments/' + userId, { method: 'DELETE', headers: { Cookie: cookie } });
+    assert.equal(removed.status, 204);
+    assert.ok(sent.some((c) => c.method === 'DELETE' && c.path === '/api/investments/' + userId + '?ownerId=' + userId));
+    assert.equal((await fx.call('/api/workspace/transactions', { amountMinor: 1 }, cookie)).status, 400);
   } finally { await fx.close(); }
 });

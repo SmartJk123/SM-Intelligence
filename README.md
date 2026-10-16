@@ -15,7 +15,8 @@ secret the same value: `JWT_SECRET` (identity-service and bank-integration-servi
 and `ADMIN_EMAILS`. Never use or share production values.
 
 **Quickest way:** from the repository root run `.\start-local.ps1`. It opens one window per service in the
-order sign-in needs them (identity, accounts, transactions, api-gateway, bank-integration, web, admin), finds
+order sign-in needs them (identity, accounts, transactions, budgets, investments, api-gateway,
+bank-integration, web, admin), finds
 Java 25 by itself, loads each service's `.env.local`, skips anything already running and waits for each service
 to be healthy. Stop everything with `.\start-local.ps1 -Stop`. If sign-in says "Unable to sign in ... the account
 service may be unavailable" or "Could not reach the identity service", the api-gateway (8080) is not running.
@@ -34,6 +35,8 @@ Get-Content backend/<service>/.env.local | Where-Object { $_ -match '^\s*[A-Za-z
 | PostgreSQL | 5432 | `smi_identity`, `smi_accounts`, `smi_transactions` (with Docker: 5432, 5433, 5434) |
 | identity-service | 8081 | sign in, users, password reset, organisations |
 | api-gateway | 8080 | everything the browsers and the mobile app call |
+| budgets-service | 8085 | the Budgets page; its own `budgets` schema inside `smi_transactions` |
+| investments-service | 8086 | the Investments page; its own `investments` schema inside `smi_transactions` |
 | accounts-service | 8082 | accounts and balances |
 | transactions-service | 8083 | transactions and the activity feed |
 | bank-integration-service | 8090 | bank webhooks, admin bank screens. Start it with `.\backend\bank-integration-service\run-local.ps1` |
