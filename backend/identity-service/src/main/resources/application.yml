@@ -62,5 +62,5 @@ app:
     failures-before-alert: ${HEALTH_MONITOR_FAILURES_BEFORE_ALERT:2}
     reminder-interval: ${HEALTH_ALERT_REMINDER:PT1H}
     recipients: ${HEALTH_ALERT_EMAILS:${ADMIN_EMAILS:}}
-    # name=address pairs. On Render the *_SERVICE_HOSTPORT values are the private addresses.
-    targets: ${HEALTH_MONITOR_TARGETS:api-gateway=http://${API_GATEWAY_HOSTPORT:localhost:8080},accounts=http://${ACCOUNTS_SERVICE_HOSTPORT:localhost:8082},transactions=http://${TRANSACTIONS_SERVICE_HOSTPORT:localhost:8083},budgets=http://${BUDGETS_SERVICE_HOSTPORT:localhost:8085},investments=http://${INVESTMENTS_SERVICE_HOSTPORT:localhost:8086},bank-integration=http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
+    # name=address pairs. Supports *_SERVICE_URL or *_HOSTPORT on Render.
+    targets: ${HEALTH_MONITOR_TARGETS:api-gateway=${API_GATEWAY_SERVICE_URL:http://${API_GATEWAY_HOSTPORT:localhost:8080}},accounts=${ACCOUNTS_SERVICE_URL:http://${ACCOUNTS_SERVICE_HOSTPORT:localhost:8082}},transactions=${TRANSACTIONS_SERVICE_URL:http://${TRANSACTIONS_SERVICE_HOSTPORT:localhost:8083}},budgets=${BUDGETS_SERVICE_URL:http://${BUDGETS_SERVICE_HOSTPORT:localhost:8085}},investments=${INVESTMENTS_SERVICE_URL:http://${INVESTMENTS_SERVICE_HOSTPORT:localhost:8086}},bank-integration=${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}}
