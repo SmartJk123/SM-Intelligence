@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: assistant-service
+  namespace: smi
+  labels:
+    app: assistant-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: assistant-service
+  template:
+    metadata:
+      labels:
+        app: assistant-service
+    spec:
+      containers:
+        - name: assistant-service
+          image: smi-assistant-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8091
+              name: http
+          envFrom:
+            - configMapRef:
+                name: smi-config
+            - secretRef:
+                name: smi-secrets
+          env:
+            - name: PORT
+              value: "8091"
+            - name: DB_SCHEMA
+              value: "assistant"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8091
+            initialDelaySeconds: 40
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8091
+            initialDelaySeconds: 25
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: assistant-service
+  namespace: smi
+  labels:
+    app: assistant-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8091
+      targetPort: 8091
+      protocol: TCP
+      name: http
+  selector:
+    app: assistant-service
