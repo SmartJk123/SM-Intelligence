@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLUSTER_NAME="smi-cluster"
 
 echo "=== [1/5] Checking Kubernetes Tooling ==="
@@ -20,17 +21,17 @@ fi
 
 echo "=== [2/5] Initializing Kind Cluster: ${CLUSTER_NAME} ==="
 if ! kind get clusters | grep -q "^${CLUSTER_NAME}$"; then
-  kind create cluster --name "${CLUSTER_NAME}" --config k8s/kind-config.yaml
+  kind create cluster --name "${CLUSTER_NAME}" --config "${SCRIPT_DIR}/kind-config.yaml"
 else
   echo "Cluster ${CLUSTER_NAME} already exists."
 fi
 
 echo "=== [3/5] Applying Kubernetes Manifests ==="
-kubectl apply -f k8s/00-namespace.yaml
-kubectl apply -f k8s/01-secrets.yaml
-kubectl apply -f k8s/02-configmap.yaml
-kubectl apply -f k8s/services/
-kubectl apply -f k8s/99-ingress.yaml
+kubectl apply -f "${SCRIPT_DIR}/00-namespace.yaml"
+kubectl apply -f "${SCRIPT_DIR}/01-secrets.yaml"
+kubectl apply -f "${SCRIPT_DIR}/02-configmap.yaml"
+kubectl apply -f "${SCRIPT_DIR}/services/"
+kubectl apply -f "${SCRIPT_DIR}/99-ingress.yaml"
 
 echo "=== [4/5] Cluster Status in Namespace 'smi' ==="
 kubectl get all -n smi

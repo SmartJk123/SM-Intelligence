@@ -33,7 +33,7 @@ This directory houses production-ready, declarative Kubernetes manifests for the
 ## Directory Structure
 
 ```text
-k8s/
+backend/k8s/
 ├── 00-namespace.yaml          # Defines isolated 'smi' namespace
 ├── 01-secrets.yaml            # Sensitive credentials (JWT secret, DB password, service tokens)
 ├── 02-configmap.yaml          # Twelve-Factor configuration & internal CoreDNS routing
@@ -60,7 +60,7 @@ k8s/
 1. Open a terminal in your Codespace.
 2. Execute the deployment script:
    ```bash
-   ./k8s/deploy.sh
+   ./backend/k8s/deploy.sh
    ```
 3. Watch your pods come alive:
    ```bash
