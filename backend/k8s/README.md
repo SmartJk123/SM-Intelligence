@@ -40,6 +40,7 @@ backend/k8s/
 ├── 99-ingress.yaml            # Edge Ingress routing rules & proxy timeouts
 ├── kind-config.yaml           # Multi-port cluster definition for local simulation
 ├── deploy.sh                  # One-command automated deployment script
+├── build-all.sh               # Automated 12-microservice image builder & K3s/Kind importer
 └── services/                  # Declarative Deployments & ClusterIP Services
     ├── api-gateway.yaml
     ├── identity-service.yaml
@@ -55,14 +56,45 @@ backend/k8s/
     └── assistant-service.yaml
 ```
 
-## Running on GitHub Codespaces (1-Command Launch)
+## Production Cloud Deployment (K3s on Ubuntu / OCI ARM64)
 
-1. Open a terminal in your Codespace.
-2. Execute the deployment script:
+1. **Install K3s (Lightweight Production Kubernetes)**:
+   ```bash
+   curl -sfL https://get.k3s.io | sh -
+   sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+   export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+   echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+   ```
+
+2. **Apply Platform Manifests & Secrets**:
+   ```bash
+   kubectl apply -f backend/k8s/00-namespace.yaml
+   kubectl apply -f backend/k8s/02-configmap.yaml
+   kubectl apply -f backend/k8s/services/
+   kubectl apply -f backend/k8s/99-ingress.yaml
+   ```
+
+3. **Build & Import the Entire 12-Service Fleet**:
+   ```bash
+   ./backend/k8s/build-all.sh
+   ```
+
+4. **Verify Fleet Health**:
+   ```bash
+   kubectl get pods -n smi -o wide
+   ```
+
+## Running on Local / Codespaces (Kind Simulation)
+
+1. Execute the deployment script:
    ```bash
    ./backend/k8s/deploy.sh
    ```
-3. Watch your pods come alive:
+2. Build and load the fleet:
+   ```bash
+   ./backend/k8s/build-all.sh
+   ```
+3. Watch pods:
    ```bash
    kubectl get pods -n smi -w
    ```

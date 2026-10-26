@@ -4,11 +4,11 @@ metadata:
   name: smi-config
   namespace: smi
 data:
-  # Shared Database Coordinates (Supabase session pooler on port 5432)
-  DB_HOST: "aws-0-eu-west-2.pooler.supabase.com"
+  # Shared Database Coordinates (Frankfurt PostgreSQL)
+  DB_HOST: "dpg-dauhbb893c1s73e8l5vg-a.frankfurt-postgres.render.com"
   DB_PORT: "5432"
-  DB_NAME: "postgres"
-  DB_USER: "postgres.smi"
+  DB_NAME: "smi_bank_integration"
+  DB_USER: "smi_admin"
 
   # Browser origins allowed by the edge API Gateway
   APP_CORS_ALLOWED_ORIGINS: "http://localhost:4200,http://localhost:4300,http://localhost:8080"
