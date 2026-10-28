@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: categories-service
+  namespace: smi
+  labels:
+    app: categories-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: categories-service
+  template:
+    metadata:
+      labels:
+        app: categories-service
+    spec:
+      containers:
+        - name: categories-service
+          image: smi-categories-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+              name: http
+          envFrom:
+            - configMapRef:
+                name: smi-config
+            - secretRef:
+                name: smi-secrets
+          env:
+            - name: PORT
+              value: "8084"
+            - name: DB_SCHEMA
+              value: "categories"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 40
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 25
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: categories-service
+  namespace: smi
+  labels:
+    app: categories-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8084
+      targetPort: 8084
+      protocol: TCP
+      name: http
+  selector:
+    app: categories-service
