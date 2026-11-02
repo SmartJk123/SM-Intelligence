@@ -9,6 +9,7 @@ import com.example.smartmoney.domain.model.Account
 import com.example.smartmoney.domain.model.BankAccount
 import com.example.smartmoney.domain.repository.AccountRepository
 import com.example.smartmoney.domain.repository.BankAccountRepository
+import com.example.smartmoney.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,23 +22,32 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
+import com.example.smartmoney.data.remote.RetrofitClient
 
 /**
  * Immutable UI state for the Accounts screen.
  * Consolidates all state into a single stream to eliminate fragmented Compose recompositions.
  */
+data class BankIntegrationInfo(
+    val environment: String = "SANDBOX",
+    val isLive: Boolean = false,
+    val webhookActive: Boolean = false
+)
+
 data class AccountUiState(
     val bankAccounts: List<BankAccount> = emptyList(),
     val isLoading: Boolean = false,
     val isAddingBankAccount: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val bankEnvironments: Map<String, BankIntegrationInfo> = emptyMap()
 )
 
 class AccountViewModel(
     private val repository: AccountRepository,
     private val bankAccountRepository: BankAccountRepository,
     private val userId: String,
-    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
+    private val transactionRepository: TransactionRepository? = null
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
@@ -48,6 +58,9 @@ class AccountViewModel(
 
     private val _bankAccountError = MutableStateFlow<String?>(null)
     val bankAccountError: StateFlow<String?> = _bankAccountError.asStateFlow()
+
+    private val _bankEnvironments = MutableStateFlow<Map<String, BankIntegrationInfo>>(emptyMap())
+    val bankEnvironments: StateFlow<Map<String, BankIntegrationInfo>> = _bankEnvironments.asStateFlow()
 
     // 30-second freshness guard to prevent redundant HTTP calls when warm-up has already synced Room
     private var lastSyncTimestamp: Long = 0L
@@ -65,13 +78,15 @@ class AccountViewModel(
         bankAccounts,
         _isLoading,
         _isAddingBankAccount,
-        _bankAccountError
-    ) { banks, loading, adding, error ->
+        _bankAccountError,
+        _bankEnvironments
+    ) { banks, loading, adding, error, envs ->
         AccountUiState(
             bankAccounts = banks,
             isLoading = loading,
             isAddingBankAccount = adding,
-            errorMessage = error
+            errorMessage = error,
+            bankEnvironments = envs
         )
     }.stateIn(
         scope = viewModelScope,
@@ -88,7 +103,11 @@ class AccountViewModel(
         )
 
     val totalBalance: StateFlow<BigDecimal> = accounts.map { list ->
-        list.fold(BigDecimal.ZERO) { acc, account -> acc.add(account.availableBalance) }
+        list.filterNot { a ->
+            a.institution.contains("M-Shwari", ignoreCase = true) ||
+            a.accountName.contains("M-Shwari", ignoreCase = true) ||
+            a.accountType.equals("INVESTMENT", ignoreCase = true)
+        }.fold(BigDecimal.ZERO) { acc, account -> acc.add(account.availableBalance) }
     }.flowOn(dispatchers.default)
     .stateIn(
         scope = viewModelScope,
@@ -98,6 +117,37 @@ class AccountViewModel(
 
     init {
         refreshAccounts(force = false)
+        loadBankEnvironments()
+    }
+
+    /**
+     * Probes the backend bank integration service to detect environment status (Sandbox vs Production)
+     * for supported banks (KCB, NCBA, Stanbic, Equity).
+     */
+    fun loadBankEnvironments() {
+        viewModelScope.launch(dispatchers.io) {
+            val map = mutableMapOf<String, BankIntegrationInfo>()
+            for (bank in listOf("kcb", "ncba", "stanbic", "equity")) {
+                try {
+                    val res = com.example.smartmoney.data.remote.RetrofitClient.bankIntegrationApi.getBankHealth(bank)
+                    if (res.isSuccessful && res.body() != null) {
+                        val body = res.body()!!
+                        val env = body.environment ?: "SANDBOX"
+                        val isLive = env.equals("PRODUCTION", ignoreCase = true)
+                        map[bank] = BankIntegrationInfo(
+                            environment = env,
+                            isLive = isLive,
+                            webhookActive = body.webhookStatus.equals("ACTIVE", ignoreCase = true) || isLive
+                        )
+                    } else {
+                        map[bank] = BankIntegrationInfo(environment = "SANDBOX", isLive = false)
+                    }
+                } catch (_: Exception) {
+                    map[bank] = BankIntegrationInfo(environment = "SANDBOX", isLive = false)
+                }
+            }
+            _bankEnvironments.value = map
+        }
     }
 
     /**
@@ -109,6 +159,8 @@ class AccountViewModel(
         if (!force && (now - lastSyncTimestamp < SYNC_COOLDOWN_MS)) {
             return // Local Room cache is warm and authoritative
         }
+
+        loadBankEnvironments()
 
         if (userId.isNotBlank()) {
             viewModelScope.launch(dispatchers.io) {
@@ -167,43 +219,82 @@ class AccountViewModel(
         _bankAccountError.value = null
     }
 
-    fun simulateKcbInflow(
+    fun simulateBankInflow(
+        bankName: String,
         amount: String = "1000.00",
+        accountId: String? = null,
+        accountNumber: String? = null,
         onSuccess: (() -> Unit)? = null,
         onError: ((String) -> Unit)? = null
     ) {
-        simulateKcbTransaction(amount = amount, direction = "Credit", onSuccess = onSuccess, onError = onError)
+        simulateBankTransaction(
+            bankName = bankName,
+            amount = amount,
+            direction = "Credit",
+            accountId = accountId,
+            accountNumber = accountNumber,
+            onSuccess = onSuccess,
+            onError = onError
+        )
     }
 
-    fun simulateKcbOutflow(
+    fun simulateBankOutflow(
+        bankName: String,
         amount: String = "500.00",
+        accountId: String? = null,
+        accountNumber: String? = null,
         onSuccess: (() -> Unit)? = null,
         onError: ((String) -> Unit)? = null
     ) {
-        simulateKcbTransaction(amount = amount, direction = "Debit", onSuccess = onSuccess, onError = onError)
+        simulateBankTransaction(
+            bankName = bankName,
+            amount = amount,
+            direction = "Debit",
+            accountId = accountId,
+            accountNumber = accountNumber,
+            onSuccess = onSuccess,
+            onError = onError
+        )
     }
 
-    fun simulateKcbTransaction(
+    fun simulateBankTransaction(
+        bankName: String,
         amount: String = "1000.00",
         direction: String = "Credit",
+        accountId: String? = null,
+        accountNumber: String? = null,
         onSuccess: (() -> Unit)? = null,
         onError: ((String) -> Unit)? = null
     ) {
         viewModelScope.launch(dispatchers.io) {
             try {
                 val isDebit = direction.equals("Debit", ignoreCase = true)
-                val narration = if (isDebit) "Simulated KCB Outflow" else "Simulated KCB Inflow"
+                val bankClean = bankName.trim().lowercase(java.util.Locale.ROOT)
+                val bankUpper = bankName.trim().uppercase(java.util.Locale.ROOT)
+                val narration = if (isDebit) "Simulated $bankUpper Outflow" else "Simulated $bankUpper Inflow"
                 val req = com.example.smartmoney.data.remote.api.SimulateTransactionRequest(
+                    bankId = bankClean,
                     amount = amount,
                     direction = direction,
-                    narration = narration
+                    narration = narration,
+                    accountNumber = accountNumber
                 )
-                val response = com.example.smartmoney.data.remote.RetrofitClient.bankIntegrationApi.simulateKcbTransaction(req)
+                val response = com.example.smartmoney.data.remote.RetrofitClient.bankIntegrationApi.simulateTransaction(req)
                 if (response.isSuccessful) {
                     val parsedAmt = try { BigDecimal(amount) } catch (_: Exception) { BigDecimal.ZERO }
                     val delta = if (isDebit) parsedAmt.negate() else parsedAmt
-                    bankAccountRepository.adjustKcbBalance(delta)
+                    bankAccountRepository.adjustBankBalance(
+                        bankName = bankUpper,
+                        delta = delta,
+                        accountId = accountId,
+                        userId = userId
+                    )
                     repository.syncAccounts(userId)
+                    try {
+                        transactionRepository?.syncTransactions(userId)
+                    } catch (_: Exception) {
+                        // Tolerate if sync fails
+                    }
                     withContext(dispatchers.main) {
                         onSuccess?.invoke()
                     }
@@ -219,6 +310,25 @@ class AccountViewModel(
             }
         }
     }
+
+    fun simulateKcbInflow(
+        amount: String = "1000.00",
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) = simulateBankInflow(bankName = "KCB", amount = amount, onSuccess = onSuccess, onError = onError)
+
+    fun simulateKcbOutflow(
+        amount: String = "500.00",
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) = simulateBankOutflow(bankName = "KCB", amount = amount, onSuccess = onSuccess, onError = onError)
+
+    fun simulateKcbTransaction(
+        amount: String = "1000.00",
+        direction: String = "Credit",
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) = simulateBankTransaction(bankName = "KCB", amount = amount, direction = direction, onSuccess = onSuccess, onError = onError)
 
     /**
      * Removes an account permanently from the remote backend and local database.
@@ -252,12 +362,19 @@ class AccountViewModel(
         private val repository: AccountRepository,
         private val bankAccountRepository: BankAccountRepository,
         private val userId: String,
-        private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
+        private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
+        private val transactionRepository: TransactionRepository? = null
     ) : ViewModelProvider.Factory {
 
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return AccountViewModel(repository, bankAccountRepository, userId, dispatchers) as T
+            return AccountViewModel(
+                repository = repository,
+                bankAccountRepository = bankAccountRepository,
+                userId = userId,
+                dispatchers = dispatchers,
+                transactionRepository = transactionRepository
+            ) as T
         }
     }
 }

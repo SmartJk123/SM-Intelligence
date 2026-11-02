@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -37,13 +36,20 @@ private data class InvestmentMessageState(
 
 class InvestmentViewModel(
     private val investmentRepository: InvestmentRepository,
+    private val userId: String? = null,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : ViewModel() {
 
     private val _messageState = MutableStateFlow(InvestmentMessageState())
 
+    init {
+        viewModelScope.launch {
+            investmentRepository.loadInvestmentsForUser(userId)
+        }
+    }
+
     val uiState: StateFlow<InvestmentUiState> = combine(
-        investmentRepository.getInvestments(),
+        investmentRepository.getInvestments(userId),
         _messageState
     ) { list, messages ->
         withContext(dispatchers.default) {
@@ -82,6 +88,7 @@ class InvestmentViewModel(
         viewModelScope.launch(dispatchers.main) {
             val investment = Investment(
                 id = id,
+                userId = userId ?: "",
                 name = name,
                 type = type,
                 principalMinor = principalMinor,
@@ -89,13 +96,13 @@ class InvestmentViewModel(
                 valuationDate = valuationDate,
                 maturityDate = maturityDate
             )
-            investmentRepository.saveInvestment(investment)
+            investmentRepository.saveInvestment(investment, userId)
         }
     }
 
     fun deleteInvestment(id: String) {
         viewModelScope.launch(dispatchers.main) {
-            investmentRepository.deleteInvestment(id)
+            investmentRepository.deleteInvestment(id, userId)
         }
     }
 
@@ -105,11 +112,12 @@ class InvestmentViewModel(
 
     class Factory(
         private val investmentRepository: InvestmentRepository,
+        private val userId: String? = null,
         private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return InvestmentViewModel(investmentRepository, dispatchers) as T
+            return InvestmentViewModel(investmentRepository, userId, dispatchers) as T
         }
     }
 }

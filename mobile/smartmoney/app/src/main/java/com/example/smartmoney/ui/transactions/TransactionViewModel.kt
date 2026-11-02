@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
+import com.example.smartmoney.data.remote.RetrofitClient
 
 class TransactionViewModel(
     private val repository: TransactionRepository? = null,

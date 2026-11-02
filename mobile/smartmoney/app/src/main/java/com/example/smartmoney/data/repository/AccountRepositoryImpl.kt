@@ -12,13 +12,28 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import com.example.smartmoney.data.local.dao.TransactionDao
 import java.math.BigDecimal
 
 class AccountRepositoryImpl(
     private val remoteDataSource: AccountRemoteDataSource,
     private val localDao: AccountDao,
+    private val transactionDao: TransactionDao? = null,
+    private val userIdProvider: (() -> String?)? = null,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : AccountRepository {
+
+    constructor(
+        remoteDataSource: AccountRemoteDataSource,
+        localDao: AccountDao,
+        dispatchers: DispatcherProvider = DefaultDispatcherProvider()
+    ) : this(
+        remoteDataSource = remoteDataSource,
+        localDao = localDao,
+        transactionDao = null,
+        userIdProvider = null,
+        dispatchers = dispatchers
+    )
 
     override fun getAccountsFlow(userId: String): Flow<List<Account>> {
         return localDao.getAccountsForUser(userId)
@@ -63,6 +78,10 @@ class AccountRepositoryImpl(
         try {
             remoteDataSource.deleteAccount(id)
             localDao.deleteAccountById(id)
+            val currentUserId = userIdProvider?.invoke()
+            if (!currentUserId.isNullOrBlank() && transactionDao != null) {
+                transactionDao.deleteTransactionsForAccount(currentUserId, id)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

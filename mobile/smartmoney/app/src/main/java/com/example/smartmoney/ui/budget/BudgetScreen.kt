@@ -7,6 +7,10 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -79,6 +83,7 @@ enum class BudgetFilter(val label: String) {
 fun BudgetScreen(
     viewModel: BudgetViewModel,
     accountViewModel: AccountViewModel? = null,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -110,6 +115,18 @@ fun BudgetScreen(
     }
 
     Scaffold(
+        topBar = {
+            @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+            TopAppBar(
+                title = { Text("Budgets", style = MaterialTheme.typography.titleMedium) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                windowInsets = WindowInsets(0, 0, 0, 0)
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {

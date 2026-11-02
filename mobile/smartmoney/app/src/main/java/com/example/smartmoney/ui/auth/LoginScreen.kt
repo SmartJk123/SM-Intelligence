@@ -152,7 +152,7 @@ fun LoginScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 40.dp) // Pinched width for a smaller footprint
+                .padding(horizontal = 40.dp)
                 .align(Alignment.Center)
                 .background(
                     brush = formGradient,
@@ -171,7 +171,7 @@ fun LoginScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp) // Reduced padding for compactness
+                    .padding(20.dp)
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

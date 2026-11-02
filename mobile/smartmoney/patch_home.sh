@@ -1,0 +1,1 @@
+sed -i 's/uiState: HomeUiState = HomeUiState.DEFAULT,/uiState: HomeUiState = HomeUiState.DEFAULT,\n    totalInvestmentBalance: java.math.BigDecimal = java.math.BigDecimal.ZERO,/' /home/frank/AndroidStudioProjects/smartmoney/app/src/main/java/com/example/smartmoney/ui/home/HomeScreen.kt

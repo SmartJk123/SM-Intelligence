@@ -37,7 +37,7 @@ class AccountRemoteDataSource(
     }
 
     /**
-     * Creates a new financial or energy account via POST /api/accounts.
+     * Creates a new financial account via POST /api/accounts.
      */
     suspend fun createAccount(request: CreateAccountRequest): Account {
         val response = accountApi.createAccount(request)
