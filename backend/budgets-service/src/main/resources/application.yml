@@ -8,7 +8,7 @@ spring:
   datasource:
     # Locally DB_URL wins. On Render the address is built from DB_HOST, DB_PORT and DB_NAME,
     # and DB_SCHEMA keeps each service in its own schema of one shared database.
-    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5436}/${DB_NAME:smi_budgets}?currentSchema=${DB_SCHEMA:public}}
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5436}/${DB_NAME:smi_budgets}?currentSchema=${DB_SCHEMA:budgets}}
     username: ${DB_USER:admin}
     password: ${DB_PASSWORD:secretpassword}
     driver-class-name: org.postgresql.Driver
@@ -21,9 +21,13 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: ${DB_SCHEMA:budgets}
 
   flyway:
     enabled: true
-    # Created on first start when it does not exist yet.
-    schemas: ${DB_SCHEMA:public}
+    create-schemas: true
+    schemas: ${DB_SCHEMA:budgets}
+    default-schema: ${DB_SCHEMA:budgets}
+    baseline-on-migrate: true
+    baseline-version: 0
     locations: classpath:db/migration

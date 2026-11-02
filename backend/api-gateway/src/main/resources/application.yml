@@ -61,6 +61,30 @@ spring:
               predicates:
                 # Customers link and remove their own accounts here (the bank service checks ownership).
                 - Path=/api/v1/admin/account-links,/api/v1/admin/account-links/**
+            - id: budgets-service
+              uri: ${BUDGETS_SERVICE_URL:http://${BUDGETS_SERVICE_HOSTPORT:localhost:8085}}
+              predicates:
+                - Path=/api/budgets,/api/budgets/**
+            - id: investments-service
+              uri: ${INVESTMENTS_SERVICE_URL:http://${INVESTMENTS_SERVICE_HOSTPORT:localhost:8086}}
+              predicates:
+                - Path=/api/investments,/api/investments/**
+            - id: categories-service
+              uri: ${CATEGORIES_SERVICE_URL:http://${CATEGORIES_SERVICE_HOSTPORT:localhost:8084}}
+              predicates:
+                - Path=/api/categories,/api/categories/**
+            - id: forecasts-service
+              uri: ${FORECASTS_SERVICE_URL:http://${FORECASTS_SERVICE_HOSTPORT:localhost:8087}}
+              predicates:
+                - Path=/api/forecasts,/api/forecasts/**
+            - id: notifications-service
+              uri: ${NOTIFICATIONS_SERVICE_URL:http://${NOTIFICATIONS_SERVICE_HOSTPORT:localhost:8088}}
+              predicates:
+                - Path=/api/notifications,/api/notifications/**
+            - id: audit-service
+              uri: ${AUDIT_SERVICE_URL:http://${AUDIT_SERVICE_HOSTPORT:localhost:8089}}
+              predicates:
+                - Path=/api/audit,/api/audit/**
 management:
   endpoints:
     web:

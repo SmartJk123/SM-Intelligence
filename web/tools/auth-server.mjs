@@ -353,20 +353,20 @@ async function sendWorkspace(send, call, callBudgets, callInvestments, session, 
 
 // Loopback development adapter. JWTs stay here; the browser receives an HttpOnly session cookie.
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
-  const backend = new URL(options.identityUrl || process.env.IDENTITY_API_URL || 'http://localhost:8080');
-  const invoiceBackend = new URL(options.invoiceUrl || process.env.INVOICE_API_URL || backend);
-  const accountsBackend = new URL(options.accountsUrl || process.env.ACCOUNTS_API_URL || backend);
+  const backend = new URL(options.identityUrl || process.env.IDENTITY_SERVICE_URL || process.env.IDENTITY_API_URL || 'http://localhost:8080');
+  const invoiceBackend = new URL(options.invoiceUrl || process.env.INVOICE_SERVICE_URL || process.env.INVOICE_API_URL || backend);
+  const accountsBackend = new URL(options.accountsUrl || process.env.ACCOUNTS_SERVICE_URL || process.env.ACCOUNTS_API_URL || backend);
   if (accountsBackend.protocol !== 'https:' && !(accountsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(accountsBackend.hostname)))
     throw new Error('Accounts API requires HTTPS, except on loopback.');
   // Where a newly created account is registered so a matching bank notification
   // (by bank + account number) reaches this customer's dashboard. Best-effort:
   // the account is already saved by the time this is called, so a failure here
   // is logged and swallowed rather than failing the account creation itself.
-  const bankIntegrationBackend = new URL(options.bankIntegrationUrl || process.env.BANK_INTEGRATION_API_URL || 'http://localhost:8090');
+  const bankIntegrationBackend = new URL(options.bankIntegrationUrl || process.env.BANK_INTEGRATION_SERVICE_URL || process.env.BANK_INTEGRATION_API_URL || 'http://localhost:8090');
   if (bankIntegrationBackend.protocol !== 'https:' && !(bankIntegrationBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(bankIntegrationBackend.hostname)))
     throw new Error('Bank integration API requires HTTPS, except on loopback.');
-  const budgetsBackend = new URL(options.budgetsUrl || process.env.BUDGETS_API_URL || 'http://localhost:8085');
-  const investmentsBackend = new URL(options.investmentsUrl || process.env.INVESTMENTS_API_URL || 'http://localhost:8086');
+  const budgetsBackend = new URL(options.budgetsUrl || process.env.BUDGETS_SERVICE_URL || process.env.BUDGETS_API_URL || 'http://localhost:8085');
+  const investmentsBackend = new URL(options.investmentsUrl || process.env.INVESTMENTS_SERVICE_URL || process.env.INVESTMENTS_API_URL || 'http://localhost:8086');
   if (investmentsBackend.protocol !== 'https:' && !(investmentsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(investmentsBackend.hostname)))
     throw new Error('Investments API requires HTTPS, except on loopback.');
   if (budgetsBackend.protocol !== 'https:' && !(budgetsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(budgetsBackend.hostname)))
