@@ -54,14 +54,25 @@
               Bank notifications received each day, last 14 days
             </p>
           </div>
-          <button
-            type="button"
-            (click)="refresh()"
-            class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
-            style="border-color: var(--border); color: var(--text-2)"
-          >
-            <span class="icon icon-sm">refresh</span> Refresh
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              (click)="exportVolume()"
+              [disabled]="!hasData()"
+              class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80 disabled:opacity-40"
+              style="border-color: var(--border); color: var(--text-2)"
+            >
+              <span class="icon icon-sm">download</span> Export CSV
+            </button>
+            <button
+              type="button"
+              (click)="refresh()"
+              class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
+              style="border-color: var(--border); color: var(--text-2)"
+            >
+              <span class="icon icon-sm">refresh</span> Refresh
+            </button>
+          </div>
         </div>
 
         @if (hasData()) {
@@ -107,14 +118,25 @@
               Notifications the platform has received and processed
             </p>
           </div>
-          <button
-            type="button"
-            (click)="goTo('notifications')"
-            class="text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
-            style="border-color: var(--border); color: var(--text-2)"
-          >
-            View all
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              (click)="exportActivity()"
+              [disabled]="events().length === 0"
+              class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80 disabled:opacity-40"
+              style="border-color: var(--border); color: var(--text-2)"
+            >
+              <span class="icon icon-sm">download</span> Export CSV
+            </button>
+            <button
+              type="button"
+              (click)="goTo('notifications')"
+              class="text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
+              style="border-color: var(--border); color: var(--text-2)"
+            >
+              View all
+            </button>
+          </div>
         </div>
 
         <div class="overflow-x-auto">

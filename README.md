@@ -16,13 +16,13 @@ and `ADMIN_EMAILS`. Never use or share production values.
 
 **Quickest way:** from the repository root run `.\start-local.ps1`. It opens one window per service in the
 order sign-in needs them (identity, accounts, transactions, budgets, investments, api-gateway,
-bank-integration, web, admin), finds
-Java 25 by itself, loads each service's `.env.local`, skips anything already running and waits for each service
-to be healthy. Stop everything with `.\start-local.ps1 -Stop`. If sign-in says "Unable to sign in ... the account
-service may be unavailable" or "Could not reach the identity service", the api-gateway (8080) is not running.
+bank-integration, web, admin). It finds Java 25 by itself, loads each service's `.env.local`, skips anything
+already running and waits for each service to be healthy. Stop everything with `.\start-local.ps1 -Stop`.
+If sign-in says "Unable to sign in ... the account service may be unavailable" or "Could not reach the
+identity service", the api-gateway (8080) is not running.
 
-To start a service by hand instead: Each Java service needs JDK 25 and is started from the repository root, one terminal each. Maven does not
-read `.env.local`, so load the service's file first:
+To start a service by hand instead, open one terminal per service at the repository root. Each Java service
+needs JDK 25. Maven does not read `.env.local`, so load the service's file first:
 
 ```powershell
 $env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot'
@@ -49,7 +49,6 @@ between identity-service and bank-integration-service. Running the script again 
 
 Start bank-integration-service as shown: its H2 database is a folder relative to where it starts, and the
 script uses `backend/bank-integration-service/data`.
-
 
 ## Health alerts, CORS and idle sign-out
 

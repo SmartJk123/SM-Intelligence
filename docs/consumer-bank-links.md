@@ -8,26 +8,20 @@ front user. An administrator registers applications, copies a Token URL and gene
 is what the developer portals on the Bank Integrations page are for. This list is kept here so the
 front-end team can pick it up rather than have it disappear.
 
-## Document control
-
-| Field | Value |
-| --- | --- |
-| Document type | Reference list |
-| Version | 1.0 |
-| Status | Handover. Nothing in the admin interface links to these any more |
-| Owner | Eclectics, SmartMoney Intelligence |
-| Last updated | 20 September 2026 |
-| Related documents | [API contract](api-contract.md), [Service README](../backend/README.md) |
-| Prerequisites | None |
+Reference list, version 1.0, last updated 20 September 2026, owned by Eclectics, SmartMoney
+Intelligence. Status: handover; nothing in the admin interface links to these any more. Related
+reading: the [API contract](api-contract.md) and the [service README](../backend/README.md).
 
 ## The links
 
-| Bank | Online banking | Google Play | App Store | USSD |
-| --- | --- | --- | --- | --- |
-| KCB | <https://ke.kcbgroup.com/> | `com.kcb.mobilebanking.android.mbp` | `id6738310699` | not published |
-| NCBA | <https://www.ncbagroup.com/> | `com.nicbank.android` | `id725534467` | not published |
-| Equity | <https://equitybank.co.ke/> | store search, see the note below | store search, see the note below | not published |
-| Stanbic | <https://www.stanbicbank.co.ke/> | `com.cfcstanbicbank.app` | `id1012923421` | `*208#` |
+- **KCB.** Online banking at <https://ke.kcbgroup.com/>. Google Play `com.kcb.mobilebanking.android.mbp`,
+  App Store `id6738310699`. No USSD code published.
+- **NCBA.** Online banking at <https://www.ncbagroup.com/>. Google Play `com.nicbank.android`, App Store
+  `id725534467`. No USSD code published.
+- **Equity.** Online banking at <https://equitybank.co.ke/>. Both stores are a search for now (see the
+  note below). No USSD code published.
+- **Stanbic.** Online banking at <https://www.stanbicbank.co.ke/>. Google Play `com.cfcstanbicbank.app`,
+  App Store `id1012923421`. USSD `*208#`.
 
 Full store addresses:
 

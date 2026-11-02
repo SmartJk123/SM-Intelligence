@@ -4,16 +4,11 @@ The interface between the administrator interface, the business user interface a
 backend. Treat this document as the merge boundary: if both sides implement what is written here,
 the merge is a contract check rather than a code negotiation.
 
-## Document control
-
-| Field | Value |
-| --- | --- |
-| Document type | Interface contract |
-| Version | 1.0 |
-| Status | Draft, pending the business surface |
-| Owner | Eclectics, SmartMoney Intelligence |
-| Last updated | 18 September 2026 |
-| Related documents | [Stanbic integration setup](../admin-interface/docs/stanbic-integration-setup.md), [KCB real time trial](../admin-interface/docs/kcb-real-time-trial.md), [NCBA integration setup](ncba-integration-setup.md) |
+Interface contract, version 1.1, last updated 18 September 2026, owned by Eclectics, SmartMoney
+Intelligence. Status: draft, pending the business surface. Related reading:
+[Stanbic integration setup](../admin-interface/docs/stanbic-integration-setup.md),
+[KCB real time trial](../admin-interface/docs/kcb-real-time-trial.md) and
+[NCBA integration setup](ncba-integration-setup.md).
 
 ## 1. Three surfaces
 
@@ -40,26 +35,34 @@ repeated per controller.
 
 Implemented in this repository unless marked otherwise.
 
-| Method | Path | Returns |
-| --- | --- | --- |
-| GET | `/api/v1/admin/bank-integrations` | Health for every bank: status, latency, counts, last receipt |
-| GET | `/api/v1/admin/bank-integrations/{bankId}` | Health for one bank |
-| GET | `/api/v1/admin/bank-integrations/{bankId}/credentials` | Credential status, masked. Never a secret |
-| GET | `/api/v1/admin/bank-integrations/{bankId}/settings` | Stored settings |
-| PUT | `/api/v1/admin/bank-integrations/{bankId}` | Save settings |
-| POST | `/api/v1/admin/bank-integrations/{bankId}/test` | Connection test, four steps |
-| POST | `/api/v1/admin/bank-integrations/{bankId}/register-callback` | Register the callback with the bank |
-| GET | `/api/v1/admin/demo/account` | The demonstration account: reserved number and name |
-| GET | `/api/v1/admin/demo/transactions` | Movements on the demonstration account, newest first |
-| GET | `/api/v1/admin/demo/summary` | Money in, money out and the difference, all measured |
-| POST | `/api/v1/admin/demo/transactions` | Record one movement. Body optional, a bare POST records a credit |
-| GET | `/api/v1/admin/organisations` | Directory only: name, type, user count, account count, status |
-| GET | `/api/v1/admin/users` | Directory: name, email, organisation, role, status, last login |
-| GET | `/api/v1/admin/transactions` | Operational view: reference, bank, status, processing time. Amounts masked |
-| GET | `/api/v1/admin/reconciliation` | Match rate and exceptions, aggregated |
-| GET | `/api/v1/admin/audit-logs` | Administrative activity |
-| GET | `/api/v1/admin/notifications` | Platform alerts |
-| GET | `/api/v1/admin/reports/{reportId}` | A report's rows |
+Bank integrations:
+
+- `GET /api/v1/admin/bank-integrations`: health for every bank (status, latency, counts, last receipt).
+- `GET /api/v1/admin/bank-integrations/{bankId}`: health for one bank.
+- `GET /api/v1/admin/bank-integrations/{bankId}/credentials`: credential status, masked. Never a secret.
+- `GET /api/v1/admin/bank-integrations/{bankId}/settings`: the stored settings.
+- `PUT /api/v1/admin/bank-integrations/{bankId}`: save the settings.
+- `POST /api/v1/admin/bank-integrations/{bankId}/test`: the four step connection test.
+- `POST /api/v1/admin/bank-integrations/{bankId}/register-callback`: register the callback with the bank.
+
+Demonstration account:
+
+- `GET /api/v1/admin/demo/account`: the reserved account number and name.
+- `GET /api/v1/admin/demo/transactions`: movements on the account, newest first.
+- `GET /api/v1/admin/demo/summary`: money in, money out and the difference, all measured.
+- `POST /api/v1/admin/demo/transactions`: record one movement. The body is optional; a bare POST records
+  a credit.
+
+Directory and monitoring:
+
+- `GET /api/v1/admin/organisations`: directory only (name, type, user count, account count, status).
+- `GET /api/v1/admin/users`: directory (name, email, organisation, role, status, last login).
+- `GET /api/v1/admin/transactions`: operational view (reference, bank, status, processing time), with
+  amounts masked.
+- `GET /api/v1/admin/reconciliation`: match rate and exceptions, aggregated.
+- `GET /api/v1/admin/audit-logs`: administrative activity.
+- `GET /api/v1/admin/notifications`: platform alerts.
+- `GET /api/v1/admin/reports/{reportId}`: a report's rows.
 
 The organisational directory is not client financial data. Profile information about who uses the
 platform is what an administrator needs in order to operate it.
@@ -67,13 +70,14 @@ platform is what an administrator needs in order to operate it.
 ### Bank notification endpoints
 
 One endpoint per bank, all public and none authenticated by a user session. Each answers a GET probe
-so the address can be confirmed before it is given to a bank.
+so the address can be confirmed before it is given to a bank. Each accepts GET and POST.
 
-| Method | Path | Bank | Verification |
-| --- | --- | --- | --- |
-| GET, POST | `/api/v1/webhooks/kcb` | KCB Bank Kenya | SHA256withRSA over the raw body in the `Signature` header |
-| GET, POST | `/api/v1/webhooks/stanbic` | Stanbic Bank Kenya | HMAC-SHA256 once Stanbic confirms the scheme. Fails closed today |
-| GET, POST | `/api/v1/webhooks/ncba` | NCBA Bank Kenya | `HashVal`, recomputed from the secret key over nine named fields, plus the username and password |
+- `/api/v1/webhooks/kcb` (KCB Bank Kenya) checks a SHA256withRSA signature over the raw body, sent in
+  the `Signature` header.
+- `/api/v1/webhooks/stanbic` (Stanbic Bank Kenya) will check HMAC-SHA256 once Stanbic confirms the
+  scheme. Until then it fails closed.
+- `/api/v1/webhooks/ncba` (NCBA Bank Kenya) recomputes `HashVal` from the secret key over nine named
+  fields, and checks the username and password.
 
 `{bankId}` is `kcb`, `stanbic` or `ncba`. Whether a notification is verified is stored per bank and
 is what the toggle in the admin interface edits, so the setting the operator sees is the setting the
@@ -83,17 +87,16 @@ endpoint obeys. The environment variable only supplies the value until something
 
 A bank sandbox cannot show a real account moving. The demonstration account exists so a
 demonstration can show money arriving and money leaving, and it is the single place where an amount
-appears on the admin surface.
+appears on the admin surface. Its rules:
 
-| Rule | Value |
-| --- | --- |
-| Account number | `1000000001`, reserved. Nothing else may use it |
-| Reference prefix | `DEMO-TXN-`, reserved. It is a label, not the selector |
-| How movements are found | By the `simulated` flag on the stored event, never by the reference, so a signed rehearsal whose reference begins the same way cannot be mistaken for a demonstration |
-| Verification | None. A movement is not a delivery from a bank, so there is no signature to check |
-| Signature state | `null`, which means unchecked and must never be displayed as verified |
-| Delivery figures | Excluded. Bank health counts and the platform totals ignore every simulated event |
-| Activity list | Included, carrying `"simulated": true` so the interface can label it |
+- The account number `1000000001` is reserved. Nothing else may use it.
+- The reference prefix `DEMO-TXN-` is reserved too, but it is a label, not the selector.
+- Movements are found by the `simulated` flag on the stored event, never by the reference, so a signed
+  rehearsal whose reference begins the same way cannot be mistaken for a demonstration.
+- There is no verification. A movement is not a delivery from a bank, so there is no signature to check.
+- The signature state is `null`, which means unchecked and must never be displayed as verified.
+- Delivery figures exclude it. Bank health counts and the platform totals ignore every simulated event.
+- The activity list includes it, with `"simulated": true` so the interface can label it.
 
 `POST /api/v1/admin/demo/transactions` accepts
 `{"bankId":"kcb","direction":"Credit","amount":2500.00,"narration":"Supplier payment"}`. `bankId`
@@ -109,38 +112,32 @@ Owner: the business user interface developer. Not implemented in this repository
 Customer facing links to each bank, which the administrator does not need, are collected in
 [Consumer bank links](consumer-bank-links.md).
 
-| Method | Path | Returns |
-| --- | --- | --- |
-| GET | `/api/v1/business/dashboard` | Own summary: income, expenses, net flow, outstanding collections |
-| GET | `/api/v1/business/accounts` | Own accounts with balances |
-| GET | `/api/v1/business/accounts/{accountId}` | One account with balance and recent movements |
-| GET | `/api/v1/business/transactions` | Own transactions, full detail and amounts |
-| GET | `/api/v1/business/collections` | Expected, received, outstanding, overdue, partially paid |
-| GET | `/api/v1/business/budgets` | Planned against actual, with variance |
-| GET | `/api/v1/business/reconciliation` | Own matches and exceptions |
-| GET | `/api/v1/business/reports/{reportId}` | Own reports |
+- `GET /api/v1/business/dashboard`: own summary (income, expenses, net flow, outstanding collections).
+- `GET /api/v1/business/accounts`: own accounts with balances.
+- `GET /api/v1/business/accounts/{accountId}`: one account with its balance and recent movements.
+- `GET /api/v1/business/transactions`: own transactions, with full detail and amounts.
+- `GET /api/v1/business/collections`: expected, received, outstanding, overdue and partially paid.
+- `GET /api/v1/business/budgets`: planned against actual, with variance.
+- `GET /api/v1/business/reconciliation`: own matches and exceptions.
+- `GET /api/v1/business/reports/{reportId}`: own reports.
 
 ## 5. Shared conventions
 
-| Concern | Convention |
-| --- | --- |
-| Content type | `application/json` |
-| Field naming | camelCase |
-| Timestamps | ISO-8601 with offset, for example `2026-09-15T09:53:21Z` |
-| Money | A number plus a `currency` field. Never pre-formatted text |
-| Identifiers | Strings, so they can grow |
-| Errors | Spring's default shape: `timestamp`, `status`, `error`, `path` |
-| Pagination | `page`, `size`, `totalElements`, `content` |
-| Authentication | `Authorization: Bearer <token>`. The backend validates the token and reads the organisation claim from it |
+- Requests and responses are `application/json`, with camelCase field names.
+- Timestamps are ISO-8601 with an offset, for example `2026-09-15T09:53:21Z`.
+- Money is a number plus a `currency` field, never pre-formatted text.
+- Identifiers are strings, so they can grow.
+- Errors use Spring's default shape: `timestamp`, `status`, `error`, `path`.
+- Pages use `page`, `size`, `totalElements` and `content`.
+- Authentication is `Authorization: Bearer <token>`. The backend validates the token and reads the
+  organisation claim from it.
 
 ## 6. Ownership for the merge
 
-| Area | Owner |
-| --- | --- |
-| Bank integration module, admin endpoints, webhook endpoints | This repository |
-| Business endpoints and the business user interface | The business interface developer |
-| Contract changes | Agreed by both before either merges |
-| Database schema | One owner. Two people editing migrations produces conflicts |
+This repository owns the bank integration module, the admin endpoints and the webhook endpoints. The
+business interface developer owns the business endpoints and the business user interface. Both agree
+on any contract change before either merges. The database schema has one owner, because two people
+editing migrations produces conflicts.
 
 ## 7. Keeping the merge mechanical
 
@@ -154,7 +151,7 @@ Customer facing links to each bank, which the administrator does not need, are c
 
 ## Revision history
 
-| Version | Date | Summary |
-| --- | --- | --- |
-| 1.1 | 18 September 2026 | NCBA notification endpoint added. The per bank verification setting is stored and enforced, so the admin toggle is the authority |
-| 1.0 | 15 September 2026 | Initial contract: three surfaces, tenancy rule, admin and business endpoints |
+- **1.1, 18 September 2026.** NCBA notification endpoint added. The per bank verification setting is
+  stored and enforced, so the admin toggle is the authority.
+- **1.0, 15 September 2026.** Initial contract: three surfaces, tenancy rule, admin and business
+  endpoints.

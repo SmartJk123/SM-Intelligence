@@ -9,8 +9,8 @@ export const IDLE_WARNING_MS = 60 * 1000;
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove'] as const;
 
 /**
- * Signs an inactive administrator out. The admin token lives in this browser
- * (localStorage) for up to a day, so an unattended portal would otherwise stay
+ * Signs an inactive administrator out. The admin token stays valid in this tab
+ * (sessionStorage) for up to a day, so an unattended portal would otherwise stay
  * open on every customer's data. AdminLayout starts this while signed in.
  */
 @Injectable({ providedIn: 'root' })

@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
@@ -34,7 +36,9 @@ import java.util.List;
  * remove it. AccountLinkController checks that the account is really theirs.
  *
  * PERMIT_ALL=true switches all of this off. It exists for tests and isolated
- * debugging only, and is off by default.
+ * debugging only, and is off by default. The service refuses to start with it
+ * on the postgres profile, which is the deployed configuration, so a stray
+ * environment variable cannot open the admin API in production.
  */
 @Configuration
 @EnableWebSecurity
@@ -44,10 +48,14 @@ public class SecurityConfig {
     public static final String CUSTOMER_ROLE = "USER";
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http, PlatformProperties platform, ObjectMapper mapper)
-            throws Exception {
+    SecurityFilterChain apiSecurity(HttpSecurity http, PlatformProperties platform, ObjectMapper mapper,
+                                    Environment environment) throws Exception {
         PlatformProperties.Security security = platform.security();
         boolean permitAll = security != null && security.permitAll();
+        if (permitAll && environment.acceptsProfiles(Profiles.of("postgres"))) {
+            throw new IllegalStateException(
+                    "PERMIT_ALL=true is not allowed on the postgres (deployed) profile. Set PERMIT_ALL=false.");
+        }
 
         http.csrf(csrf -> csrf.disable());
         http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
