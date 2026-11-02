@@ -3,6 +3,12 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { IDENTITY_AUTH_BASE_URL } from './api.config';
 
+/**
+ * The admin token is kept in sessionStorage, not localStorage: it is gone when
+ * the browser is closed instead of staying on disk until it expires, and it is
+ * not shared with other tabs. Script on the page can still read it, so this
+ * narrows the exposure but is not an HttpOnly cookie.
+ */
 const TOKEN_STORAGE_KEY = 'smi_admin_token';
 
 /** The signed-in administrator, read from the identity-service JWT's claims. */
@@ -82,16 +88,16 @@ export class AuthService {
     }
     this.tokenState.set(response.token);
     try {
-      localStorage.setItem(TOKEN_STORAGE_KEY, response.token);
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, response.token);
     } catch {
-      // Storage may be unavailable (private browsing); the session still works for this tab.
+      // Storage may be unavailable; the session still works until this page is reloaded.
     }
   }
 
   logout(): void {
     this.tokenState.set(null);
     try {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     } catch {
       // Nothing to clean up if storage was never available.
     }
@@ -100,7 +106,14 @@ export class AuthService {
 
 function readStoredToken(): string | null {
   try {
-    return typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
+    // A token saved by an earlier version, which used localStorage, is dropped
+    // rather than carried over, so it no longer sits on disk.
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // Storage unavailable: nothing was stored there.
+  }
+  try {
+    return typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(TOKEN_STORAGE_KEY) : null;
   } catch {
     return null;
   }
