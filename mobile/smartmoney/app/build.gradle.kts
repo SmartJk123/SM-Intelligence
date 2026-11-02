@@ -20,9 +20,9 @@ val supabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
     ?: "sb_publishable_PeXsVtIFu1lsECKVbIp2cA_-Z5Wzu3V"
 val bankIntegrationUrl: String = localProperties.getProperty("BANK_INTEGRATION_URL")
     ?: "https://bank-integration-service.onrender.com/"
-// Production Render Gateway
+// Production Kubernetes Fleet
 val apiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
-    ?: "https://api-gateway-cbby.onrender.com/"
+    ?: "http://145.241.250.59/"
 
 android {
     namespace = "com.example.smartmoney"
