@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
@@ -121,6 +122,7 @@ private val DarkGreenPillBadge = SmartMoneyColors.DarkSlateGreen // #657166: Dar
 @Composable
 fun HomeScreen(
     uiState: HomeUiState = HomeUiState.DEFAULT,
+    totalInvestmentBalance: java.math.BigDecimal = java.math.BigDecimal.ZERO,
     userName: String = "User",
     onLinkAccountClick: () -> Unit = {},
     unreadNotificationCount: Int = uiState.unreadNotificationCount,
@@ -212,6 +214,7 @@ fun HomeScreen(
                         when (page) {
                             0 -> TotalBalanceBannerCard(
                                 uiState = uiState,
+                                totalInvestmentBalance = totalInvestmentBalance,
                                 isBalanceVisible = isBalanceVisible,
                                 onToggleBalanceVisibility = { isBalanceVisible = !isBalanceVisible }
                             )
@@ -439,11 +442,34 @@ private fun TopCardBottomGlowLine(
 @Composable
 private fun TotalBalanceBannerCard(
     uiState: HomeUiState,
+    totalInvestmentBalance: java.math.BigDecimal,
     isBalanceVisible: Boolean,
     onToggleBalanceVisibility: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalDarkTheme.current
+    var isShowingInvestments by remember { mutableStateOf(false) }
+
+    val targetColors = remember(isDark, isShowingInvestments) {
+        val baseDark = listOf(Color(0xFF4A4A4A), Color(0xFF2C2C2C), Color(0xFF383838), Color(0xFF505050))
+        val baseLight = listOf(Color(0xFFE5E4E2), Color(0xFFF8F8F8), Color(0xFFD3D3D3), Color(0xFFE8E8E8))
+        val base = if (isDark) baseDark else baseLight
+        if (isShowingInvestments) base.reversed() else base
+    }
+
+    val c0 by animateColorAsState(targetValue = targetColors[0], animationSpec = tween(600, easing = FastOutSlowInEasing))
+    val c1 by animateColorAsState(targetValue = targetColors[1], animationSpec = tween(600, easing = FastOutSlowInEasing))
+    val c2 by animateColorAsState(targetValue = targetColors[2], animationSpec = tween(600, easing = FastOutSlowInEasing))
+    val c3 by animateColorAsState(targetValue = targetColors[3], animationSpec = tween(600, easing = FastOutSlowInEasing))
+
+    val platinumBrush = remember(c0, c1, c2, c3) {
+        Brush.linearGradient(
+            colors = listOf(c0, c1, c2, c3),
+            start = Offset.Zero,
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        )
+    }
+
     ElevatedCard(
         modifier = modifier
             .fillMaxWidth()
@@ -454,103 +480,53 @@ private fun TotalBalanceBannerCard(
         ),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
+                .clip(RoundedCornerShape(20.dp))
+                .background(platinumBrush)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 1. Top Row: Title + Performance Badge (top right, like a card chip/contactless badge)
+            // 1. Top Row: Title + Toggle Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Total Balance",
+                    text = if (isShowingInvestments) "Total Investments" else "Total Balance",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                if (uiState.isOnboardingActive) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (isDark) SmartMoneyColors.DarkSurface else MaterialTheme.colorScheme.surfaceVariant
+                Surface(
+                    onClick = { isShowingInvestments = !isShowingInvestments },
+                    shape = RoundedCornerShape(50),
+                    color = (if (isDark) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White).copy(alpha = 0.3f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = "No cards linked",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                } else if (!uiState.hasTransactions) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (isDark) SmartMoneyColors.DarkSurface else SmartMoneyColors.PaleMintGreen.copy(alpha = 0.5f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = "Card active",
-                                color = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                } else {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (isDark) SmartMoneyColors.DarkSurface else DarkGreenPillBadge
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowUpward,
-                                contentDescription = null,
-                                tint = if (isDark) SmartMoneyColors.PaleMintGreen else MutedSageCard,
-                                modifier = Modifier.size(11.dp)
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(
-                                text = "Live",
-                                color = if (isDark) SmartMoneyColors.PaleMintGreen else MutedSageCard,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "This week",
-                                color = Color.White.copy(alpha = 0.92f),
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 11.sp
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.SwapHoriz,
+                            contentDescription = "Switch view",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isShowingInvestments) "View balance" else "View Investments",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
@@ -560,9 +536,9 @@ private fun TotalBalanceBannerCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
-                val displayBalance = remember(isBalanceVisible, uiState.totalBalance) {
+                val displayBalance = remember(isBalanceVisible, uiState.totalBalance, totalInvestmentBalance, isShowingInvestments) {
                     if (isBalanceVisible) {
-                        formatKesCurrency(uiState.totalBalance)
+                        formatKesCurrency(if (isShowingInvestments) totalInvestmentBalance else uiState.totalBalance)
                     } else {
                         "••••••••"
                     }
@@ -582,7 +558,7 @@ private fun TotalBalanceBannerCard(
                 Surface(
                     onClick = onToggleBalanceVisibility,
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = (if (isDark) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White).copy(alpha = 0.3f),
                     modifier = Modifier.size(26.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -617,6 +593,7 @@ private fun TotalBalanceBannerCard(
             }
         }
     }
+        }
 }
 
 /**
@@ -652,7 +629,7 @@ private fun ConnectedAppsBannerCard(
                 .fillMaxSize()
                 .padding(horizontal = 18.dp, vertical = 14.dp)
         ) {
-            // Header Row: "Connected Apps" title and real-time status pill
+            // Header Row: "Connected Accounts" title and real-time status pill
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -660,7 +637,7 @@ private fun ConnectedAppsBannerCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Connected Apps",
+                        text = "Connected Accounts",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface

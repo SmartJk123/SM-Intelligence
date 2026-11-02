@@ -1,6 +1,7 @@
 package com.example.smartmoney.domain.model
 
 import androidx.compose.runtime.Immutable
+import org.json.JSONObject
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -22,6 +23,7 @@ enum class InvestmentType(val displayName: String) {
  * Pure domain model representing an investment holding record.
  *
  * @property id Unique identifier.
+ * @property userId Owner user ID.
  * @property name Investment instrument name (e.g., "Sanlam MMF", "91-Day Treasury Bill").
  * @property type Type of investment asset.
  * @property principalMinor Original invested amount in integer cents.
@@ -32,6 +34,7 @@ enum class InvestmentType(val displayName: String) {
 @Immutable
 data class Investment(
     val id: String,
+    val userId: String = "",
     val name: String,
     val type: InvestmentType,
     val principalMinor: Long,
@@ -59,4 +62,56 @@ data class Investment(
 
     val isMaturingSoon: Boolean
         get() = daysUntilMaturity?.let { it in 0..90 } ?: false
+
+    fun toJson(): JSONObject {
+        val json = JSONObject()
+        json.put("id", id)
+        json.put("userId", userId)
+        json.put("name", name)
+        json.put("type", type.name)
+        json.put("principalMinor", principalMinor)
+        if (currentValueMinor != null) {
+            json.put("currentValueMinor", currentValueMinor)
+        }
+        json.put("valuationDate", valuationDate.toString())
+        if (maturityDate != null) {
+            json.put("maturityDate", maturityDate.toString())
+        }
+        return json
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): Investment {
+            val id = json.optString("id", "")
+            val userId = json.optString("userId", "")
+            val name = json.optString("name", "")
+            val typeStr = json.optString("type", "OTHER")
+            val type = InvestmentType.fromString(typeStr)
+            val principalMinor = json.optLong("principalMinor", 0L)
+            val currentValueMinor = if (json.has("currentValueMinor")) json.optLong("currentValueMinor") else null
+            val valDateStr = json.optString("valuationDate", "")
+            val valuationDate = try {
+                if (valDateStr.isNotBlank()) LocalDate.parse(valDateStr) else LocalDate.now()
+            } catch (_: Exception) {
+                LocalDate.now()
+            }
+            val matDateStr = json.optString("maturityDate", "")
+            val maturityDate = try {
+                if (matDateStr.isNotBlank()) LocalDate.parse(matDateStr) else null
+            } catch (_: Exception) {
+                null
+            }
+
+            return Investment(
+                id = id,
+                userId = userId,
+                name = name,
+                type = type,
+                principalMinor = principalMinor,
+                currentValueMinor = currentValueMinor,
+                valuationDate = valuationDate,
+                maturityDate = maturityDate
+            )
+        }
+    }
 }

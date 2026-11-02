@@ -3,6 +3,7 @@ package com.example.smartmoney.data.repository
 import com.example.smartmoney.core.coroutine.DefaultDispatcherProvider
 import com.example.smartmoney.core.coroutine.DispatcherProvider
 import com.example.smartmoney.data.local.dao.AccountDao
+import com.example.smartmoney.data.local.dao.TransactionDao
 import com.example.smartmoney.data.local.entity.AccountEntity
 import com.example.smartmoney.data.remote.RetrofitClient
 import com.example.smartmoney.data.remote.api.CreateAccountRequest
@@ -28,6 +29,7 @@ import java.util.UUID
 class BankAccountRepositoryImpl(
     private val remoteDataSource: AccountRemoteDataSource = AccountRemoteDataSource(),
     private val localDao: AccountDao? = null,
+    private val transactionDao: TransactionDao? = null,
     private val userIdProvider: () -> String,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : BankAccountRepository {
@@ -35,11 +37,26 @@ class BankAccountRepositoryImpl(
     constructor(
         remoteDataSource: AccountRemoteDataSource = AccountRemoteDataSource(),
         localDao: AccountDao? = null,
+        userIdProvider: () -> String,
+        dispatchers: DispatcherProvider = DefaultDispatcherProvider()
+    ) : this(
+        remoteDataSource = remoteDataSource,
+        localDao = localDao,
+        transactionDao = null,
+        userIdProvider = userIdProvider,
+        dispatchers = dispatchers
+    )
+
+    constructor(
+        remoteDataSource: AccountRemoteDataSource = AccountRemoteDataSource(),
+        localDao: AccountDao? = null,
+        transactionDao: TransactionDao? = null,
         userId: String,
         dispatchers: DispatcherProvider = DefaultDispatcherProvider()
     ) : this(
         remoteDataSource = remoteDataSource,
         localDao = localDao,
+        transactionDao = transactionDao,
         userIdProvider = { userId },
         dispatchers = dispatchers
     )
@@ -114,7 +131,7 @@ class BankAccountRepositoryImpl(
                         if (localDao != null) {
                             val entity = AccountEntity(
                                 id = accountId,
-                                userId = effectiveUserId,
+                                userId = currentUserId,
                                 accountId = body.accountNumber.ifBlank { trimmedNumber },
                                 accountName = body.accountName ?: accountTitle,
                                 institution = bankName.trim(),
@@ -132,6 +149,9 @@ class BankAccountRepositoryImpl(
                                 dataSource = "BANK_API"
                             )
                             localDao.upsertAccount(entity)
+                            if (effectiveUserId != currentUserId) {
+                                localDao.upsertAccount(entity.copy(id = "${accountId}_alias", userId = effectiveUserId))
+                            }
                         }
                         _bankAccountsFlow.value = _bankAccountsFlow.value + linkedAccount
                         return@withContext Result.success(Unit)
@@ -180,7 +200,11 @@ class BankAccountRepositoryImpl(
             }
 
             if (localDao != null) {
-                localDao.upsertAccount(AccountEntity.fromDomain(created))
+                val entity = AccountEntity.fromDomain(created).copy(userId = currentUserId)
+                localDao.upsertAccount(entity)
+                if (effectiveUserId != currentUserId) {
+                    localDao.upsertAccount(entity.copy(id = "${entity.id}_alias", userId = effectiveUserId))
+                }
             }
 
             val createdBankAccount = created.toBankAccount()
@@ -220,8 +244,12 @@ class BankAccountRepositoryImpl(
             }
 
             // 2. Always remove locally from Room cache and StateFlow
+            val effectiveUserId = userIdProvider()
             if (localDao != null) {
                 localDao.deleteAccountById(id)
+            }
+            if (transactionDao != null) {
+                transactionDao.deleteTransactionsForAccount(effectiveUserId, id)
             }
             _bankAccountsFlow.value = _bankAccountsFlow.value.filterNot { it.id == id || it.accountNumber == id }
             Result.success(Unit)
@@ -231,7 +259,23 @@ class BankAccountRepositoryImpl(
     }
 
     override suspend fun adjustKcbBalance(delta: BigDecimal) = withContext(dispatchers.io) {
-        localDao?.adjustKcbBalance(delta)
+        adjustBankBalance("KCB", delta)
+    }
+
+    override suspend fun adjustBankBalance(
+        bankName: String,
+        delta: BigDecimal,
+        accountId: String?,
+        userId: String?
+    ) = withContext(dispatchers.io) {
+        val effectiveUserId = userId ?: userIdProvider()
+        if (localDao != null) {
+            if (!accountId.isNullOrBlank()) {
+                localDao.adjustAccountBalance(effectiveUserId, accountId, delta)
+            } else {
+                localDao.adjustBankBalanceForUser(effectiveUserId, bankName, delta)
+            }
+        }
         Unit
     }
 
@@ -239,7 +283,13 @@ class BankAccountRepositoryImpl(
         id = this.id,
         bankName = this.institution,
         accountNumber = this.accountId,
-        cardType = if (this.accountType.equals("CREDIT", ignoreCase = true)) "Credit" else "Debit",
+        cardType = when {
+            this.accountType.equals("INVESTMENT", ignoreCase = true) ||
+            this.institution.contains("M-Shwari", ignoreCase = true) ||
+            this.accountName.contains("M-Shwari", ignoreCase = true) -> "Investment"
+            this.accountType.equals("CREDIT", ignoreCase = true) -> "Credit"
+            else -> "Debit"
+        },
         balance = this.availableBalance
     )
 
@@ -247,7 +297,13 @@ class BankAccountRepositoryImpl(
         id = this.id,
         bankName = this.institution,
         accountNumber = this.accountId,
-        cardType = if (this.accountType.equals("CREDIT", ignoreCase = true)) "Credit" else "Debit",
+        cardType = when {
+            this.accountType.equals("INVESTMENT", ignoreCase = true) ||
+            this.institution.contains("M-Shwari", ignoreCase = true) ||
+            this.accountName.contains("M-Shwari", ignoreCase = true) -> "Investment"
+            this.accountType.equals("CREDIT", ignoreCase = true) -> "Credit"
+            else -> "Debit"
+        },
         balance = this.availableBalance
     )
 }

@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -54,6 +58,7 @@ import com.example.smartmoney.ui.theme.SmartMoneyColors
 @Composable
 fun InvestmentScreen(
     viewModel: InvestmentViewModel,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -64,6 +69,18 @@ fun InvestmentScreen(
     var investmentToDeleteId by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
+        topBar = {
+            @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+            TopAppBar(
+                title = { Text("Investments", style = MaterialTheme.typography.titleMedium) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                windowInsets = WindowInsets(0, 0, 0, 0)
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {

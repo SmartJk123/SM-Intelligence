@@ -49,7 +49,7 @@ class AuthRepositoryImpl(
             remoteDataSource.updateSession(body = body, email = email, fallbackName = name)
             Result.success(Unit)
         } catch (e: SocketTimeoutException) {
-            Result.failure(Exception("The server is waking up. Please try again in 30 seconds."))
+            Result.failure(Exception("A timeout occurred on the server-side. Try again later."))
         } catch (e: HttpException) {
             val mappedMessage = parseHttpException(e)
             Result.failure(Exception(mappedMessage))
@@ -77,7 +77,7 @@ class AuthRepositoryImpl(
             remoteDataSource.updateSession(body = body, email = email, fallbackName = null)
             Result.success(Unit)
         } catch (e: SocketTimeoutException) {
-            Result.failure(Exception("The server is waking up. Please try again in 30 seconds."))
+            Result.failure(Exception("Server timeout. Please try again later"))
         } catch (e: HttpException) {
             val mappedMessage = parseHttpException(e)
             Result.failure(Exception(mappedMessage))
@@ -150,7 +150,7 @@ class AuthRepositoryImpl(
             404 -> "Authentication endpoint not found."
             409 -> "An account with this email already exists."
             500 -> "Internal server error. Please try again later."
-            502, 503, 504 -> "The server is waking up. Please try again in 30 seconds."
+            502, 503, 504 -> "Server is unavailable. Please try again later."
             else -> "Server error ($statusCode). Please try again."
         }
     }

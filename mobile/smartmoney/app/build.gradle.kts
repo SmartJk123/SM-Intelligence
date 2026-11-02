@@ -17,9 +17,12 @@ val localProperties = Properties().apply {
 val supabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
     ?: "https://lhizwzqkpshwmpqlbffm.supabase.co"
 val supabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
-// The deployed api-gateway, e.g. https://api-gateway-xxxx.onrender.com. Empty uses local services.
-val apiBaseUrl: String = localProperties.getProperty("API_BASE_URL") ?: ""
     ?: "sb_publishable_PeXsVtIFu1lsECKVbIp2cA_-Z5Wzu3V"
+val bankIntegrationUrl: String = localProperties.getProperty("BANK_INTEGRATION_URL")
+    ?: "https://bank-integration-service.onrender.com/"
+// Production Render Gateway
+val apiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
+    ?: "https://api-gateway-cbby.onrender.com/"
 
 android {
     namespace = "com.example.smartmoney"
@@ -36,6 +39,7 @@ android {
 
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        buildConfigField("String", "BANK_INTEGRATION_URL", "\"$bankIntegrationUrl\"")
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 

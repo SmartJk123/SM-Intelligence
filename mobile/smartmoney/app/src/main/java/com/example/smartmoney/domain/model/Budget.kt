@@ -1,6 +1,7 @@
 package com.example.smartmoney.domain.model
 
 import androidx.compose.runtime.Immutable
+import org.json.JSONObject
 import java.time.LocalDate
 
 enum class BudgetStatus {
@@ -32,6 +33,44 @@ data class Budget(
 ) {
     val allocatedMajor: Double
         get() = allocatedMinor / 100.0
+
+    fun toJson(): JSONObject {
+        val json = JSONObject()
+        json.put("id", id)
+        json.put("category", category)
+        json.put("allocatedMinor", allocatedMinor)
+        json.put("start", start.toString())
+        json.put("end", end.toString())
+        if (accountId != null) {
+            json.put("accountId", accountId)
+        }
+        json.put("threshold", threshold)
+        return json
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): Budget {
+            val id = json.optString("id", "")
+            val category = json.optString("category", "")
+            val allocatedMinor = json.optLong("allocatedMinor", 0L)
+            val startStr = json.optString("start", "")
+            val endStr = json.optString("end", "")
+            val start = try { LocalDate.parse(startStr) } catch (_: Exception) { LocalDate.now() }
+            val end = try { LocalDate.parse(endStr) } catch (_: Exception) { LocalDate.now() }
+            val accountId = if (json.has("accountId")) json.optString("accountId") else null
+            val threshold = json.optInt("threshold", 85)
+
+            return Budget(
+                id = id,
+                category = category,
+                allocatedMinor = allocatedMinor,
+                start = start,
+                end = end,
+                accountId = accountId,
+                threshold = threshold
+            )
+        }
+    }
 }
 
 /**

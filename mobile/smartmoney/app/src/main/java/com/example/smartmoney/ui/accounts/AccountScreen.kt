@@ -181,7 +181,13 @@ fun AccountScreen(
                     val accId = bankAccount.id
                     val bName = bankAccount.bankName
                     val masked = bankAccount.maskedAccountNumber
-                    val isKcb = remember(bName) { bName.equals("KCB", ignoreCase = true) }
+                    val bankKey = remember(bName) { bName.lowercase(java.util.Locale.ROOT) }
+                    val isIntegrated = remember(bName) {
+                        bName.equals("KCB", ignoreCase = true) || bName.equals("NCBA", ignoreCase = true)
+                    }
+
+                    val envInfo = uiState.bankEnvironments[bankKey]
+                    val isLive = envInfo?.isLive == true
 
                     val onDelete = remember(accId, bName, masked) {
                         {
@@ -190,14 +196,19 @@ fun AccountScreen(
                         }
                     }
 
-                    val onSimulateInflow: (() -> Unit)? = remember(accId, isKcb) {
-                        if (isKcb) {
+                    val accNum = bankAccount.accountNumber
+                    // Simulation is available in Sandbox mode for supported integrated banks (KCB & NCBA)
+                    val onSimulateInflow: (() -> Unit)? = remember(accId, isIntegrated, isLive, bName, accNum) {
+                        if (isIntegrated && !isLive) {
                             {
-                                viewModel.simulateKcbInflow(
+                                viewModel.simulateBankInflow(
+                                    bankName = bName,
                                     amount = "1000.00",
+                                    accountId = accId,
+                                    accountNumber = accNum,
                                     onSuccess = {
                                         scope.launch {
-                                            snackbarHostState.showSnackbar("⚡ Simulated KCB inflow of KES 1,000 received!")
+                                            snackbarHostState.showSnackbar("⚡ Simulated $bName inflow of KES 1,000 received!")
                                         }
                                     },
                                     onError = { error ->
@@ -210,14 +221,17 @@ fun AccountScreen(
                         } else null
                     }
 
-                    val onSimulateOutflow: (() -> Unit)? = remember(accId, isKcb) {
-                        if (isKcb) {
+                    val onSimulateOutflow: (() -> Unit)? = remember(accId, isIntegrated, isLive, bName, accNum) {
+                        if (isIntegrated && !isLive) {
                             {
-                                viewModel.simulateKcbOutflow(
+                                viewModel.simulateBankOutflow(
+                                    bankName = bName,
                                     amount = "500.00",
+                                    accountId = accId,
+                                    accountNumber = accNum,
                                     onSuccess = {
                                         scope.launch {
-                                            snackbarHostState.showSnackbar("⚡ Simulated KCB outflow of KES 500 paid!")
+                                            snackbarHostState.showSnackbar("⚡ Simulated $bName outflow of KES 500 paid!")
                                         }
                                     },
                                     onError = { error ->
@@ -234,7 +248,8 @@ fun AccountScreen(
                         bankAccount = bankAccount,
                         onDelete = onDelete,
                         onSimulateInflow = onSimulateInflow,
-                        onSimulateOutflow = onSimulateOutflow
+                        onSimulateOutflow = onSimulateOutflow,
+                        integrationInfo = envInfo
                     )
                 }
             }
@@ -353,7 +368,7 @@ fun LinkBankAccountDialog(
     onDismiss: () -> Unit,
     onSave: (bank: String, accNumber: String, cardType: String) -> Unit
 ) {
-    val bankOptions = listOf("NCBA", "Equity", "KCB", "Stanbic")
+    val bankOptions = listOf("M-PESA", "NCBA", "Equity", "KCB", "Stanbic")
     var bankExpanded by remember { mutableStateOf(false) }
     var selectedBank by remember { mutableStateOf("") }
 
@@ -515,11 +530,40 @@ fun BankAccountCard(
     bankAccount: BankAccount,
     onDelete: () -> Unit = {},
     onSimulateInflow: (() -> Unit)? = null,
-    onSimulateOutflow: (() -> Unit)? = null
+    onSimulateOutflow: (() -> Unit)? = null,
+    integrationInfo: BankIntegrationInfo? = null
 ) {
-    val isKcb = remember(bankAccount.bankName) { bankAccount.bankName.equals("KCB", ignoreCase = true) }
+    val bName = bankAccount.bankName
+    val isKcb = remember(bName) { bName.equals("KCB", ignoreCase = true) }
+    val isNcba = remember(bName) { bName.equals("NCBA", ignoreCase = true) }
+    val isIntegrated = isKcb || isNcba
+    val isLive = integrationInfo?.isLive == true
+
     val maskedNumber = remember(bankAccount.accountNumber) { bankAccount.maskedAccountNumber }
     val formattedBalance = remember(bankAccount.balance) { CurrencyUtils.formatKes(bankAccount.balance) }
+
+    val badgeText = when {
+        isKcb && isLive -> "KCB Live IPN"
+        isKcb && !isLive -> "KCB Sandbox"
+        isNcba && isLive -> "NCBA Live IPN"
+        isNcba && !isLive -> "NCBA Sandbox"
+        else -> "Connected"
+    }
+    val badgeBgColor = when {
+        isLive -> Color(0xFF4CAF50).copy(alpha = 0.12f)
+        isIntegrated -> Color(0xFF009688).copy(alpha = 0.12f)
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val badgeTextColor = when {
+        isLive -> Color(0xFF2E7D32)
+        isIntegrated -> Color(0xFF00796B)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val badgeDotColor = when {
+        isLive -> Color(0xFF4CAF50)
+        isIntegrated -> Color(0xFF009688)
+        else -> MaterialTheme.colorScheme.primary
+    }
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -641,7 +685,7 @@ fun BankAccountCard(
                 // Status Indicator
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = if (isKcb) Color(0xFF4CAF50).copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
+                    color = badgeBgColor
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -651,24 +695,24 @@ fun BankAccountCard(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(if (isKcb) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary)
+                                .background(badgeDotColor)
                         )
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = if (isKcb) "BUNI Live IPN" else "Connected",
+                            text = badgeText,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
-                            color = if (isKcb) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = badgeTextColor
                         )
                     }
                 }
             }
 
             // -------------------------------------------------------------
-            // 3. OPTIONAL KCB SANDBOX SIMULATION ACTIONS STRIP
+            // 3. OPTIONAL SANDBOX SIMULATION ACTIONS STRIP
             // -------------------------------------------------------------
-            if (isKcb && (onSimulateInflow != null || onSimulateOutflow != null)) {
+            if (onSimulateInflow != null || onSimulateOutflow != null) {
                 Spacer(modifier = Modifier.height(14.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),

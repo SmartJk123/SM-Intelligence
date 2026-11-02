@@ -1,24 +1,29 @@
 package com.example.smartmoney.data.remote.datasource
 
+import com.example.smartmoney.data.local.UserPreferencesRepository
 import com.example.smartmoney.data.remote.RetrofitClient
 import com.example.smartmoney.data.remote.api.AuthApi
 import com.example.smartmoney.data.remote.api.AuthResponse
 import com.example.smartmoney.data.remote.api.LoginRequest
 import com.example.smartmoney.data.remote.api.RegisterRequest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import retrofit2.Response
 
 /**
- * Remote data source routing authentication directly through the Spring Boot backend via Retrofit.
- * Completely eliminates any client-side Supabase GoTrue calls.
+ * Remote data source routing authentication directly through the Render Gateway via Retrofit.
+ * Completely eliminates any client-side Supabase GoTrue calls and manages session persistence.
  */
 class AuthRemoteDataSource(
-    val authApi: AuthApi = RetrofitClient.authApi
+    val authApi: AuthApi = RetrofitClient.authApi,
+    private val userPreferencesRepository: UserPreferencesRepository? = null
 ) {
 
     private val _isLoggedInFlow = MutableStateFlow(false)
@@ -32,10 +37,22 @@ class AuthRemoteDataSource(
 
     init {
         RetrofitClient.tokenProvider = { authToken }
+
+        // Restore persisted session from storage on cold start
+        val savedToken = userPreferencesRepository?.getAuthToken()
+        val savedUserId = userPreferencesRepository?.getUserId()
+        if (!savedToken.isNullOrBlank() && !savedUserId.isNullOrBlank()) {
+            authToken = savedToken
+            currentUserId = savedUserId
+            currentUserName = userPreferencesRepository?.getUserName()
+            currentUserEmail = userPreferencesRepository?.getUserEmail()
+            currentUserPhoneNumber = userPreferencesRepository?.getUserPhoneNumber()
+            _isLoggedInFlow.value = true
+        }
     }
 
     /**
-     * Registers a new user via the Spring Boot backend endpoint POST /api/auth/register.
+     * Registers a new user via the backend endpoint POST /api/auth/register.
      */
     suspend fun register(
         name: String,
@@ -58,7 +75,7 @@ class AuthRemoteDataSource(
     }
 
     /**
-     * Authenticates an existing user via the Spring Boot backend endpoint POST /api/auth/login.
+     * Authenticates an existing user via the backend endpoint POST /api/auth/login.
      */
     suspend fun login(
         email: String,
@@ -95,7 +112,37 @@ class AuthRemoteDataSource(
     ): Result<AuthResponse> = login(email, password)
 
     /**
-     * Logs out the user, clearing in-memory session tokens and state.
+     * Validates the active session against GET /api/auth/me on app launch.
+     */
+    suspend fun validateRemoteSession(): Result<Unit> {
+        if (authToken.isNullOrBlank()) {
+            signOut()
+            return Result.failure(Exception("No active session token"))
+        }
+        return try {
+            val response = authApi.getCurrentUser()
+            if (response.isSuccessful && response.body() != null) {
+                val user = response.body()!!
+                currentUserName = user.name ?: currentUserName
+                currentUserEmail = user.emailAddress ?: currentUserEmail
+                currentUserPhoneNumber = user.phoneNumber ?: currentUserPhoneNumber
+                userPreferencesRepository?.saveAuthSession(authToken, currentUserId, currentUserName, currentUserEmail, currentUserPhoneNumber)
+                Result.success(Unit)
+            } else if (response.code() == 401 || response.code() == 403) {
+                signOut()
+                Result.failure(Exception("Session token has expired"))
+            } else {
+                // Keep local session if server returns transient error
+                Result.success(Unit)
+            }
+        } catch (e: Exception) {
+            // Keep local offline session if server is temporarily unreachable
+            Result.success(Unit)
+        }
+    }
+
+    /**
+     * Logs out the user, clearing session tokens and storage.
      */
     suspend fun signOut(): Result<Unit> {
         currentUserId = null
@@ -104,6 +151,7 @@ class AuthRemoteDataSource(
         currentUserPhoneNumber = null
         authToken = null
         _isLoggedInFlow.value = false
+        userPreferencesRepository?.clearAuthSession()
         return Result.success(Unit)
     }
 
@@ -122,7 +170,7 @@ class AuthRemoteDataSource(
     fun observeAuthState(): Flow<Boolean> = _isLoggedInFlow.asStateFlow()
 
     /**
-     * Updates local in-memory session details after successful authentication.
+     * Updates local session details after successful authentication.
      */
     fun updateSession(
         body: AuthResponse,
@@ -135,6 +183,12 @@ class AuthRemoteDataSource(
         currentUserPhoneNumber = body.phoneNumber
         authToken = body.token ?: body.accessToken
         _isLoggedInFlow.value = true
+
+        userPreferencesRepository?.let { prefs ->
+            CoroutineScope(Dispatchers.IO).launch {
+                prefs.saveAuthSession(authToken, currentUserId, currentUserName, currentUserEmail, currentUserPhoneNumber)
+            }
+        }
     }
 
     /**
