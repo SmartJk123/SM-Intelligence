@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from './api.config';
 import {
+  AdminTransaction,
   BankConnectionSettings,
   BankHealth,
   BankIntegrationGateway,
@@ -42,11 +43,23 @@ export class HttpBankIntegrationGateway implements BankIntegrationGateway {
     return firstValueFrom(this.http.get<BankHealth[]>(`${API_BASE_URL}/admin/bank-integrations`));
   }
 
+  async loadTransactions(limit: number, includeDemo: boolean): Promise<AdminTransaction[]> {
+    return firstValueFrom(
+      this.http.get<AdminTransaction[]>(`${API_BASE_URL}/admin/transactions`, { params: { limit, includeDemo } }),
+    );
+  }
+
   async loadSettings(bankId: string): Promise<BankConnectionSettings> {
     return firstValueFrom(
       this.http.get<BankConnectionSettings>(
         `${API_BASE_URL}/admin/bank-integrations/${bankId}/settings`,
       ),
+    );
+  }
+
+  async loadLatestTest(bankId: string): Promise<ConnectionTestResult | null> {
+    return firstValueFrom(
+      this.http.get<ConnectionTestResult | null>(`${API_BASE_URL}/admin/bank-integrations/${bankId}/test`),
     );
   }
 

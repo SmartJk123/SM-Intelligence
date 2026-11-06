@@ -3,10 +3,10 @@ import { environment } from '../../environments/environment';
 /**
  * Where the admin portal finds the backend.
  *
- * Deployed, everything goes through one api-gateway (environment.gatewayUrl,
- * set in src/environments/environment.production.ts), so the admin portal, the
- * web app and the mobile app all read the same data. Locally the gatewayUrl is
- * empty: identity calls go to the gateway on 8080 and bank calls straight to
+ * Everything goes through one api-gateway (environment.gatewayUrl, currently
+ * the Kubernetes VM in both src/environments files), so the admin portal, the
+ * web app and the mobile app all read the same data. With an empty gatewayUrl,
+ * identity calls go to the gateway on localhost:8080 and bank calls straight to
  * bank-integration-service on 8090.
  */
 const gateway = environment.gatewayUrl.replace(/\/+$/, '');

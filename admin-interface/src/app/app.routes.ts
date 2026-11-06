@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { AdminLayout } from './layout/admin-layout';
 import { authGuard } from './core/auth.guard';
 import { loginGuard } from './core/login.guard';
+import { permissionGuard } from './core/permission.guard';
 import { AuditLogs } from './pages/audit-logs/audit-logs';
 import { BankAccounts } from './pages/bank-accounts/bank-accounts';
 import { BankIntegrations } from './pages/bank-integrations/bank-integrations';
@@ -22,6 +23,7 @@ export const routes: Routes = [
     path: 'admin',
     component: AdminLayout,
     canActivate: [authGuard],
+    canActivateChild: [permissionGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       { path: 'dashboard', component: Dashboard },

@@ -91,7 +91,7 @@ flowchart TD
 | `/admin/login` | Login and two factor | `LoginPage` |
 | `/admin/dashboard` | System overview | `Dashboard` |
 | `/admin/organisations` | Organisation management | `Organisations` |
-| `/admin/users` | User management | `Users` |
+| `/admin/users` | Customers (`?type=individual` or `?type=organisation`) | `Users` |
 | `/admin/bank-integrations` | Bank health | `BankIntegrations` |
 | `/admin/bank-accounts` | Account monitoring | `BankAccounts` |
 | `/admin/transactions` | Transaction monitoring | `Transactions` |
@@ -121,15 +121,24 @@ frontend, so the browser never holds a bank credential.
 - **Transactions** is the demonstration account. It uses `/api/v1/admin/demo/account`,
   `/demo/transactions` and `/demo/summary`: money in and money out are recorded on demand and read
   back from the backend.
-- **Users** uses identity-service `/api/v1/admin/users` to list, edit, suspend and restore, and
-  `/api/auth/forgot-password` to send a reset link.
+- **Customers** (the `users` route, with Individuals and Organisations under it in the sidebar) uses
+  identity-service `/api/v1/admin/users` to list, edit, suspend and restore, `POST /api/v1/admin/users`
+  to add a customer (Account type Individual or Organisation; for an organisation, pick one or create
+  it), and `/api/auth/forgot-password` to send a reset link. An added customer is emailed a temporary
+  password and a link to choose their own.
 - **Organisations** uses identity-service `/api/organizations` and `/api/organizations/{id}/members`.
 - **Bank accounts**, and a user's bank accounts, use `/api/v1/admin/account-links`.
-- **Reports**: the bank performance report reads live bank health. The other reports still read
-  `src/app/core/data.ts`, which is empty.
-- **Audit logs, reconciliation and notifications** are not connected. They read
-  `src/app/core/data.ts`, which is empty, and audit logs and reconciliation show a "Not connected"
-  banner. Their endpoints are defined in the [API contract](../docs/api-contract.md) but not wired yet.
+- **Notifications** has three tabs, all from identity-service: Notifications
+  (`/api/v1/admin/notifications`: new sign ups, first sign ins, administrator sign ins, suspended
+  accounts trying to sign in, services down or recovered; the bell reloads every 30 seconds), Outbox
+  (`/api/v1/admin/email-outbox`: every email sent, with links and temporary passwords stored as
+  `[hidden]`) and Templates (`/api/v1/admin/email-templates`: edit or restore each email's wording).
+- **Audit logs** reads `/api/v1/admin/audit-events`: sign ups, sign ins and failed attempts, sign outs,
+  password resets and every change staff make, filterable by customers, staff or system.
+- **Reports** are built from the live data above (customers, organisations, sign ins, bank
+  notifications and health, demo movements, audit log, outbox), filtered by the reporting period,
+  reloaded every minute, and downloadable as CSV or printable as PDF.
+- **Reconciliation** is not connected. It reads `src/app/core/data.ts`, which is empty, and says so.
 
 `{bankId}` is `kcb`, `stanbic`, `ncba` or `equity`. Every response shape the integration screens read
 is mirrored by an interface in `src/app/core/bank-integration.gateway.ts`, so a change on one side
@@ -157,7 +166,9 @@ another bank's operator.
 
 Credentials are read only here. They live in `backend/bank-integration-service/.env.local` and are
 never sent to the browser. Environment, timeouts, retries and signature checking are editable and
-saved with "Save settings".
+saved with "Save settings". Saving keeps the last connection test, and the stored test is loaded again
+after signing in (`GET /api/v1/admin/bank-integrations/{bankId}/test`), so a working bank stays shown as
+working without testing again.
 
 ### Webhook base address
 
@@ -181,9 +192,11 @@ yet.
 
 ## Current limitations
 
-- **Backend services.** Dashboard, bank integrations, transactions, users, organisations and bank
-  accounts are wired to the API. Audit logs, reconciliation, notifications and most reports are not
-  connected yet (see [Backend contract](#backend-contract)).
+- **Backend services.** Everything except reconciliation is wired to the API (see
+  [Backend contract](#backend-contract)).
+- **Temporary passwords.** An added customer's invite email carries a temporary password, at the
+  request of the product owner. Email is not a secure channel; the same email has a one-time link to
+  choose a new password, and the outbox never stores the password.
 - **Authentication.** Sign in is real, against identity-service, and only `PLATFORM_ADMIN` accounts
   are accepted. An admin is signed out after 15 idle minutes.
 - **Token storage.** The admin JWT is kept in `sessionStorage`, so it is gone when the browser closes
@@ -197,6 +210,17 @@ yet.
 
 ## Revision history
 
+- **1.5, 6 November 2026.** Settings saves everything to identity-service: general, security policy
+  (idle sign-out, lockout, staff email domains, two-factor reminder), notification emails and system
+  (maintenance mode, audit retention). Staff and roles replace the fixed sample roles: add staff by email
+  with a role, change or remove it; roles choose which pages staff can open (sidebar and route guard, and
+  identity-service refuses its own endpoints). Two-factor setup (QR code) and sign in with a code; real
+  signed-in devices with sign out. Transactions shows every bank-reported transaction, live every 15
+  seconds (`GET /api/v1/admin/transactions`), next to the demo account. Customers folds open.
+- **1.4, 6 November 2026.** Users renamed Customers, with Individuals and Organisations under it.
+  Sidebar highlights the open page even with `?query` in the URL. Notifications, Outbox and Templates
+  connected; audit log and reports read live data. Add customer has an Account type and creates the
+  organisation when needed. Bank settings keep the chosen environment and the last test result.
 - **1.3, 12 October 2026.** Admin token moved to `sessionStorage`. Audit logs and reconciliation say
   they are not connected. Backend contract and limitations updated to the screens that are actually
   wired. Equity added to the bank panel notes, and tables replaced with plain text.

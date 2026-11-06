@@ -4,6 +4,8 @@ import { InvitePreset, InviteType } from '../core/ui.service';
 import { OrganizationMemberRole } from '../core/organization.gateway';
 import { OrganizationService } from '../core/organization.service';
 import { AccountLinkService } from '../core/account-link.service';
+import { ActivityGateway } from '../core/activity.gateway';
+import { UserService } from '../core/user.service';
 import { BANKS } from '../core/data';
 import { BankLogo } from '../shared/bank-logo';
 
@@ -24,6 +26,17 @@ export class InviteModal implements OnInit {
 
   private readonly organizations = inject(OrganizationService);
   private readonly accountLinks = inject(AccountLinkService);
+  private readonly activity = inject(ActivityGateway);
+  private readonly users = inject(UserService);
+
+  /** Add customer: an individual, or a member of an organisation (existing or new). */
+  protected readonly accountType = signal<'INDIVIDUAL' | 'ORGANIZATION'>('INDIVIDUAL');
+  /** '' until chosen; NEW_ORG when the admin is creating the organisation here. */
+  protected static readonly NEW_ORG = '__new__';
+  protected readonly newOrgValue = InviteModal.NEW_ORG;
+  protected readonly newOrgName = signal('');
+  /** True when the account was created by the customer endpoint, which emails a temporary password. */
+  protected readonly sentTemporaryPassword = signal(false);
 
   /** Starts as the type the caller asked for. Moves to 'user' after an organisation is saved. */
   protected readonly mode = signal<InviteType>('org');
@@ -51,6 +64,10 @@ export class InviteModal implements OnInit {
   protected readonly bankLinked = signal<{ bankName: string; accountNumber: string } | null>(null);
 
   protected readonly orgs = this.organizations.organisations;
+  protected readonly accountTypes: { value: 'INDIVIDUAL' | 'ORGANIZATION'; label: string; hint: string }[] = [
+    { value: 'INDIVIDUAL', label: 'Individual', hint: 'Personal or freelance' },
+    { value: 'ORGANIZATION', label: 'Organisation', hint: 'Business, team or group' },
+  ];
   protected readonly businessTypes = ['SME', 'Business', 'Rental Management', 'Property Management'];
   protected readonly roles: { value: OrganizationMemberRole; label: string }[] = [
     { value: 'OWNER', label: 'Owner' },
@@ -64,18 +81,28 @@ export class InviteModal implements OnInit {
   /** The organisation an invite is for, when it is already decided. */
   protected readonly fixedOrg = computed(() => this.savedOrg() ?? this.preset());
 
+  /** An admin adding a customer from scratch, rather than inviting into a fixed organisation. */
+  protected readonly isCustomer = computed(() => !this.isOrg() && !this.fixedOrg());
+  protected readonly creatingOrg = computed(() => this.selectedOrgId() === InviteModal.NEW_ORG);
+
   protected readonly canSubmit = computed(() => {
     if (this.isOrg()) {
       return this.name().trim().length >= 2;
     }
-    return !!this.email() && !!this.name() && !!this.selectedOrgId();
+    if (!this.email().trim() || this.name().trim().length < 2) {
+      return false;
+    }
+    if (this.isCustomer() && this.accountType() === 'INDIVIDUAL') {
+      return true;
+    }
+    return this.creatingOrg() ? this.newOrgName().trim().length >= 2 : !!this.selectedOrgId();
   });
 
   protected readonly title = computed(() => {
     if (this.isOrg()) {
       return 'Add Organisation';
     }
-    return this.fixedOrg() ? 'Send Invite' : 'Add User';
+    return this.fixedOrg() ? 'Send Invite' : 'Add Customer';
   });
 
   protected readonly subtitle = computed(() => {
@@ -85,7 +112,7 @@ export class InviteModal implements OnInit {
     const org = this.fixedOrg();
     return org
       ? `An account will be created for the invitee in ${org.organizationName}, and they will be emailed a link to choose their password.`
-      : 'An account will be created, and they will be emailed a link to choose their password.';
+      : 'An account will be created and emailed a temporary password, with a link to choose their own.';
   });
 
   ngOnInit(): void {
@@ -108,6 +135,8 @@ export class InviteModal implements OnInit {
     try {
       if (this.isOrg()) {
         await this.save();
+      } else if (this.isCustomer()) {
+        await this.addCustomer();
       } else {
         await this.invite();
       }
@@ -128,6 +157,29 @@ export class InviteModal implements OnInit {
     this.stage.set('saved');
   }
 
+  /** Add customer: identity-service creates the account (and organisation) and emails a temporary password. */
+  private async addCustomer(): Promise<void> {
+    const organisation = this.accountType() === 'ORGANIZATION';
+    const result = await this.activity.createCustomer({
+      name: this.name().trim(),
+      email: this.email().trim(),
+      accountType: this.accountType(),
+      organizationId: organisation && !this.creatingOrg() ? this.selectedOrgId() : null,
+      newOrganizationName: organisation && this.creatingOrg() ? this.newOrgName().trim() : null,
+      businessType: organisation && this.creatingOrg() ? this.orgType() : null,
+      role: organisation ? this.role() : null,
+    });
+    this.emailSent.set(result.emailSent);
+    this.sentTemporaryPassword.set(true);
+    this.recipientEmail.set(this.email().trim());
+    void this.users.loadUsers();
+    if (organisation && this.creatingOrg()) {
+      void this.organizations.loadOrganizations();
+    }
+    await this.linkBank(result.user.id);
+    this.stage.set('sent');
+  }
+
   private async invite(): Promise<void> {
     const member = await this.organizations.inviteMember(this.selectedOrgId(), {
       name: this.name().trim(),
@@ -136,6 +188,12 @@ export class InviteModal implements OnInit {
     });
     this.emailSent.set(member.emailSent);
     this.recipientEmail.set(this.email().trim());
+    await this.linkBank(member.userId);
+    this.stage.set('sent');
+  }
+
+  /** Optional bank account for the new customer; a failure here never undoes the account. */
+  private async linkBank(userId: string): Promise<void> {
     this.bankLinkWarning.set(null);
     this.bankLinked.set(null);
     const accountNumber = this.accountNumber().trim();
@@ -144,7 +202,7 @@ export class InviteModal implements OnInit {
         await this.accountLinks.link({
           bankId: this.bankId(),
           accountNumber,
-          userId: member.userId,
+          userId,
           accountName: null,
         });
         const bankName = this.banks.find((bank) => bank.id === this.bankId())?.name ?? this.bankId();
@@ -152,10 +210,15 @@ export class InviteModal implements OnInit {
       } catch {
         // The invite already succeeded; a failed link is fixable later from the user's
         // detail page, and must not be reported as the invite itself having failed.
-        this.bankLinkWarning.set('The invite was sent, but the bank account could not be linked. Add it from the user’s profile.');
+        this.bankLinkWarning.set('The invite was sent, but the bank account could not be linked. Add it from the customer’s profile.');
       }
     }
-    this.stage.set('sent');
+  }
+
+  /** Picking a new organisation makes the customer its owner; joining an existing one, a member. */
+  protected chooseOrganisation(value: string): void {
+    this.selectedOrgId.set(value);
+    this.role.set(value === InviteModal.NEW_ORG ? 'OWNER' : 'MEMBER');
   }
 
   /** From the "saved" screen: carry straight on to inviting the owner of the new organisation. */
