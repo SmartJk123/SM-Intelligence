@@ -2,12 +2,17 @@ package com.smi.identity_service.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.smi.identity_service.activity.ActivityLog;
+import com.smi.identity_service.activity.EmailTemplates;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -56,18 +61,34 @@ public class PasswordResetMailer {
         this.sender = mail;
     }
 
+    private ActivityLog activity;
+    private EmailTemplates templates = EmailTemplates.builtIn();
+
+    /** Optional so the mailer can still be built on its own, as the health monitor tests do. */
+    @Autowired(required = false)
+    public void setActivityLog(ActivityLog activity) {
+        this.activity = activity;
+    }
+
+    @Autowired(required = false)
+    public void setTemplates(EmailTemplates templates) {
+        this.templates = templates;
+    }
+
     public boolean isConfigured() {
         return sender != null;
     }
 
     /** Sends the link. Failures are logged, never thrown: the caller's answer must not reveal them. */
     public void sendResetLink(String to, String name, String link, long validMinutes) {
-        send(to, "Reset your SM-Intelligence password", "Hello " + name + ",\n\n"
-                + "We received a request to reset the password for your SM-Intelligence account.\n"
-                + "Open this link to choose a new password:\n\n"
-                + link + "\n\n"
-                + "The link works once and expires in " + validMinutes + " minutes.\n"
-                + "If you did not ask for this, you can ignore this email; your password has not changed.\n");
+        sendTemplate(to, EmailTemplates.PASSWORD_RESET,
+                Map.of("name", name, "link", link, "validMinutes", String.valueOf(validMinutes)));
+    }
+
+    /** Fills an email template in and sends it; its secret values are hidden in the outbox copy. */
+    public boolean sendTemplate(String to, String templateKey, Map<String, String> values) {
+        EmailTemplates.Rendered email = templates.render(templateKey, values);
+        return send(to, email.subject(), email.body(), templateKey, email.secretValues());
     }
 
     /**
@@ -78,8 +99,17 @@ public class PasswordResetMailer {
      *         caller has already saved.
      */
     public boolean send(String to, String subject, String text) {
+        return send(to, subject, text, null);
+    }
+
+    /**
+     * As send(to, subject, text), and keeps a copy in the admin Outbox under
+     * templateKey. Each of secrets is stored as [hidden] in that copy.
+     */
+    public boolean send(String to, String subject, String text, String templateKey, String... secrets) {
         if (sender == null) {
             log.warn("SMTP_HOST is not set, so the email \"{}\" was not sent", subject);
+            record(to, subject, text, templateKey, "NOT_CONFIGURED", "SMTP is not set up", secrets);
             return false;
         }
         SimpleMailMessage message = new SimpleMailMessage();
@@ -90,10 +120,19 @@ public class PasswordResetMailer {
         try {
             sender.send(message);
             log.info("Sent the email \"{}\"", subject);
+            record(to, subject, text, templateKey, "SENT", null, secrets);
             return true;
         } catch (MailException error) {
             log.warn("Could not send the email \"{}\": {}", subject, error.getMessage());
+            record(to, subject, text, templateKey, "FAILED", error.getMessage(), secrets);
             return false;
+        }
+    }
+
+    private void record(String to, String subject, String text, String templateKey, String status, String error,
+                        String... secrets) {
+        if (activity != null) {
+            activity.recordEmail(to, subject, text, templateKey, status, error, secrets);
         }
     }
 }

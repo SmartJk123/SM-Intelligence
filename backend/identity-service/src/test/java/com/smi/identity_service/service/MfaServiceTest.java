@@ -117,8 +117,8 @@ class MfaServiceTest {
         when(jwtService.extractUserId("mfa.token")).thenReturn(userId);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(totpService.verifyTotp("SECRET", "123456")).thenReturn(true);
-        when(jwtService.generateToken(user)).thenReturn("access.jwt.token");
-        when(refreshTokenService.createRefreshToken(user)).thenReturn("new-refresh-token");
+        when(refreshTokenService.issue(user)).thenReturn(
+                new RefreshTokenService.Issued("access.jwt.token", "new-refresh-token", null));
 
         AuthResponse authResponse = mfaService.verifyMfaLogin("mfa.token", "123456");
 
