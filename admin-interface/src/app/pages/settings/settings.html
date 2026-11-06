@@ -1,9 +1,6 @@
 <div class="flex-1 flex overflow-hidden">
   <!-- Section sidebar -->
-  <div
-    class="w-52 flex-shrink-0 border-r p-3 space-y-0.5 overflow-auto"
-    style="border-color: var(--border); background: var(--surface)"
-  >
+  <div class="w-52 flex-shrink-0 border-r p-3 space-y-0.5 overflow-auto" style="border-color: var(--border); background: var(--surface)">
     <p class="text-[11px] font-bold uppercase tracking-widest px-3 py-2" style="color: var(--text-3)">Settings</p>
     @for (section of sections; track section.id) {
       <button
@@ -21,46 +18,44 @@
 
   <!-- Content -->
   <div class="flex-1 overflow-auto p-4 lg:p-6">
+    @if (settingsError(); as error) {
+      <p class="max-w-xl mb-4 text-[12.5px] px-4 py-3 rounded-2xl" style="background: var(--red-soft); color: var(--red-ink)" role="alert">{{ error }}</p>
+    }
+
     @switch (active()) {
       @case ('General') {
         <div class="max-w-xl space-y-5">
           <app-surface-card class="p-6" animDelay="">
-            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Platform Information</h3>
+            <h3 class="text-sm font-bold mb-1 font-display" style="color: var(--text-1)">Platform Information</h3>
+            <p class="text-[12px] mb-4" style="color: var(--text-3)">{{ savedBy('general') }}</p>
             <div class="space-y-4">
               <app-settings-field label="Platform Name">
-                <app-settings-input defaultValue="SmartMoney Intelligence" />
+                <input class="settings-control" [value]="value('general', 'platformName')" (input)="set('general', 'platformName', $any($event.target).value)" />
               </app-settings-field>
               <div class="grid grid-cols-2 gap-4">
                 <app-settings-field label="Default Currency">
-                  <app-settings-input defaultValue="KES" />
+                  <input class="settings-control" [value]="value('general', 'defaultCurrency')" (input)="set('general', 'defaultCurrency', $any($event.target).value)" />
                 </app-settings-field>
                 <app-settings-field label="Default Language">
-                  <app-settings-input defaultValue="English (Kenya)" />
+                  <input class="settings-control" [value]="value('general', 'defaultLanguage')" (input)="set('general', 'defaultLanguage', $any($event.target).value)" />
                 </app-settings-field>
               </div>
               <app-settings-field label="Timezone">
-                <app-settings-input defaultValue="Africa/Nairobi (UTC+3)" />
+                <input class="settings-control" [value]="value('general', 'timezone')" (input)="set('general', 'timezone', $any($event.target).value)" />
               </app-settings-field>
               <app-settings-field label="Date Format">
-                <select
-                  class="w-full px-3 py-2.5 text-sm rounded-xl border focus:outline-none"
-                  style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
-                >
+                <select class="settings-control" (change)="set('general', 'dateFormat', $any($event.target).value)">
                   @for (format of dateFormats; track format) {
-                    <option>{{ format }}</option>
+                    <option [value]="format" [selected]="value('general', 'dateFormat') === format">{{ format }}</option>
                   }
                 </select>
               </app-settings-field>
               <app-settings-field label="Support Email">
-                <app-settings-input defaultValue="support@smartmoney.io" type="email" />
+                <input class="settings-control" type="email" [value]="value('general', 'supportEmail')" (input)="set('general', 'supportEmail', $any($event.target).value)" placeholder="support@yourcompany.co.ke" />
               </app-settings-field>
             </div>
-            <button
-              type="button"
-              class="mt-5 px-5 py-2 rounded-xl text-sm font-semibold text-white"
-              style="background: var(--primary)"
-            >
-              Save Changes
+            <button type="button" class="settings-save" (click)="saveSection('general', 'General settings')" [disabled]="!changed('general') || savingSection() !== null">
+              {{ savingSection() === 'general' ? 'Saving…' : 'Save Changes' }}
             </button>
           </app-surface-card>
         </div>
@@ -70,10 +65,8 @@
         <div class="max-w-xl space-y-4">
           <app-surface-card class="p-6" animDelay="">
             <div class="flex items-center gap-4 mb-6 pb-5 border-b" style="border-color: var(--border)">
-              <div
-                class="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
-                style="background: linear-gradient(135deg,#d97706,#f59e0b)"
-              >
+              <div class="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
+                style="background: linear-gradient(135deg,#d97706,#f59e0b)">
                 @if (profile.avatar(); as avatarUrl) {
                   <img [src]="avatarUrl" alt="Administrator profile" class="w-full h-full object-cover" />
                 } @else {
@@ -82,107 +75,59 @@
               </div>
               <div class="flex-1">
                 <p class="text-base font-bold font-display" style="color: var(--text-1)">{{ profile.fullName() }}</p>
-                <p class="text-[13px]" style="color: var(--text-3)">{{ profile.email() }} · {{ profile.role() }} role</p>
+                <p class="text-[13px]" style="color: var(--text-3)">{{ profile.email() }} · {{ staffAccess.roleName() || 'Administrator' }}</p>
                 <div class="flex flex-wrap items-center gap-2 mt-2">
-                  <button
-                    type="button"
-                    (click)="pickAvatar()"
-                    [disabled]="profile.uploading()"
+                  <button type="button" (click)="pickAvatar()" [disabled]="profile.uploading()"
                     class="text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
-                    style="background: var(--primary-soft); color: var(--primary)"
-                  >
+                    style="background: var(--primary-soft); color: var(--primary)">
                     {{ profile.uploading() ? 'Uploading...' : (profile.avatar() ? 'Change avatar' : 'Upload avatar') }}
                   </button>
                   @if (profile.avatar()) {
-                    <button
-                      type="button"
-                      (click)="removeAvatar()"
-                      class="text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
-                      style="border-color: var(--border); color: var(--red)"
-                    >
-                      Remove
-                    </button>
+                    <button type="button" (click)="removeAvatar()" class="text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
+                      style="border-color: var(--border); color: var(--red)">Remove</button>
                   }
                 </div>
-                <p class="text-[12px] mt-1.5" style="color: var(--text-3)">PNG, JPG or WEBP. Maximum 2 MB.</p>
+                <p class="text-[12px] mt-1.5" style="color: var(--text-3)">PNG, JPG or WEBP. Maximum 2 MB. Kept in this browser.</p>
                 @if (profile.avatarError()) {
                   <p class="text-[12px] mt-1" style="color: var(--red)">{{ profile.avatarError() }}</p>
                 }
               </div>
               <app-badge status="Active" />
-              <input
-                #avatarInput
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                class="hidden"
-                (change)="onAvatarSelected($event)"
-              />
+              <input #avatarInput type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" (change)="onAvatarSelected($event)" />
             </div>
             <div class="space-y-4">
-              <div class="grid grid-cols-2 gap-4">
-                <app-settings-field label="First Name">
-                  <app-settings-input
-                    [defaultValue]="profile.firstName()"
-                    (valueChange)="profile.firstName.set($event)"
-                  />
-                </app-settings-field>
-                <app-settings-field label="Last Name">
-                  <app-settings-input
-                    [defaultValue]="profile.lastName()"
-                    (valueChange)="profile.lastName.set($event)"
-                  />
-                </app-settings-field>
-              </div>
-              <app-settings-field label="Email Address" hint="Changing email requires re-verification">
-                <app-settings-input
-                  [defaultValue]="profile.email()"
-                  type="email"
-                  (valueChange)="profile.email.set($event)"
-                />
+              <app-settings-field label="Full Name">
+                <input class="settings-control" [value]="profileName()" (input)="profileName.set($any($event.target).value)" />
               </app-settings-field>
-              <app-settings-field label="Phone Number">
-                <app-settings-input
-                  [defaultValue]="profile.phone()"
-                  type="tel"
-                  (valueChange)="profile.phone.set($event)"
-                />
+              <app-settings-field label="Email Address" hint="Your sign-in address. Another administrator can change it from Customers.">
+                <input class="settings-control" type="email" [value]="profile.email()" disabled />
               </app-settings-field>
-              <app-settings-field label="Job Title">
-                <app-settings-input
-                  [defaultValue]="profile.jobTitle()"
-                  (valueChange)="profile.jobTitle.set($event)"
-                />
+              <app-settings-field label="Phone Number" hint="International format, for example +254712345678">
+                <input class="settings-control" type="tel" [value]="profilePhone()" (input)="profilePhone.set($any($event.target).value)" />
               </app-settings-field>
             </div>
-            <button
-              type="button"
-              class="mt-5 px-5 py-2 rounded-xl text-sm font-semibold text-white"
-              style="background: var(--primary)"
-            >
-              Update Profile
+            <button type="button" class="settings-save" (click)="saveProfile()" [disabled]="savingProfile()">
+              {{ savingProfile() ? 'Saving…' : 'Update Profile' }}
             </button>
           </app-surface-card>
 
           <app-surface-card class="p-6" animDelay="delay-50">
             <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Change Password</h3>
-            <div class="space-y-3">
+            <form class="space-y-3" (submit)="$event.preventDefault(); changePassword()">
               <app-settings-field label="Current Password">
-                <app-settings-input type="password" placeholder="••••••••" />
+                <input class="settings-control" type="password" autocomplete="current-password" [value]="passwords().current" (input)="setPassword('current', $any($event.target).value)" />
               </app-settings-field>
-              <app-settings-field label="New Password" hint="Minimum 12 characters with uppercase, numbers, and symbols">
-                <app-settings-input type="password" placeholder="••••••••" />
+              <app-settings-field label="New Password" hint="At least 8 characters">
+                <input class="settings-control" type="password" autocomplete="new-password" [value]="passwords().next" (input)="setPassword('next', $any($event.target).value)" />
               </app-settings-field>
               <app-settings-field label="Confirm New Password">
-                <app-settings-input type="password" placeholder="••••••••" />
+                <input class="settings-control" type="password" autocomplete="new-password" [value]="passwords().confirm" (input)="setPassword('confirm', $any($event.target).value)" />
               </app-settings-field>
-            </div>
-            <button
-              type="button"
-              class="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white"
-              style="background: var(--primary)"
-            >
-              Update Password
-            </button>
+              <button type="submit" class="settings-save" [disabled]="savingPassword()">
+                {{ savingPassword() ? 'Saving…' : 'Update Password' }}
+              </button>
+            </form>
+            <p class="text-[12px] mt-3" style="color: var(--text-3)">Changing your password signs out your other devices.</p>
           </app-surface-card>
         </div>
       }
@@ -191,169 +136,242 @@
         <div class="max-w-xl space-y-4">
           <app-surface-card class="p-6" animDelay="">
             <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Two-Factor Authentication</h3>
-            <div
-              class="flex items-center gap-3 p-4 rounded-xl mb-4"
-              style="background: var(--green-soft); border: 1px solid var(--green)"
-            >
-              <span class="icon" style="color: var(--green)">check_circle</span>
-              <p class="text-[13px] font-medium" style="color: var(--green)">2FA is currently enabled for this account</p>
-            </div>
-            <app-toggle label="Require 2FA for all admin logins" [defaultChecked]="true" />
-            <app-toggle label="Authenticator app (TOTP)" [defaultChecked]="true" />
-            <app-toggle label="SMS backup codes" [defaultChecked]="false" />
-            <div class="mt-4 flex gap-2">
-              <button
-                type="button"
-                class="px-4 py-2 rounded-xl text-[13px] font-semibold"
-                style="background: var(--primary-soft); color: var(--primary)"
-              >
-                Regenerate Backup Codes
-              </button>
-              <button
-                type="button"
-                class="px-4 py-2 rounded-xl text-[13px] font-semibold"
-                style="background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border)"
-              >
-                View Backup Codes
-              </button>
-            </div>
+            @if (mfaEnabled() === true) {
+              <div class="flex items-center gap-3 p-4 rounded-xl mb-4" style="background: var(--green-soft); border: 1px solid var(--green)">
+                <span class="icon" style="color: var(--green)">check_circle</span>
+                <p class="text-[13px] font-medium" style="color: var(--green-ink)">Two-factor authentication is on for your account.</p>
+              </div>
+              <p class="text-[12.5px] mb-3" style="color: var(--text-2)">To turn it off, confirm your password and a code from your app.</p>
+              <div class="grid grid-cols-2 gap-3">
+                <input class="settings-control" type="password" placeholder="Password" autocomplete="current-password" [value]="mfaPassword()" (input)="mfaPassword.set($any($event.target).value)" />
+                <input class="settings-control" inputmode="numeric" placeholder="Code from the app" autocomplete="one-time-code" [value]="mfaCode()" (input)="mfaCode.set($any($event.target).value)" />
+              </div>
+              <button type="button" class="settings-secondary mt-3" (click)="disableMfa()" [disabled]="mfaBusy()">Turn off two-factor</button>
+            } @else if (mfaEnabled() === false) {
+              <div class="flex items-center gap-3 p-4 rounded-xl mb-4" style="background: var(--gold-soft); border: 1px solid var(--gold)">
+                <span class="icon" style="color: var(--gold-ink)">shield</span>
+                <p class="text-[13px] font-medium" style="color: var(--gold-ink)">Two-factor authentication is off. Turn it on to protect customer data.</p>
+              </div>
+              @if (mfaSetup(); as setup) {
+                <ol class="space-y-4 text-[13px] list-decimal pl-5" style="color: var(--text-1)">
+                  <li>
+                    Scan this code with Google Authenticator, Microsoft Authenticator or Authy:
+                    @if (setup.qr) {
+                      <img [src]="setup.qr" alt="QR code for your authenticator app" width="180" height="180" class="my-2 rounded-xl bg-white p-1.5" />
+                    }
+                    <span class="block text-[12px]" style="color: var(--text-3)">Or enter this setup key:</span>
+                    <code class="block mt-1 px-3 py-2 rounded-lg text-[12.5px] break-all" style="background: var(--surface-2)">{{ setup.secret }}</code>
+                  </li>
+                  <li>
+                    Keep these recovery codes somewhere safe. Each works once if you lose your phone:
+                    <code class="block mt-1 px-3 py-2 rounded-lg text-[12.5px]" style="background: var(--surface-2)">{{ setup.backupCodes.join('   ') }}</code>
+                  </li>
+                  <li>
+                    Enter the 6-digit code the app shows:
+                    <div class="flex gap-2 mt-2">
+                      <input class="settings-control max-w-[180px]" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" [value]="mfaCode()" (input)="mfaCode.set($any($event.target).value)" />
+                      <button type="button" class="settings-save !mt-0" (click)="enableMfa()" [disabled]="mfaBusy()">Turn on</button>
+                      <button type="button" class="settings-secondary" (click)="mfaSetup.set(null)">Cancel</button>
+                    </div>
+                  </li>
+                </ol>
+              } @else {
+                <button type="button" class="settings-save !mt-0" (click)="startMfa()" [disabled]="mfaBusy()">Set up authenticator app</button>
+              }
+            } @else {
+              <p class="text-[12.5px]" style="color: var(--text-3)">Loading…</p>
+            }
           </app-surface-card>
 
           <app-surface-card class="p-6" animDelay="delay-50">
-            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Session &amp; Access Policy</h3>
+            <h3 class="text-sm font-bold mb-1 font-display" style="color: var(--text-1)">Session &amp; Access Policy</h3>
+            <p class="text-[12px] mb-4" style="color: var(--text-3)">{{ savedBy('security') }}</p>
             <div class="space-y-4">
-              <app-settings-field label="Session Timeout (minutes)" hint="Admins will be logged out after this period of inactivity">
-                <app-settings-input defaultValue="30" type="number" />
+              <app-settings-field label="Admin idle sign-out (minutes)" hint="The admin portal signs out after this long without activity">
+                <input class="settings-control" type="number" min="1" max="1440" [value]="value('security', 'sessionTimeoutMinutes')" (input)="set('security', 'sessionTimeoutMinutes', $any($event.target).value)" />
               </app-settings-field>
-              <app-settings-field label="Max Failed Login Attempts before lockout">
-                <app-settings-input defaultValue="5" type="number" />
-              </app-settings-field>
-              <app-settings-field label="Allowed Email Domains" hint="Only these domains can sign in (comma-separated)">
-                <app-settings-input defaultValue="@smartmoney.io" />
-              </app-settings-field>
-              <app-settings-field label="IP Allowlist" hint="Leave empty to allow all IPs. Enter CIDR ranges separated by commas">
-                <app-settings-input placeholder="e.g. 41.90.64.0/24, 105.160.0.0/16" />
+              <div class="grid grid-cols-2 gap-4">
+                <app-settings-field label="Failed sign-ins before lockout" hint="0 turns lockout off">
+                  <input class="settings-control" type="number" min="0" max="100" [value]="value('security', 'maxFailedAttempts')" (input)="set('security', 'maxFailedAttempts', $any($event.target).value)" />
+                </app-settings-field>
+                <app-settings-field label="Lockout length (minutes)">
+                  <input class="settings-control" type="number" min="1" max="1440" [value]="value('security', 'lockoutMinutes')" (input)="set('security', 'lockoutMinutes', $any($event.target).value)" />
+                </app-settings-field>
+              </div>
+              <app-settings-field label="Allowed staff email domains" hint="Staff may only sign in from these domains (comma separated). Empty allows any. ADMIN_EMAILS addresses always may.">
+                <input class="settings-control" [value]="value('security', 'adminEmailDomains')" (input)="set('security', 'adminEmailDomains', $any($event.target).value)" placeholder="e.g. smartmoney.co.ke, eclectics.io" />
               </app-settings-field>
             </div>
-            <app-toggle label="Force Google OAuth for admin logins" [defaultChecked]="true" />
-            <app-toggle label="Log all admin actions to audit trail" [defaultChecked]="true" />
-            <app-toggle label="Allow concurrent admin sessions" [defaultChecked]="false" />
-            <button
-              type="button"
-              class="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white"
-              style="background: var(--primary)"
-            >
-              Save Security Settings
+            <app-toggle label="Remind staff without two-factor to set it up" [defaultChecked]="flag('security', 'requireAdminMfa')" (checked)="set('security', 'requireAdminMfa', $event)" />
+            <button type="button" class="settings-save" (click)="saveSection('security', 'Security policy')" [disabled]="!changed('security') || savingSection() !== null">
+              {{ savingSection() === 'security' ? 'Saving…' : 'Save Security Settings' }}
             </button>
           </app-surface-card>
 
           <app-surface-card class="p-6" animDelay="delay-100">
-            <h3 class="text-sm font-bold mb-3 font-display" style="color: var(--text-1)">Active Sessions</h3>
-            @for (session of sessions; track session.device) {
-              <div class="flex items-center justify-between py-3 border-b last:border-0" style="border-color: var(--border)">
-                <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold font-display" style="color: var(--text-1)">Active Sessions</h3>
+              <button type="button" class="text-[12px] font-semibold" style="color: var(--primary)" (click)="loadSessions()">Refresh</button>
+            </div>
+            @for (session of sessions() ?? []; track session.id) {
+              <div class="flex items-center justify-between gap-3 py-3 border-b last:border-0" style="border-color: var(--border)">
+                <div class="min-w-0">
                   <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ session.device }}</p>
-                  <p class="text-[12px]" style="color: var(--text-3)">
-                    {{ session.ip }} · {{ session.location }} · {{ session.time }}
-                  </p>
+                  <p class="text-[12px]" style="color: var(--text-3)">{{ session.ipAddress || 'Address unknown' }} · signed in {{ sessionTime(session) }}</p>
                 </div>
                 @if (session.current) {
                   <app-badge status="Active" />
                 } @else {
-                  <button type="button" class="text-[12px] font-semibold" style="color: var(--red)">Revoke</button>
+                  <button type="button" class="text-[12px] font-semibold flex-shrink-0" style="color: var(--red)" (click)="revokeSession(session)">Sign out</button>
                 }
               </div>
+            } @empty {
+              <p class="text-[12.5px]" style="color: var(--text-3)">{{ sessions() === null ? 'Loading…' : 'No signed-in devices found.' }}</p>
             }
+            <p class="text-[12px] mt-3" style="color: var(--text-3)">Each device you sign in from, with the browser and address it used. Signing a device out ends its session at once.</p>
           </app-surface-card>
         </div>
       }
 
       @case ('Roles & Permissions') {
-        <div class="space-y-4 max-w-2xl">
-          @for (role of roles; track role.name; let i = $index) {
-            <app-surface-card class="p-5" [animDelay]="delayFor(i)">
-              <div class="flex items-start justify-between mb-4">
-                <div class="flex items-center gap-3">
-                  <div
-                    class="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm"
-                    [style.background]="roleColor(role.color)"
-                  >
-                    {{ role.name[0] }}
+        <div class="max-w-3xl space-y-4">
+          @if (!canManageStaff()) {
+            <p class="text-[12.5px] px-4 py-3 rounded-2xl" style="background: var(--gold-soft); color: var(--gold-ink)">Your role does not include managing staff and roles.</p>
+          } @else {
+            @if (staffError(); as error) {
+              <p class="text-[12.5px] px-4 py-3 rounded-2xl" style="background: var(--red-soft); color: var(--red-ink)" role="alert">{{ error }}</p>
+            }
+
+            <app-surface-card class="p-6" animDelay="">
+              <h3 class="text-sm font-bold mb-1 font-display" style="color: var(--text-1)">Staff</h3>
+              <p class="text-[12px] mb-4" style="color: var(--text-3)">
+                People who can sign in to this admin portal. A new address is emailed a temporary password; an existing customer
+                account keeps its password and gains admin access.
+              </p>
+              @for (member of staff() ?? []; track member.id) {
+                <div class="flex flex-wrap items-center gap-3 py-3 border-b last:border-0" style="border-color: var(--border)">
+                  <div class="flex-1 min-w-[180px]">
+                    <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ member.name }} @if (isSelf(member)) { <span class="text-[11px] font-normal" style="color: var(--text-3)">(you)</span> }</p>
+                    <p class="text-[12px] font-mono" style="color: var(--text-3)">{{ member.email }}</p>
                   </div>
-                  <div>
-                    <p class="text-sm font-bold font-display" style="color: var(--text-1)">{{ role.name }}</p>
-                    <p class="text-[12px]" style="color: var(--text-3)">{{ role.desc }}</p>
-                  </div>
+                  @if (member.fromAdminEmails) {
+                    <span class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg" style="background: var(--primary-soft); color: var(--primary-ink)" title="Listed in ADMIN_EMAILS">Full access</span>
+                  } @else {
+                    <select class="settings-control !w-auto" [disabled]="isSelf(member)" (change)="changeStaffRole(member, $any($event.target).value)" aria-label="Role">
+                      @if (!member.roleId) { <option value="" selected>Full access</option> }
+                      @for (role of roles(); track role.id) {
+                        <option [value]="role.id" [selected]="role.id === member.roleId">{{ role.name }}</option>
+                      }
+                    </select>
+                    @if (!isSelf(member)) {
+                      <button type="button" class="text-[12px] font-semibold" style="color: var(--red)" (click)="removeStaff(member)">Remove</button>
+                    }
+                  }
                 </div>
-                <button
-                  type="button"
-                  class="text-[12px] font-semibold px-3 py-1 rounded-lg"
-                  style="background: var(--primary-soft); color: var(--primary)"
-                >
-                  Edit Role
-                </button>
-              </div>
-              <div class="flex flex-wrap gap-2">
-                @for (permission of allPermissions; track permission) {
-                  <span
-                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[12px] font-medium"
-                    [style.background]="hasPermission(role, permission) ? 'var(--green-soft)' : 'var(--surface-2)'"
-                    [style.borderColor]="hasPermission(role, permission) ? 'var(--green)' : 'var(--border)'"
-                    [style.color]="hasPermission(role, permission) ? 'var(--green)' : 'var(--text-3)'"
-                  >
-                    <span class="icon icon-sm">{{ hasPermission(role, permission) ? 'check' : 'radio_button_unchecked' }}</span> {{ permission }}
-                  </span>
+              } @empty {
+                <p class="text-[12.5px] py-2" style="color: var(--text-3)">{{ staff() === null ? 'Loading…' : 'No staff yet.' }}</p>
+              }
+
+              <div class="mt-5 pt-4 border-t" style="border-color: var(--border)">
+                <p class="text-[12px] font-semibold uppercase tracking-wider mb-2" style="color: var(--text-3)">Add staff member</p>
+                @if (roles().length === 0) {
+                  <p class="text-[12.5px]" style="color: var(--text-3)">Create a role below first.</p>
+                } @else {
+                  <div class="grid grid-cols-1 sm:grid-cols-[1fr_1.3fr_1fr_auto] gap-2">
+                    <input class="settings-control" placeholder="Full name" [value]="newStaff().name" (input)="setNewStaff('name', $any($event.target).value)" aria-label="Full name" />
+                    <input class="settings-control" type="email" placeholder="name@company.co.ke" [value]="newStaff().email" (input)="setNewStaff('email', $any($event.target).value)" aria-label="Email address" />
+                    <select class="settings-control" (change)="setNewStaff('roleId', $any($event.target).value)" aria-label="Role">
+                      <option value="" disabled [selected]="!newStaff().roleId">Choose a role</option>
+                      @for (role of roles(); track role.id) {
+                        <option [value]="role.id" [selected]="newStaff().roleId === role.id">{{ role.name }}</option>
+                      }
+                    </select>
+                    <button type="button" class="settings-save !mt-0" (click)="addStaff()" [disabled]="addingStaff()">{{ addingStaff() ? 'Adding…' : 'Add' }}</button>
+                  </div>
                 }
               </div>
             </app-surface-card>
+
+            <app-surface-card class="p-6" animDelay="delay-50">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="text-sm font-bold font-display" style="color: var(--text-1)">Roles</h3>
+                  <p class="text-[12px]" style="color: var(--text-3)">Each role is a set of admin pages its staff can open. Changes apply at their next page load.</p>
+                </div>
+                <button type="button" class="settings-save !mt-0" (click)="editRole()">+ Add New Role</button>
+              </div>
+
+              @if (roleDraft(); as draft) {
+                <div class="p-4 rounded-2xl border mb-4 space-y-3" style="border-color: var(--primary); background: var(--primary-soft)">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input class="settings-control" placeholder="Role name, e.g. Support" [value]="draft.name" (input)="setRoleField('name', $any($event.target).value)" aria-label="Role name" />
+                    <input class="settings-control" placeholder="What this role is for" [value]="draft.description" (input)="setRoleField('description', $any($event.target).value)" aria-label="Description" />
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    @for (permission of allPermissions(); track permission.key) {
+                      <button type="button" (click)="togglePermission(permission.key)"
+                        [attr.aria-pressed]="draft.permissions.includes(permission.key)"
+                        class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[12px] font-medium"
+                        [style.background]="draft.permissions.includes(permission.key) ? 'var(--green-soft)' : 'var(--surface)'"
+                        [style.borderColor]="draft.permissions.includes(permission.key) ? 'var(--green)' : 'var(--border)'"
+                        [style.color]="draft.permissions.includes(permission.key) ? 'var(--green-ink)' : 'var(--text-3)'">
+                        <span class="icon icon-sm">{{ draft.permissions.includes(permission.key) ? 'check' : 'radio_button_unchecked' }}</span>
+                        {{ permission.label }}
+                      </button>
+                    }
+                  </div>
+                  <div class="flex gap-2">
+                    <button type="button" class="settings-save !mt-0" (click)="saveRole()" [disabled]="savingRole()">{{ savingRole() ? 'Saving…' : 'Save role' }}</button>
+                    <button type="button" class="settings-secondary" (click)="roleDraft.set(null)">Cancel</button>
+                  </div>
+                </div>
+              }
+
+              @for (role of roles(); track role.id; let i = $index) {
+                <div class="py-4 border-b last:border-0" style="border-color: var(--border)">
+                  <div class="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <p class="text-sm font-bold font-display" style="color: var(--text-1)">{{ role.name }}</p>
+                      <p class="text-[12px]" style="color: var(--text-3)">{{ role.description || 'No description' }} · {{ role.staffCount }} staff</p>
+                    </div>
+                    <div class="flex gap-2">
+                      <button type="button" class="text-[12px] font-semibold px-3 py-1 rounded-lg" style="background: var(--primary-soft); color: var(--primary)" (click)="editRole(role)">Edit Role</button>
+                      <button type="button" class="text-[12px] font-semibold px-3 py-1 rounded-lg" style="color: var(--red)" (click)="deleteRole(role)" [disabled]="role.staffCount > 0" [attr.title]="role.staffCount > 0 ? 'Move its staff to another role first' : null">Delete</button>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5">
+                    @for (permission of role.permissions; track permission) {
+                      <span class="px-2 py-0.5 rounded-md text-[11.5px] font-medium" style="background: var(--green-soft); color: var(--green-ink)">{{ permissionLabel(permission) }}</span>
+                    }
+                  </div>
+                </div>
+              } @empty {
+                <p class="text-[12.5px]" style="color: var(--text-3)">No roles yet. Add one to give staff limited access.</p>
+              }
+            </app-surface-card>
           }
-          <button
-            type="button"
-            class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
-            style="background: var(--primary)"
-          >
-            + Add New Role
-          </button>
         </div>
       }
 
       @case ('Notifications') {
         <div class="max-w-xl space-y-4">
           <app-surface-card class="p-6" animDelay="">
-            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Email Notification Preferences</h3>
-            <app-toggle label="Bank integration failures" [defaultChecked]="true" />
-            <app-toggle label="Webhook delivery failures" [defaultChecked]="true" />
-            <app-toggle label="Transaction processing errors" [defaultChecked]="true" />
-            <app-toggle label="Reconciliation issues" [defaultChecked]="true" />
-            <app-toggle label="New organisation registrations" [defaultChecked]="false" />
-            <app-toggle label="User account changes (suspend/activate)" [defaultChecked]="true" />
-            <app-toggle label="Daily platform summary digest" [defaultChecked]="false" />
-            <app-toggle label="Security alerts and admin logins" [defaultChecked]="true" />
-          </app-surface-card>
-
-          <app-surface-card class="p-6" animDelay="delay-50">
-            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Alert Thresholds</h3>
-            <div class="space-y-4">
-              <app-settings-field label="Webhook silence alert after (minutes)" hint="Alert if no webhook received within this period">
-                <app-settings-input defaultValue="10" type="number" />
-              </app-settings-field>
-              <app-settings-field label="Failed transaction alert threshold">
-                <app-settings-input defaultValue="5" type="number" />
-              </app-settings-field>
-              <app-settings-field label="Reconciliation backlog alert after (hours)">
-                <app-settings-input defaultValue="2" type="number" />
-              </app-settings-field>
-              <app-settings-field label="Notification email recipients" hint="Comma-separated list">
-                <app-settings-input defaultValue="admin@smartmoney.io, ops@smartmoney.io" />
+            <h3 class="text-sm font-bold mb-1 font-display" style="color: var(--text-1)">Email Notification Preferences</h3>
+            <p class="text-[12px] mb-3" style="color: var(--text-3)">Every notification appears on the bell. These choose which are also emailed. {{ savedBy('notifications') }}</p>
+            <app-toggle label="New customer sign ups and customers added by staff" [defaultChecked]="flag('notifications', 'emailNewSignUps')" (checked)="set('notifications', 'emailNewSignUps', $event)" />
+            <app-toggle label="A customer's first sign in" [defaultChecked]="flag('notifications', 'emailFirstSignIns')" (checked)="set('notifications', 'emailFirstSignIns', $event)" />
+            <app-toggle label="Customer account changes (suspend and restore)" [defaultChecked]="flag('notifications', 'emailAccountChanges')" (checked)="set('notifications', 'emailAccountChanges', $event)" />
+            <app-toggle label="Security alerts and administrator sign ins" [defaultChecked]="flag('notifications', 'emailSecurity')" (checked)="set('notifications', 'emailSecurity', $event)" />
+            <app-toggle label="Service outages and recoveries" [defaultChecked]="flag('notifications', 'emailServiceAlerts')" (checked)="set('notifications', 'emailServiceAlerts', $event)" />
+            <div class="mt-4">
+              <app-settings-field label="Notification email recipients" hint="Comma separated. Empty sends to the ADMIN_EMAILS addresses.">
+                <input class="settings-control" [value]="value('notifications', 'recipients')" (input)="set('notifications', 'recipients', $any($event.target).value)" placeholder="admin@company.co.ke, ops@company.co.ke" />
               </app-settings-field>
             </div>
-            <button
-              type="button"
-              class="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white"
-              style="background: var(--primary)"
-            >
-              Save Preferences
+            <button type="button" class="settings-save" (click)="saveSection('notifications', 'Notification preferences')" [disabled]="!changed('notifications') || savingSection() !== null">
+              {{ savingSection() === 'notifications' ? 'Saving…' : 'Save Preferences' }}
             </button>
+            <p class="text-[12px] mt-3" style="color: var(--text-3)">Emails need SMTP settings in identity-service; without them they show in Notifications, Outbox as "Not sent".</p>
           </app-surface-card>
         </div>
       }
@@ -361,34 +379,22 @@
       @case ('Bank Integration Settings') {
         <div class="space-y-4 max-w-3xl">
           <app-surface-card class="p-5" animDelay="">
-            <label class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">
-              Webhook base address
-            </label>
+            <label class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">Webhook base address</label>
             <div class="flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                [value]="platformUrlDraft()"
-                (input)="onPlatformUrlInput($any($event.target).value)"
+              <input type="text" [value]="platformUrlDraft()" (input)="onPlatformUrlInput($any($event.target).value)"
                 placeholder="https://your-tunnel.trycloudflare.com"
                 class="flex-1 px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none font-mono"
-                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
-              />
-              <button
-                type="button"
-                data-self-reporting
-                [disabled]="platformUrlSaving()"
-                (click)="savePlatformUrl()"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)" />
+              <button type="button" [disabled]="platformUrlSaving()" (click)="savePlatformUrl()"
                 class="px-4 py-2.5 text-[13px] font-semibold rounded-xl transition-all hover:opacity-90 disabled:opacity-60"
-                style="background: var(--primary); color: #fff"
-              >{{ platformUrlSaving() ? 'Saving…' : platformUrlSaved() ? 'Saved' : 'Save' }}</button>
+                style="background: var(--primary); color: #fff">{{ platformUrlSaving() ? 'Saving…' : platformUrlSaved() ? 'Saved' : 'Save' }}</button>
             </div>
             @if (platformUrlError()) {
               <p class="text-[12px] mt-2" style="color: var(--red)">{{ platformUrlError() }}</p>
             } @else {
               <p class="text-[12px] mt-2" style="color: var(--text-3)">
                 Every bank's webhook endpoint below is this address followed by /api/v1/webhooks/&lt;bank&gt;.
-                For production use https://sm-intelligence.globalsmartspaces.com. Saving applies immediately and is kept
-                across restarts.
+                For production use https://sm-intelligence.globalsmartspaces.com. Saving applies immediately and is kept across restarts.
               </p>
             }
           </app-surface-card>
@@ -403,67 +409,28 @@
       @case ('System Configuration') {
         <div class="max-w-xl space-y-4">
           <app-surface-card class="p-6" animDelay="">
-            <h3 class="text-sm font-bold mb-4 font-display" style="color: var(--text-1)">Platform Configuration</h3>
-            <div class="space-y-4">
-              <app-settings-field label="Platform Version">
-                <app-settings-input defaultValue="v2.4.1" />
-              </app-settings-field>
-              <app-settings-field label="Spring Boot API Base URL">
-                <app-settings-input defaultValue="https://api.smartmoney.io/v1" />
-              </app-settings-field>
-              <app-settings-field label="PostgreSQL Database Host">
-                <app-settings-input defaultValue="db.smartmoney.io" />
-              </app-settings-field>
-              <app-settings-field label="Audit Log Retention (days)" hint="Logs older than this will be archived">
-                <app-settings-input defaultValue="365" type="number" />
-              </app-settings-field>
-              <app-settings-field label="Transaction Processing Workers">
-                <app-settings-input defaultValue="4" type="number" />
+            <h3 class="text-sm font-bold mb-1 font-display" style="color: var(--text-1)">Platform Configuration</h3>
+            <p class="text-[12px] mb-3" style="color: var(--text-3)">{{ savedBy('system') }}</p>
+            <app-toggle label="Maintenance mode (customers cannot sign in or sign up; staff still can)" [defaultChecked]="flag('system', 'maintenanceMode')" (checked)="set('system', 'maintenanceMode', $event)" />
+            <div class="mt-4">
+              <app-settings-field label="Audit log retention (days)" hint="Entries older than this are deleted every night at 02:30. 0 keeps everything.">
+                <input class="settings-control" type="number" min="0" max="3650" [value]="value('system', 'auditRetentionDays')" (input)="set('system', 'auditRetentionDays', $any($event.target).value)" />
               </app-settings-field>
             </div>
+            <button type="button" class="settings-save" (click)="saveSection('system', 'System configuration')" [disabled]="!changed('system') || savingSection() !== null">
+              {{ savingSection() === 'system' ? 'Saving…' : 'Save Configuration' }}
+            </button>
           </app-surface-card>
 
           <app-surface-card class="p-6" animDelay="delay-50">
-            <h3 class="text-sm font-bold mb-3 font-display" style="color: var(--text-1)">System Toggles</h3>
-            <app-toggle label="Maintenance mode (disables user portal access)" [defaultChecked]="false" />
-            <app-toggle label="Transaction auto-processing" [defaultChecked]="true" />
-            <app-toggle label="Reconciliation engine enabled" [defaultChecked]="true" />
-            <app-toggle label="Notification service enabled" [defaultChecked]="true" />
-            <app-toggle label="Debug logging (verbose)" [defaultChecked]="false" />
-            <app-toggle label="Rate limiting on API endpoints" [defaultChecked]="true" />
-          </app-surface-card>
-
-          <app-surface-card class="p-6" animDelay="delay-100">
-            <h3 class="text-sm font-bold mb-3 font-display" style="color: var(--text-1)">Danger Zone</h3>
-            <div class="p-4 rounded-xl border" style="background: var(--red-soft); border-color: var(--red)">
-              <p class="text-[13px] font-semibold mb-1" style="color: var(--red)">Irreversible Actions</p>
-              <p class="text-[12px] mb-3" style="color: var(--text-2)">
-                These actions cannot be undone. Proceed with extreme caution.
-              </p>
-              <div class="flex gap-2">
-                <button
-                  type="button"
-                  class="text-[12px] font-semibold px-3 py-1.5 rounded-lg border"
-                  style="border-color: var(--red); color: var(--red)"
-                >
-                  Clear Audit Logs
-                </button>
-                <button
-                  type="button"
-                  class="text-[12px] font-semibold px-3 py-1.5 rounded-lg border"
-                  style="border-color: var(--red); color: var(--red)"
-                >
-                  Reset Platform
-                </button>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="mt-4 px-5 py-2 rounded-xl text-sm font-semibold text-white"
-              style="background: var(--primary)"
-            >
-              Save Configuration
-            </button>
+            <h3 class="text-sm font-bold mb-3 font-display" style="color: var(--text-1)">Connection</h3>
+            <dl class="grid grid-cols-[160px_1fr] gap-y-2 text-[12.5px]">
+              <dt style="color: var(--text-3)">API gateway</dt>
+              <dd class="font-mono break-all" style="color: var(--text-1)">{{ gatewayUrl }}</dd>
+              <dt style="color: var(--text-3)">Bank service</dt>
+              <dd style="color: var(--text-1)">{{ integrations.backendConnected() ? 'Connected' : 'Not reachable' }}</dd>
+            </dl>
+            <p class="text-[12px] mt-3" style="color: var(--text-3)">Set in src/environments when the portal is built; not editable here.</p>
           </app-surface-card>
         </div>
       }

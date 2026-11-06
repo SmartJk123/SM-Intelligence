@@ -1,6 +1,6 @@
 <div class="flex-1 overflow-auto p-4 lg:p-6 space-y-5">
   <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
-    <app-kpi-card label="Total users" [value]="total()" sub="with platform access" color="blue" delay="delay-50" action="all" (selected)="applyCardAction($event)" />
+    <app-kpi-card [label]="heading()" [value]="total()" sub="registered on the platform" color="blue" delay="delay-50" action="all" (selected)="applyCardAction($event)" />
     <app-kpi-card label="Active" [value]="active()" sub="can sign in" color="green" delay="delay-100" action="Active" (selected)="applyCardAction($event)" />
     <app-kpi-card label="Never signed in" [value]="neverSignedIn()" sub="registered, no sign in yet" color="gold" delay="delay-150" action="Never signed in" (selected)="applyCardAction($event)" />
     <app-kpi-card label="Suspended" [value]="suspended()" sub="access withdrawn" color="red" delay="delay-200" action="Suspended" (selected)="applyCardAction($event)" />
@@ -54,7 +54,7 @@
           class="flex items-center gap-1.5 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
           style="background: var(--primary); color: #fff"
         >
-          + Invite user
+          + Add customer
         </button>
       </div>
     </div>
@@ -98,12 +98,12 @@
             <tr>
               <td colspan="7" class="px-5 py-14 text-center">
                 @if (!userService.loaded()) {
-                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">Loading users…</p>
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">Loading customers…</p>
                 } @else if (total() === 0 && !userService.loadError()) {
-                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">No users yet</p>
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">No customers yet</p>
                   <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Accounts appear here as soon as someone registers on the web app.</p>
                 } @else {
-                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">No users match</p>
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">No customers match</p>
                   <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Clear the search or choose a different status.</p>
                 }
               </td>

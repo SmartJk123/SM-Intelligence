@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { DemoMovement } from '../../core/bank-integration.gateway';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { AdminTransaction, DemoMovement } from '../../core/bank-integration.gateway';
+import { UserService } from '../../core/user.service';
+import { Badge } from '../../shared/badge';
 import { BankIntegrationService } from '../../core/bank-integration.service';
 import { money } from '../../core/data';
 import { CsvExportService } from '../../core/csv-export.service';
@@ -23,7 +25,7 @@ const EXPORT_HEADERS = [
 @Component({
   selector: 'app-transactions',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [KpiCard, SurfaceCard],
+  imports: [KpiCard, SurfaceCard, Badge],
   templateUrl: './transactions.html',
   host: { class: 'flex-1 flex flex-col min-h-0' },
 })
@@ -31,6 +33,114 @@ export class Transactions {
   private readonly csv = inject(CsvExportService);
   private readonly toasts = inject(ToastService);
   private readonly integrations = inject(BankIntegrationService);
+  private readonly users = inject(UserService);
+
+  /** live: every transaction the banks reported. demo: the demonstration account. */
+  protected readonly tab = signal<'live' | 'demo'>('live');
+
+  // ---- Live transactions (bank-integration-service, refreshed every 15 seconds) ----
+  protected readonly live = signal<AdminTransaction[]>([]);
+  protected readonly liveLoaded = signal(false);
+  protected readonly liveError = signal<string | null>(null);
+  protected readonly liveUpdatedAt = signal<Date | null>(null);
+  protected readonly liveQuery = signal('');
+  protected readonly liveBank = signal('');
+  protected readonly liveDirection = signal<DirectionFilter>('All');
+  protected readonly liveDelivery = signal('All');
+  protected readonly deliveryFilters = ['All', 'Delivered', 'Not linked', 'Failed'];
+  private readonly newIds = signal<ReadonlySet<number>>(new Set());
+
+  private readonly customerNames = computed(() => {
+    const names = new Map<string, string>();
+    for (const user of this.users.summaries()) names.set(user.id, user.name);
+    return names;
+  });
+
+  protected readonly liveRows = computed(() => {
+    const term = this.liveQuery().trim().toLowerCase();
+    const delivery = { Delivered: 'DELIVERED', 'Not linked': 'UNLINKED', Failed: 'FAILED' }[this.liveDelivery()] ?? '';
+    return this.live().filter((tx) =>
+      (!this.liveBank() || tx.bankId === this.liveBank()) &&
+      (this.liveDirection() === 'All' || tx.direction === this.liveDirection().toUpperCase()) &&
+      (!delivery || tx.delivery === delivery) &&
+      (!term || [tx.reference, tx.narration, tx.counterpartyName, tx.accountMasked, this.customer(tx)]
+        .some((value) => (value ?? '').toLowerCase().includes(term))));
+  });
+
+  private readonly today = computed(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return this.live().filter((tx) => new Date(tx.receivedAt).getTime() >= start.getTime());
+  });
+  protected readonly liveCountToday = computed(() => this.today().length);
+  protected readonly liveInToday = computed(() =>
+    this.today().filter((tx) => tx.direction === 'CREDIT').reduce((sum, tx) => sum + tx.amount, 0));
+  protected readonly liveOutToday = computed(() =>
+    this.today().filter((tx) => tx.direction === 'DEBIT').reduce((sum, tx) => sum + tx.amount, 0));
+  protected readonly undelivered = computed(() => this.live().filter((tx) => tx.delivery !== 'DELIVERED').length);
+
+  constructor() {
+    void this.loadLive();
+    const timer = setInterval(() => void this.loadLive(true), 15_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
+  protected async loadLive(background = false): Promise<void> {
+    try {
+      const rows = await this.integrations.loadTransactions(1000, false);
+      const known = new Set(this.live().map((tx) => tx.id));
+      if (background && known.size > 0) {
+        const fresh = rows.filter((tx) => !known.has(tx.id)).map((tx) => tx.id);
+        if (fresh.length > 0) {
+          this.newIds.set(new Set(fresh));
+          this.toasts.show('New transactions', 'info', `${fresh.length} new transaction${fresh.length === 1 ? '' : 's'} from the banks.`);
+          setTimeout(() => this.newIds.set(new Set()), 6000);
+        }
+      }
+      this.live.set(rows);
+      this.liveError.set(null);
+      this.liveUpdatedAt.set(new Date());
+    } catch {
+      this.liveError.set('Transactions could not be loaded. Check that bank-integration-service is running.');
+    } finally {
+      this.liveLoaded.set(true);
+    }
+  }
+
+  protected isNew(tx: AdminTransaction): boolean {
+    return this.newIds().has(tx.id);
+  }
+
+  protected customer(tx: AdminTransaction): string {
+    if (!tx.customerId) return '';
+    return this.customerNames().get(tx.customerId) ?? tx.accountName ?? 'Linked customer';
+  }
+
+  protected deliveryLabel(tx: AdminTransaction): string {
+    return { DELIVERED: 'Delivered', UNLINKED: 'Not linked', FAILED: 'Failed', PENDING: 'Pending' }[tx.delivery] ?? tx.delivery;
+  }
+
+  protected updatedLabel(): string {
+    const at = this.liveUpdatedAt();
+    return at ? at.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '…';
+  }
+
+  protected exportLive(): void {
+    const rows = this.liveRows();
+    if (rows.length === 0) {
+      this.toasts.show('Nothing to export', 'warning', 'No transactions match the current filters.');
+      return;
+    }
+    this.csv.download(
+      `smartmoney-bank-transactions-${this.csv.stamp()}.csv`,
+      ['Received', 'Booked', 'Bank', 'Reference', 'Direction', 'Amount', 'Currency', 'Counterparty', 'Narration',
+        'Account', 'Customer', 'Delivery', 'Delivery error'],
+      rows.map((tx) => [tx.receivedAt, tx.bookingDate, tx.bankId.toUpperCase(), tx.reference, tx.direction, tx.amount,
+        tx.currency, tx.counterpartyName, tx.narration, tx.accountMasked, this.customer(tx), this.deliveryLabel(tx),
+        tx.deliveryError]),
+    );
+    this.toasts.show('Export ready', 'success', `${rows.length} transaction${rows.length === 1 ? '' : 's'} written to CSV.`);
+  }
 
   protected readonly money = money;
   protected readonly banks = ['kcb', 'stanbic', 'ncba', 'equity'];

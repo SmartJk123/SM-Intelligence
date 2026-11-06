@@ -3,6 +3,7 @@
 <div class="h-full flex overflow-hidden" style="background: var(--surface)">
   <app-sidebar
     [active]="activePage()"
+    [activeType]="activeType()"
     [open]="ui.sidebarOpen()"
     (closed)="ui.closeSidebar()"
     (logout)="ui.openLogout()"
@@ -18,6 +19,15 @@
       (logout)="ui.openLogout()"
       (profileClick)="goToProfile()"
     />
+    @if (mfaReminder()) {
+      <div class="flex flex-wrap items-center gap-3 px-5 py-2.5 text-[12.5px] border-b" role="status"
+        style="background: var(--gold-soft); color: var(--gold-ink); border-color: var(--border)">
+        <span class="icon icon-sm">shield</span>
+        <span class="flex-1">Your organisation asks staff to use two-factor authentication. Set it up to protect customer data.</span>
+        <button type="button" class="font-semibold underline" (click)="setUpMfa()">Set it up</button>
+        <button type="button" aria-label="Dismiss" (click)="mfaReminder.set(false)"><span class="icon icon-sm">close</span></button>
+      </div>
+    }
     <main class="flex-1 flex flex-col overflow-hidden min-h-0" style="background: var(--bg)">
       <router-outlet />
     </main>
