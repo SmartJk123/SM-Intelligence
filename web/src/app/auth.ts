@@ -1,7 +1,7 @@
 // Login and registration component.
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AccountApi, AccountKind } from './account-api';
 
 @Component({
@@ -29,6 +29,9 @@ import { AccountApi, AccountKind } from './account-api';
               : 'Sign in to your SM-Intelligence account.'
           }}
         </p>
+        @if (!register && signedOutIdle) {
+          <p role="status" class="alert">You were signed out after 15 minutes of inactivity. Sign in again to continue.</p>
+        }
         @if (created()) {
           <p role="status">Your account was created, but automatic sign-in could not complete. Please sign in to continue.</p>
           <a class="button" routerLink="/login">Continue to sign in</a>
@@ -153,6 +156,8 @@ import { AccountApi, AccountKind } from './account-api';
 // Owns form validation, submission state and navigation after authentication.
 export class Auth {
   private router = inject(Router);
+  /** Set when IdleTimeout sent the customer here (/login?reason=idle). */
+  readonly signedOutIdle = inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === 'idle';
   readonly api = inject(AccountApi);
   readonly created = signal(false);
   private fb = inject(FormBuilder);

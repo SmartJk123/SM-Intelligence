@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { Router } from '@angular/router';
 import { BankIntegrationService } from '../../core/bank-integration.service';
 import { PlatformEvent } from '../../core/bank-integration.gateway';
+import { CsvExportService } from '../../core/csv-export.service';
 import { Page } from '../../core/data';
 import { FlowSeries } from '../../core/dashboard-data';
 import { ToastService } from '../../core/toast.service';
@@ -41,6 +42,7 @@ export class Dashboard {
   private readonly integrations = inject(BankIntegrationService);
   private readonly router = inject(Router);
   private readonly toasts = inject(ToastService);
+  private readonly csv = inject(CsvExportService);
 
   /** True once the Spring Boot service has answered the statistics request. */
   protected readonly backendConnected = this.integrations.backendConnected;
@@ -170,6 +172,48 @@ export class Dashboard {
     if (page) {
       this.goTo(page);
     }
+  }
+
+  /** The recent activity table as shown, with full timestamps. No amounts, as on screen. */
+  protected exportActivity(): void {
+    const rows = this.events();
+    if (rows.length === 0) {
+      this.toasts.show('Nothing to export', 'warning', 'No notifications have been received yet.');
+      return;
+    }
+    this.csv.download(
+      `smartmoney-dashboard-activity-${this.csv.stamp()}.csv`,
+      ['Received', 'Processed', 'Bank', 'Flow', 'Demo', 'Sender', 'Reference', 'Signature', 'Status', 'Handled in', 'Error'],
+      rows.map((event) => [
+        event.receivedAt,
+        event.processedAt,
+        event.bankId,
+        this.flowLabel(event),
+        event.simulated ? 'Yes' : 'No',
+        event.counterpartyName,
+        event.externalEventId,
+        this.signatureLabel(event),
+        event.status,
+        this.duration(event),
+        event.errorMessage,
+      ]),
+    );
+    this.toasts.show('Export ready', 'success', `${rows.length} notification${rows.length === 1 ? '' : 's'} written to CSV.`);
+  }
+
+  /** The daily figures behind the notification volume chart. */
+  protected exportVolume(): void {
+    const volume = this.stats()?.volume ?? [];
+    if (volume.length === 0) {
+      this.toasts.show('Nothing to export', 'warning', 'There is no notification volume to export yet.');
+      return;
+    }
+    this.csv.download(
+      `smartmoney-dashboard-volume-${this.csv.stamp()}.csv`,
+      ['Date', 'Received', 'Failed'],
+      volume.map((point) => [point.date, point.received, point.failed]),
+    );
+    this.toasts.show('Export ready', 'success', `${volume.length} days written to CSV.`);
   }
 
   protected async refresh(): Promise<void> {

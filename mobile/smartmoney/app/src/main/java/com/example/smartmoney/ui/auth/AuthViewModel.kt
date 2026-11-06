@@ -18,11 +18,16 @@ import kotlinx.coroutines.launch
  * through the Spring Boot backend repository with robust error handling.
  */
 class AuthViewModel(
+
+    //dependency injection for authrepo
     private val authRepository: AuthRepository,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : ViewModel() {
 
+    // private mutable state means it can only be mutated within the authViewModel
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
+
+    //ths is the public read-only stateflow exposed to the public e.g login screen (it follows the unidirectional data flow principle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     // Backward-compatible alias for existing consumers referencing uiState
@@ -77,16 +82,24 @@ class AuthViewModel(
      * Authenticates an existing user with the Spring Boot backend.
      * Collects the Result from the repository and emits Success or Error state.
      */
+
+
+    //defines the entry-point method for authentication... does once input validation passes
     fun signIn(
         email: String,
         password: String
     ) {
         viewModelScope.launch {
+
+            //emits the new state to _authstate and disables the sign in button
             _authState.value = AuthState.Loading
+
+            //initiates the sign in process in the repository and waits for the network layer
             val result = authRepository.signIn(
                 email = email,
                 password = password
             )
+
             result.fold(
                 onSuccess = {
                     _authState.value = AuthState.Success("Sign in successful!")
@@ -94,6 +107,7 @@ class AuthViewModel(
                 onFailure = { error ->
                     val errorMessage = error.localizedMessage ?: error.message ?: "Invalid email or password."
                     _authState.value = AuthState.Error(errorMessage)
+
                 }
             )
         }

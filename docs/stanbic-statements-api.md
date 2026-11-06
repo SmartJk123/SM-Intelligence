@@ -3,17 +3,12 @@
 What the Standard Bank Statement Management API does, how it would fit SmartMoney Intelligence, and
 what has to be confirmed with Standard Bank before any work starts.
 
-## Document control
-
-| Field | Value |
-| --- | --- |
-| Document type | Assessment |
-| Version | 1.0 |
-| Status | Under review. Invited to the next rollout phase, reply due by close of business 2 October 2026 |
-| Owner | Eclectics, SmartMoney Intelligence |
-| Last updated | 28 September 2026 |
-| Related documents | [Stanbic integration setup](../admin-interface/docs/stanbic-integration-setup.md), [Public endpoint and trial runbook](public-endpoint-and-trial-runbook.md) |
-| Source | Standard Bank API Marketplace, Statement Management API page, and `nbp-document-api.yaml` version 3.4.0 (asset `nbp-document-api`, API version v3) |
+Assessment, version 1.0, last updated 28 September 2026, owned by Eclectics, SmartMoney Intelligence.
+Status: under review; we were invited to the next rollout phase, with a reply due by close of business
+2 October 2026. Sources: the Standard Bank API Marketplace Statement Management API page and
+`nbp-document-api.yaml` version 3.4.0 (asset `nbp-document-api`, API version v3). Related reading:
+[Stanbic integration setup](../admin-interface/docs/stanbic-integration-setup.md) and the
+[public endpoint and trial runbook](public-endpoint-and-trial-runbook.md).
 
 ## 1. Background
 
@@ -32,25 +27,28 @@ A statement document service. It lists the statements available for an account a
 downloads a chosen statement as a file. It does not return individual transactions as data, and it
 has no webhook or push notification of any kind.
 
-| Environment | Base URL |
-| --- | --- |
-| Sandbox, per the Marketplace | `https://api-gatewaynp.standardbank.co.za/npextorg/extnonprod/nbp-document` |
-| Server named in the YAML | `https://sit-gateway.apinp.standardbank.co.za/sit/sit/nbp-document` |
-| Mocking service | On the Marketplace page, no credentials needed |
-
-Use the Marketplace sandbox address. The YAML server is an internal test gateway.
+The sandbox, per the Marketplace, is
+`https://api-gatewaynp.standardbank.co.za/npextorg/extnonprod/nbp-document`. The YAML names a
+different server, `https://sit-gateway.apinp.standardbank.co.za/sit/sit/nbp-document`, which is an
+internal test gateway, so use the Marketplace address. There is also a mocking service on the
+Marketplace page that needs no credentials.
 
 ### Operations
 
-| Operation | Method and path | Purpose |
-| --- | --- | --- |
-| `getDocumentCategoriesByChannel` | `GET /document-services/statements/v2/account/statements/categories/{channelId}?userId=` | Statement categories for a channel |
-| `getDocumentCategories` | `GET /document-services/statements/v2/account/statements/categories?userId=` | The same without a channel. Marked deprecated on the Marketplace page, so avoid it |
-| `postAccountDocuments` | `POST /document-services/statements/v2/account/statements?userId=` | Lists available statements for the posted accounts, dates and categories |
-| `getAccountDocumentsDownload` | `GET /document-services/statements/v2/account/statements/download/{uid}?userId=` | Downloads a statement by its `uid` |
-| `downloadDocumentType` | `GET /document-services/statements/v2/account/statements/download/{uid}/document/{documentUid}?userId=` | Downloads one format of a statement |
-| `downloadWithoutListing` | `POST /document-services/statements/v3/account/statements/download/email` | Downloads by category and date range in one call, and can email the document |
-| `getCachedRows` | `POST /content-services/lookups/cache` | Lookup table access. Purpose not documented |
+- `getDocumentCategoriesByChannel`, `GET /document-services/statements/v2/account/statements/categories/{channelId}?userId=`:
+  the statement categories for a channel.
+- `getDocumentCategories`, `GET /document-services/statements/v2/account/statements/categories?userId=`:
+  the same without a channel. The Marketplace page marks it deprecated, so avoid it.
+- `postAccountDocuments`, `POST /document-services/statements/v2/account/statements?userId=`: lists the
+  available statements for the posted accounts, dates and categories.
+- `getAccountDocumentsDownload`, `GET /document-services/statements/v2/account/statements/download/{uid}?userId=`:
+  downloads a statement by its `uid`.
+- `downloadDocumentType`, `GET /document-services/statements/v2/account/statements/download/{uid}/document/{documentUid}?userId=`:
+  downloads one format of a statement.
+- `downloadWithoutListing`, `POST /document-services/statements/v3/account/statements/download/email`:
+  downloads by category and date range in one call, and can email the document.
+- `getCachedRows`, `POST /content-services/lookups/cache`: lookup table access. Its purpose is not
+  documented.
 
 ### The normal flow
 
@@ -65,37 +63,33 @@ Use the Marketplace sandbox address. The YAML server is an internal test gateway
 
 ### Authentication, as far as the specification states it
 
-| Header | Source |
-| --- | --- |
-| `X-IBM-Client-Id` | Issued with the subscription |
-| `X-IBM-Client-Secret` | Issued with the subscription |
-| `authorization` | Required on every call, described only as "validation tokens". How it is obtained is not documented |
-| `x-fapi-interaction-id` | Optional UUID for tracing a call |
-
-Every call also requires a `userId` query parameter that the specification does not define.
+`X-IBM-Client-Id` and `X-IBM-Client-Secret` are issued with the subscription. An `authorization` header
+is required on every call, but it is described only as "validation tokens" and how to obtain it is not
+documented. `x-fapi-interaction-id` is an optional UUID for tracing a call. Every call also requires a
+`userId` query parameter that the specification does not define.
 
 ## 3. Fit for SmartMoney Intelligence
 
-| Need | Covered | Notes |
-| --- | --- | --- |
-| Real time transaction notification | No | No webhook. The `/api/v1/webhooks/stanbic` endpoint plays no part in this product |
-| Transaction data a program can read | Unknown | The examples show `pdf`. Useful only if CSV, Excel or MT940 is offered |
-| Historical backfill | Possibly | Past statements by period, if a readable format exists |
-| Month end reconciliation | Possibly | Same condition |
+- **Real time transaction notification: no.** There is no webhook, so the `/api/v1/webhooks/stanbic`
+  endpoint plays no part in this product.
+- **Transaction data a program can read: unknown.** The examples show `pdf`. It is useful only if CSV,
+  Excel or MT940 is offered.
+- **Historical backfill and month end reconciliation: possibly**, through past statements by period,
+  if a readable format exists.
 
 It is a supplementary data source at best. It cannot replace a push feed like NCBA or KCB.
 
 ## 4. Blockers and open questions
 
-| Item | Why it matters |
-| --- | --- |
-| "Available to South African clients only" | Every gateway is on `standardbank.co.za` and the compliance terms are South African law (POPIA, NCA, Consumer Protection Act). If the account is with Stanbic Bank Kenya, the product may not be open to us at all |
-| Statement formats | PDF only would mean parsing PDFs, which breaks whenever the layout changes |
-| The `authorization` token | Not documented. The integration cannot be built without it |
-| The meaning of `userId` | Required everywhere, undefined |
-| `channelId` and category values | Not listed, and category lookup needs the channel |
-| Statement latency | Whether intraday or provisional statements exist, or only period end ones |
-| Push notifications | Whether any Standard Bank or Stanbic API offers them |
+- **"Available to South African clients only."** Every gateway is on `standardbank.co.za` and the
+  compliance terms are South African law (POPIA, NCA, Consumer Protection Act). If the account is with
+  Stanbic Bank Kenya, the product may not be open to us at all.
+- **Statement formats.** PDF only would mean parsing PDFs, which breaks whenever the layout changes.
+- **The `authorization` token** is not documented, and the integration cannot be built without it.
+- **`userId`** is required everywhere and defined nowhere.
+- **`channelId` and the category values** are not listed, and category lookup needs the channel.
+- **Statement latency.** Do intraday or provisional statements exist, or only period end ones?
+- **Push notifications.** Does any Standard Bank or Stanbic API offer them?
 
 ### Inconsistencies in the published material
 
@@ -128,6 +122,5 @@ Bank UX/UI design, and meet the listed regulatory requirements.
 
 ## Revision history
 
-| Version | Date | Summary |
-| --- | --- | --- |
-| 1.0 | 28 September 2026 | First assessment from the Marketplace page and `nbp-document-api.yaml` 3.4.0 |
+- **1.0, 28 September 2026.** First assessment from the Marketplace page and `nbp-document-api.yaml`
+  3.4.0.

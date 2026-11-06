@@ -16,13 +16,13 @@ and `ADMIN_EMAILS`. Never use or share production values.
 
 **Quickest way:** from the repository root run `.\start-local.ps1`. It opens one window per service in the
 order sign-in needs them (identity, accounts, transactions, budgets, investments, api-gateway,
-bank-integration, web, admin), finds
-Java 25 by itself, loads each service's `.env.local`, skips anything already running and waits for each service
-to be healthy. Stop everything with `.\start-local.ps1 -Stop`. If sign-in says "Unable to sign in ... the account
-service may be unavailable" or "Could not reach the identity service", the api-gateway (8080) is not running.
+bank-integration, web, admin). It finds Java 25 by itself, loads each service's `.env.local`, skips anything
+already running and waits for each service to be healthy. Stop everything with `.\start-local.ps1 -Stop`.
+If sign-in says "Unable to sign in ... the account service may be unavailable" or "Could not reach the
+identity service", the api-gateway (8080) is not running.
 
-To start a service by hand instead: Each Java service needs JDK 25 and is started from the repository root, one terminal each. Maven does not
-read `.env.local`, so load the service's file first:
+To start a service by hand instead, open one terminal per service at the repository root. Each Java service
+needs JDK 25. Maven does not read `.env.local`, so load the service's file first:
 
 ```powershell
 $env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot'
@@ -49,6 +49,22 @@ between identity-service and bank-integration-service. Running the script again 
 
 Start bank-integration-service as shown: its H2 database is a folder relative to where it starts, and the
 script uses `backend/bank-integration-service/data`.
+
+## Health alerts, CORS and idle sign-out
+
+- **Health alerts by email.** identity-service checks every service's `/actuator/health` each minute
+  (api-gateway, accounts, transactions, budgets, investments, bank-integration). When one fails two checks
+  in a row, or bank-integration reports `DEGRADED` (a bank or cPanel import failing), it emails
+  `ADMIN_EMAILS` (or `HEALTH_ALERT_EMAILS`), reminds every hour while the problem lasts, and sends a
+  "resolved" email with the downtime. It needs the SMTP settings in identity's `.env.local`; without them the
+  alerts are only logged. Turn it off with `HEALTH_MONITOR_ENABLED=false`.
+- **CORS.** Browsers reach the backend only through api-gateway, which allows the origins in
+  `APP_CORS_ALLOWED_ORIGINS`. accounts, transactions and the assistant no longer answer CORS themselves
+  (they allowed any website, with credentials). bank-integration, which the admin portal calls directly,
+  reads the same `APP_CORS_ALLOWED_ORIGINS` (default: any localhost port).
+- **Idle sign-out.** The web app and the admin portal sign out after 15 minutes without interaction, with a
+  one-minute warning and a "Stay signed in" button. The web app's server also ends a session after 15 idle
+  minutes (`SESSION_IDLE_MINUTES`), so an abandoned browser cannot be picked up later.
 
 ## Features at a glance
 

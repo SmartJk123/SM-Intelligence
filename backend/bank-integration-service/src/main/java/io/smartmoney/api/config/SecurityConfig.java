@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
@@ -34,7 +36,9 @@ import java.util.List;
  * remove it. AccountLinkController checks that the account is really theirs.
  *
  * PERMIT_ALL=true switches all of this off. It exists for tests and isolated
- * debugging only, and is off by default.
+ * debugging only, and is off by default. The service refuses to start with it
+ * on the postgres profile, which is the deployed configuration, so a stray
+ * environment variable cannot open the admin API in production.
  */
 @Configuration
 @EnableWebSecurity
@@ -44,10 +48,14 @@ public class SecurityConfig {
     public static final String CUSTOMER_ROLE = "USER";
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http, PlatformProperties platform, ObjectMapper mapper)
-            throws Exception {
+    SecurityFilterChain apiSecurity(HttpSecurity http, PlatformProperties platform, ObjectMapper mapper,
+                                    Environment environment) throws Exception {
         PlatformProperties.Security security = platform.security();
         boolean permitAll = security != null && security.permitAll();
+        if (permitAll && environment.acceptsProfiles(Profiles.of("postgres"))) {
+            throw new IllegalStateException(
+                    "PERMIT_ALL=true is not allowed on the postgres (deployed) profile. Set PERMIT_ALL=false.");
+        }
 
         http.csrf(csrf -> csrf.disable());
         http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
@@ -85,13 +93,18 @@ public class SecurityConfig {
     }
 
     /**
-     * The Angular development server uses a port of its own choosing, so every
-     * localhost port is allowed while developing. Narrow this before release.
+     * Browser origins allowed to call this service: the admin portal. Set
+     * APP_CORS_ALLOWED_ORIGINS (comma separated) to the deployed portal's
+     * address; locally every localhost port is allowed, since the Angular
+     * development server picks its own.
      */
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(
+            @org.springframework.beans.factory.annotation.Value(
+                    "${APP_CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}") String allowedOrigins) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+        configuration.setAllowedOriginPatterns(java.util.Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim).filter(origin -> !origin.isEmpty()).toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

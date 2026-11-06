@@ -16,8 +16,13 @@ import java.util.Map;
  * (for example /actuator/health/banks/kcb).
  *
  *   UP        the last connection test passed, or notifications are arriving
- *   DEGRADED  the last connection test failed, or no notification for 7 days
- *   UNKNOWN   no connector, or nothing has been tested or received yet
+ *   DEGRADED  a PRODUCTION bank's last connection test failed, or its notifications failed
+ *   UNKNOWN   no connector, nothing tested or received yet, or a sandbox bank failing
+ *
+ * Only production banks can degrade the service: they carry real money, and a
+ * DEGRADED service emails the administrators every hour (identity-service's
+ * ServiceHealthMonitor). A sandbox bank that is not set up yet still shows its
+ * ERROR in the details and on the admin portal, without paging anyone.
  *
  * DEGRADED is a custom status ranked below DOWN, so one bank failing marks
  * the service degraded rather than down, and the HTTP answer stays 200: a
@@ -63,7 +68,7 @@ public class BankHealthIndicators {
             return Status.UNKNOWN;
         }
         if (bank.apiStatus() == IntegrationStatus.ERROR || bank.webhookStatus() == IntegrationStatus.ERROR) {
-            return DEGRADED;
+            return bank.environment() == BankEnvironment.PRODUCTION ? DEGRADED : Status.UNKNOWN;
         }
         if (bank.apiStatus() == IntegrationStatus.PENDING && bank.webhookStatus() == IntegrationStatus.PENDING) {
             return Status.UNKNOWN;

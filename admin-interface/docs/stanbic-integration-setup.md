@@ -3,33 +3,27 @@
 How to stand up the Spring Boot backend for Stanbic bank integration, connect the Angular admin
 interface to it, and drive the work through to a successful instant payment notification.
 
-## Document control
+Integration setup guide, version 1.1, last updated 15 September 2026, owned by Eclectics, SmartMoney
+Intelligence. Status: working scaffold; the token endpoint was the one outstanding blocker. You need
+a Stanbic sandbox account, Java 21, PostgreSQL and optionally Docker. Related reading:
+[KCB real time trial](kcb-real-time-trial.md), the [API contract](../../docs/api-contract.md) and the
+[service README](../../backend/README.md).
 
-| Field | Value |
-| --- | --- |
-| Document type | Integration setup guide |
-| Version | 1.1 |
-| Status | Working scaffold. The token endpoint is the one outstanding blocker |
-| Owner | Eclectics, SmartMoney Intelligence |
-| Last updated | 15 September 2026 |
-| Related documents | [KCB real time trial](kcb-real-time-trial.md), [API contract](api-contract.md), [Service README](../backend/README.md) |
-| Prerequisites | Stanbic sandbox account, Java 21, PostgreSQL, Docker (optional) |
+> **This guide records how the service was first built.** The service now lives in
+> `backend/bank-integration-service` (port 8090), with the package layout described in the
+> [service README](../../backend/README.md). Read the project creation steps below as history, and
+> use the service README to run it today.
 
-The domain knowledge document lives outside this repository, in the planning folder at
+A copy of the domain knowledge document is in this repository as
+[domain-knowledge.md](../domain-knowledge.md); the original sits in the planning folder at
 `ECLECTICS/Planning/domain-knowledge.md`, alongside the original Figma prototype.
 
 ## 1. Scope
 
-This covers the Stanbic side of the platform:
-
-| Area | In scope |
-| --- | --- |
-| OAuth access token handling | Yes |
-| Bank connector behind the shared interface | Yes |
-| Incoming payment notification endpoint | Yes |
-| Admin API consumed by the Angular interface | Yes |
-| PostgreSQL schema for integration state | Yes |
-| The other three banks | No, they follow the same pattern later |
+This covers the Stanbic side of the platform: OAuth access token handling, the bank connector behind
+the shared interface, the incoming payment notification endpoint, the admin API the Angular interface
+consumes, and the PostgreSQL schema for integration state. The other banks are out of scope here;
+they follow the same pattern.
 
 ## 2. What exists and what is missing
 
@@ -70,33 +64,23 @@ interface never calls a bank and never receives a client key or client secret.
 
 From the Stanbic developer sandbox portal at `https://sandbox.stanbicbank.co.ke/` you need:
 
-| Item | Where it comes from | Status |
-| --- | --- | --- |
-| Developer account | Portal sign up and email activation | Your guide covers this |
-| Application client key | Created when you register the application | Your guide covers this |
-| Application client secret | Created with the client key | Your guide covers this |
-| Account number | Your Stanbic account | `0100013306316` |
-| Token URL | API product page, on the specific API | Your guide covers this |
-| API base URL | API product page | Your guide covers this |
-| Notification product subscription | API Products | To confirm |
-| Callback registration route | To confirm with the Integrations Team | Outstanding |
-| Notification payload and signature rules | To confirm | Outstanding |
+- A developer account, from the portal sign up and email activation.
+- The application client key and client secret, created when you register the application.
+- The account number: `0100013306316`.
+- The Token URL and the API base URL, from the specific API's product page.
+- A subscription to the notification product, under API Products (still to confirm).
+- The callback registration route, still to confirm with the Integrations Team.
+- The notification payload and signature rules, still to confirm.
+
+Your own sandbox guide covers the account, keys, Token URL and base URL.
 
 Store the client key and client secret in environment variables or a secret manager. Never commit
 them. The account number is configured, and the interface displays it masked.
 
 ## 5. Create the Spring Boot project
 
-Generate the project from Spring Initializr or your IDE with these settings.
-
-| Setting | Value |
-| --- | --- |
-| Project | Maven |
-| Language | Java |
-| Spring Boot | 3.3 or later |
-| Group | `io.smartmoney` |
-| Artifact | `smartmoney-api` |
-| Java | 21 |
+Generate the project from Spring Initializr or your IDE as a Maven project in Java 21, with Spring
+Boot 3.3 or later, group `io.smartmoney` and artifact `smartmoney-api`.
 
 Dependencies:
 
@@ -497,12 +481,10 @@ GET /api/v1/admin/bank-integrations
 
 Allowed values:
 
-| Field | Allowed values |
-| --- | --- |
-| environment | `Sandbox`, `Production` |
-| apiStatus, webhookStatus | `CONNECTED`, `HEALTHY`, `WARNING`, `ERROR`, `PENDING`, `UNKNOWN` |
-| tokenStatus | `VALID`, `EXPIRING`, `EXPIRED`, `UNKNOWN` |
-| timestamps | ISO-8601 with offset, or `null` |
+- `environment`: `Sandbox` or `Production`.
+- `apiStatus` and `webhookStatus`: `CONNECTED`, `HEALTHY`, `WARNING`, `ERROR`, `PENDING` or `UNKNOWN`.
+- `tokenStatus`: `VALID`, `EXPIRING`, `EXPIRED` or `UNKNOWN`.
+- Timestamps: ISO-8601 with an offset, or `null`.
 
 ### 11.2 Connection test
 
@@ -564,14 +546,10 @@ the credentials, which are referenced, not returned.
 
 ## 12. Security and CORS
 
-Security rules:
-
-| Path | Rule |
-| --- | --- |
-| `/api/v1/admin/**` | Authenticated, admin or super admin role |
-| `/api/v1/webhooks/**` | Public, but the caller must pass signature or IP verification |
-| `/actuator/health` | Public |
-| Everything else | Denied by default |
+Security rules: `/api/v1/admin/**` needs an authenticated admin. `/api/v1/webhooks/**` is public, but
+the caller must pass signature or IP verification. `/actuator/health` is public. Everything else is
+denied by default. (The service as built checks identity-service tokens for the `PLATFORM_ADMIN`
+role; see the [service README](../../backend/README.md#admin-api-security).)
 
 ```java
 @Bean
@@ -641,48 +619,68 @@ npm start
 There is no simulated mode to switch off. The Bank Integrations page shows a `Backend connected`
 indicator, and every page reports an unreachable service rather than showing invented figures.
 
-| Screen | Behaviour |
-| --- | --- |
-| Settings, Bank Integration Settings | Test connection runs against the backend and renders the steps it returns |
-| Bank Integrations | Status badges, notification counts, token state and webhook state come from `GET /api/v1/admin/bank-integrations` |
-| Dashboard | Counts, the volume chart and recent activity come from `GET /api/v1/admin/stats` |
-| Both | The account number is displayed masked, for example `*********6316` |
+- On Settings, Bank Integration Settings, Test connection runs against the backend and renders the
+  steps it returns.
+- On Bank Integrations, the status badges, notification counts, token state and webhook state come
+  from `GET /api/v1/admin/bank-integrations`.
+- On the Dashboard, the counts, the volume chart and recent activity come from
+  `GET /api/v1/admin/stats`.
+- Everywhere, the account number is displayed masked, for example `*********6316`.
 
 If the backend is not running, the panel does not go blank. It renders a failed test that names the
 URL it could not reach.
 
 ## 15. Runbook to a successful notification
 
-| Step | Action | Evidence that it worked |
-| --- | --- | --- |
-| 1 | Create the developer account and activate it | You can sign in to the portal |
-| 2 | Register the application with account `0100013306316` | Client key and client secret issued |
-| 3 | Subscribe the application to the notification API product | The product is listed under Apps, Subscriptions |
-| 4 | Copy the Token URL and API base URL from the product page | Both values saved to environment variables |
-| 5 | Start Postgres and the Spring Boot service | `GET /actuator/health` returns UP |
-| 6 | Call the token service once | An access token is cached server-side; its value is never logged or returned |
-| 7 | Call Test connection in the admin interface | Steps return, token request passes |
-| 8 | Start the tunnel and set `PUBLIC_BASE_URL` | The admin interface shows the public callback URL |
-| 9 | Register the callback URL with Stanbic | Stanbic confirms registration |
-| 10 | Ask Stanbic to trigger a test notification, or make a sandbox payment | A row appears in `webhook_event` |
-| 11 | Confirm signature verification | `signature_valid` is true |
-| 12 | Confirm idempotency | A repeated delivery does not create a second transaction |
-| 13 | Confirm reconciliation | The expected record matches the received transaction |
-| 14 | Confirm the admin interface | Bank Integrations shows the webhook as healthy and the notification appears |
+Each step, and how you know it worked:
+
+1. Create the developer account and activate it. You can sign in to the portal.
+2. Register the application with account `0100013306316`. A client key and client secret are issued.
+3. Subscribe the application to the notification API product. The product is listed under Apps,
+   Subscriptions.
+4. Copy the Token URL and API base URL from the product page. Both values are saved to environment
+   variables.
+5. Start Postgres and the Spring Boot service. `GET /actuator/health` returns UP.
+6. Call the token service once. An access token is cached server-side; its value is never logged or
+   returned.
+7. Run Test connection in the admin interface. The steps come back and the token request passes.
+8. Start the tunnel and set `PUBLIC_BASE_URL`. The admin interface shows the public callback URL.
+9. Register the callback URL with Stanbic. Stanbic confirms the registration.
+10. Ask Stanbic to trigger a test notification, or make a sandbox payment. A row appears in
+    `webhook_event`.
+11. Confirm signature verification: `signature_valid` is true.
+12. Confirm idempotency: a repeated delivery does not create a second transaction.
+13. Confirm reconciliation: the expected record matches the received transaction.
+14. Confirm the admin interface: Bank Integrations shows the webhook as healthy and the notification
+    appears.
 
 ## 16. Troubleshooting
 
-| Symptom | Likely cause | Action |
-| --- | --- | --- |
-| Unauthorized from the token endpoint | Wrong client key or secret | Recheck the values copied from the portal |
-| Token works in Postman, fails in the service | Credentials in the body versus Basic auth | Match the mode the gateway expects |
-| Token expired | Token older than one hour | Cached token must refresh before expiry |
-| Subscription error | Application not subscribed to the product | Verify under Apps, Subscriptions |
-| No notification received | Callback URL not registered, or the tunnel is down | Re-register and keep the tunnel running |
-| Webhook returns 500 | Processing happens before the response | Store and return 200 first, process after |
-| Duplicate transactions | No unique key on bank plus external reference | Add and rely on the unique index |
-| Connection test shows no HTTP status | Backend down, wrong base URL, or CORS | Check the service, the base URL and the CORS origin |
-| Interface shows `Backend unreachable` | The service is not running, or `API_BASE_URL` points elsewhere | Start the service and check the base URL |
+**Unauthorized from the token endpoint.** The client key or secret is wrong. Recheck the values
+copied from the portal.
+
+**The token works in Postman but fails in the service.** One sends the credentials in the body, the
+other as Basic auth. Match the mode the gateway expects.
+
+**The token expired.** It is older than one hour. The cached token must refresh before expiry.
+
+**Subscription error.** The application is not subscribed to the product. Check under Apps,
+Subscriptions.
+
+**No notification received.** The callback URL is not registered, or the tunnel is down. Register
+again and keep the tunnel running.
+
+**The webhook returns 500.** Processing happens before the response. Store the event and return 200
+first, then process.
+
+**Duplicate transactions.** There is no unique key on bank plus external reference. Add the unique
+index and rely on it.
+
+**The connection test shows no HTTP status.** The backend is down, the base URL is wrong, or CORS
+blocked the call. Check the service, the base URL and the CORS origin.
+
+**The interface shows `Backend unreachable`.** The service is not running, or `API_BASE_URL` points
+elsewhere. Start the service and check the base URL.
 
 ## 17. Registering the callback URL with Stanbic
 
@@ -690,14 +688,12 @@ This comes from the specification "Register Your Payment Result URL for Real-tim
 Sandbox 1.0.2". Registration is what makes Stanbic push real-time credit and debit alerts to us.
 Until it is done, no notifications arrive.
 
-| Item | Value |
-| --- | --- |
-| Registration endpoint | `https://api.connect.stanbicbank.co.ke/api/sandbox/registerurl/` |
-| Production endpoint | `https://api.connect.stanbicbank.co.ke/api/prod/registerurl/` |
-| Token endpoint | `https://api.connect.stanbicbank.co.ke/api/sandbox/auth/oauth2/token` |
-| Authentication | OAuth 2.0 application flow, scope `payments` |
-| Method | POST, `Content-Type: application/json` |
-| Support contact | kilele@stanbic.com |
+- Registration endpoint (sandbox): `https://api.connect.stanbicbank.co.ke/api/sandbox/registerurl/`
+- Registration endpoint (production): `https://api.connect.stanbicbank.co.ke/api/prod/registerurl/`
+- Token endpoint: `https://api.connect.stanbicbank.co.ke/api/sandbox/auth/oauth2/token`
+- Authentication: the OAuth 2.0 application flow, with scope `payments`.
+- Method: POST, with `Content-Type: application/json`.
+- Support contact: kilele@stanbic.com
 
 The request body:
 
@@ -749,14 +745,13 @@ the Client Key, the Client Secret and the public host are the only entries that 
 The developer portal shows the OAuth pair and the token URL. The register request additionally
 carries an `ApiKey` field, which the portal does not always expose.
 
-| Portal value | Environment variable | Required |
-| --- | --- | --- |
-| Client Key | `STANBIC_CLIENT_KEY` | Yes |
-| Client Secret | `STANBIC_CLIENT_SECRET` | Yes |
-| Token URL | `STANBIC_TOKEN_URL` | Yes, if it differs from the default below |
-| ApiKey, if a separate one is issued | `STANBIC_API_KEY` | Optional |
-| Bank account number | `STANBIC_ACCOUNT_NUMBER` | Yes, defaults to `0100013306316` |
-| Public host for the callback | `PUBLIC_BASE_URL` | Yes for anything beyond localhost |
+- The Client Key goes in `STANBIC_CLIENT_KEY` (required).
+- The Client Secret goes in `STANBIC_CLIENT_SECRET` (required).
+- The Token URL goes in `STANBIC_TOKEN_URL`. It is required if it differs from the default below.
+- A separate ApiKey, if one is issued, goes in `STANBIC_API_KEY` (optional).
+- The bank account number goes in `STANBIC_ACCOUNT_NUMBER` (required, defaults to `0100013306316`).
+- The public host for the callback goes in `PUBLIC_BASE_URL`. It is required for anything beyond
+  localhost.
 
 When `STANBIC_API_KEY` is not set, the service sends the Client Key in that field and reports the
 source as `client key fallback` on the Settings screen and from the credentials endpoint. That is an
@@ -833,10 +828,10 @@ The same information appears on Settings, Bank Integration Settings, under Clien
 This is the question that decides how far the integration can be tested, so it is worth stating
 plainly.
 
-| Level | What it exercises | Needs a real account holder | Shows your own money |
-| --- | --- | --- | --- |
-| Sandbox | The real Stanbic network path, with a sandbox application and a sandbox account | No | No |
-| Live | Notifications generated by activity on your own account | Yes, and the product enabled on that account | Yes |
+The **sandbox** exercises the real Stanbic network path, with a sandbox application and a sandbox
+account. It needs no real account holder, and it never shows your own money. **Live** delivers
+notifications generated by activity on your own account. It needs a real account holder with the
+product enabled on that account, and it is the only level that shows your own money.
 
 The sandbox is the right place to prove the plumbing. It does not watch your personal or business
 account, and no configuration on our side changes that.
@@ -902,7 +897,7 @@ Still open:
 
 ## Revision history
 
-| Version | Date | Summary |
-| --- | --- | --- |
-| 1.1 | 15 September 2026 | Sandbox against live account explained. Corrected section 18, which claimed the token endpoint was confirmed. It returns HTTP 404 and must be copied from the portal. Frontend connection steps updated to the backend-only interface |
-| 1.0 | 14 September 2026 | Initial backend setup guide and frontend connection steps |
+- **1.1, 15 September 2026.** Sandbox against live account explained. Corrected section 18, which
+  claimed the token endpoint was confirmed; it returns HTTP 404 and must be copied from the portal.
+  Frontend connection steps updated to the backend-only interface.
+- **1.0, 14 September 2026.** Initial backend setup guide and frontend connection steps.

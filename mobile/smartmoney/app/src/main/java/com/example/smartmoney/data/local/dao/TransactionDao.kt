@@ -1,6 +1,8 @@
 package com.example.smartmoney.data.local.dao
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
@@ -28,6 +30,18 @@ interface TransactionDao {
 
     @Upsert
     suspend fun upsertTransaction(transaction: TransactionEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertTransaction(transaction: TransactionEntity): Long
+
+    @Query("SELECT * FROM transactions WHERE providerTransactionId = :providerTxId OR id = :id LIMIT 1")
+    suspend fun findTransactionByProviderIdOrId(providerTxId: String, id: String): TransactionEntity?
+
+    @Query("SELECT * FROM transactions WHERE providerTransactionId = :providerTxId LIMIT 1")
+    suspend fun findTransactionByProviderId(providerTxId: String): TransactionEntity?
+
+    @Query("DELETE FROM transactions WHERE userId = :userId AND (accountId = :accountId OR accountId IN (SELECT accountId FROM accounts WHERE id = :accountId AND userId = :userId))")
+    suspend fun deleteTransactionsForAccount(userId: String, accountId: String)
 
     @Query("DELETE FROM transactions WHERE userId = :userId")
     suspend fun clearTransactionsForUser(userId: String)

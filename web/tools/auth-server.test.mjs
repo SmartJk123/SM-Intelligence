@@ -5,8 +5,8 @@ import { startAuthServer } from './auth-server.mjs';
 const userId = '12345678-1234-4234-8234-123456789abc';
 const profile = { id: userId, name: 'Team Member', emailAddress: 'member@example.invalid', accountType: 'ORGANIZATION' };
 const jwt = (subject = userId, expires = Date.now() / 1000 + 60) => 'header.' + Buffer.from(JSON.stringify({ sub: subject, exp: expires })).toString('base64url') + '.signature';
-async function fixture(fetchAuth) {
-  const server = startAuthServer(0, 4200, { fetchAuth, identityUrl: 'http://localhost:8080' });
+async function fixture(fetchAuth, extra = {}) {
+  const server = startAuthServer(0, 4200, { fetchAuth, identityUrl: 'http://localhost:8080', ...extra });
   await once(server, 'listening');
   const base = 'http://127.0.0.1:' + server.address().port;
   return { server, base, async call(route, body, cookie, origin) {
@@ -303,5 +303,23 @@ test('workspace combines the user’s accounts, transactions, budgets and invest
     assert.equal(removed.status, 204);
     assert.ok(sent.some((c) => c.method === 'DELETE' && c.path === '/api/investments/' + userId + '?ownerId=' + userId));
     assert.equal((await fx.call('/api/workspace/transactions', { amountMinor: 1 }, cookie)).status, 400);
+  } finally { await fx.close(); }
+});
+
+test('a session left idle is signed out, while one in use stays signed in', async () => {
+  const token = jwt();
+  const fx = await fixture(async (url) => {
+    if (url.pathname.endsWith('/login')) return Response.json({ token, userId });
+    return Response.json(profile);
+  }, { sessionIdleMinutes: 0.005 }); // 300 ms
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  try {
+    const cookie = (await fx.call('/api/auth/login', input)).cookie.split(';')[0];
+    for (let i = 0; i < 4; i++) {
+      await pause(150);
+      assert.equal((await fx.call('/api/auth/session', null, cookie)).status, 200, 'activity keeps the session');
+    }
+    await pause(450);
+    assert.equal((await fx.call('/api/auth/session', null, cookie)).status, 401, 'idle session ended');
   } finally { await fx.close(); }
 });

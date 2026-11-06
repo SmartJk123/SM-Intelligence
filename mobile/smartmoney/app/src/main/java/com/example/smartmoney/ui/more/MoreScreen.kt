@@ -283,6 +283,19 @@ fun MoreScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = "Automation & Tracking",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        com.example.smartmoney.ui.more.components.MpesaTrackingSettingsCard()
+
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(

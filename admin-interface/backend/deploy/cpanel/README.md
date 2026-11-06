@@ -29,13 +29,12 @@ upload each file to the same path.
     └── ncba-config.php             from smi-private/ncba-config.sample.php, filled in on the server
 ```
 
-| File in this folder | Goes to on the server |
-| --- | --- |
-| `public_html/.htaccess` | `public_html/.htaccess`. If one exists, paste the block between `BEGIN` and `END` at its top |
-| `public_html/sm-intelligence/.htaccess` | `public_html/sm-intelligence/.htaccess` |
-| `public_html/sm-intelligence/ncba-webhook.php` | `public_html/sm-intelligence/ncba-webhook.php` |
-| `smi-private/ncba-config.sample.php` | `smi-private/ncba-config.php`, renamed and filled in |
-| `schema.sql` | Run once in phpMyAdmin, not uploaded |
+Each file in this folder goes to the same path on the server, with three exceptions:
+
+- `public_html/.htaccess`: if the server already has one, paste the block between `BEGIN` and `END`
+  at the top of it instead of replacing it.
+- `smi-private/ncba-config.sample.php` is renamed to `smi-private/ncba-config.php` and filled in.
+- `schema.sql` is not uploaded. Run it once in phpMyAdmin.
 
 The endpoint looks for `smi-private/ncba-config.php` in the folders above its own, so it is found
 from `public_html/sm-intelligence` without any setting. When the subdomain
@@ -64,14 +63,17 @@ cPanel File Manager turn on Settings, Show Hidden Files.
 
 ## Proving it before NCBA sends anything
 
-| Check | How | Expected |
-| --- | --- | --- |
-| Address reachable | Open the endpoint address in a browser | `Status : ready` |
-| `not ready: ...ncba-config.php was not found` | The config is missing, misnamed or not valid PHP | Fix `smi-private/ncba-config.php` |
-| `not ready: the MySQL login ... failed` | `error_log` in the folder of `ncba-webhook.php` names the user it tried | Match the database, user and password from step 1 |
-| Credentials and hash | From `admin-interface\backend`: `.\tools\send-ncba-notification.ps1 -Url https://globalsmartspaces.com/api/v1/webhooks/ncba -TransId SMI-LIVE-TEST-1` | `HTTP 200 ... OK` |
-| Duplicate handling | The same command again | `OK: Duplicate Notification` |
-| Refusal | Add `-BreakHash` | `FAIL: HashVal did not match the values sent` |
+1. **Address reachable.** Open the endpoint address in a browser. Expect `Status : ready`.
+   - `not ready: ...ncba-config.php was not found` means the config is missing, misnamed or not valid
+     PHP. Fix `smi-private/ncba-config.php`.
+   - `not ready: the MySQL login ... failed` means the database login is wrong. `error_log` in the
+     folder of `ncba-webhook.php` names the user it tried. Match the database, user and password from
+     step 1.
+2. **Credentials and hash.** From `admin-interface\backend`, run
+   `.\tools\send-ncba-notification.ps1 -Url https://globalsmartspaces.com/api/v1/webhooks/ncba -TransId SMI-LIVE-TEST-1`.
+   Expect `HTTP 200 ... OK`.
+3. **Duplicate handling.** Run the same command again. Expect `OK: Duplicate Notification`.
+4. **Refusal.** Add `-BreakHash`. Expect `FAIL: HashVal did not match the values sent`.
 
 The rehearsal rows land in the live table. They carry `REHEARSAL` in the stored body, so delete
 them in phpMyAdmin before NCBA begins sending:
@@ -126,22 +128,18 @@ KCB's public key. The endpoint answers with the acknowledgement body the specifi
 {"transactionID": "FT00026252", "statusCode": "0", "statusMessage": "Notification received successfully"}
 ```
 
-| Case | HTTP | statusCode |
-| --- | --- | --- |
-| Accepted | 200 | `0` |
-| Already received (same `transactionReference`) | 200 | `0`, "Duplicate notification received" |
-| Signature missing or wrong | 401 | `401` |
-| Body not JSON | 400 | `400` |
-| Config or database not ready | 503 | `503`, so KCB can retry |
+An accepted notification gets HTTP 200 with `statusCode` `0`. One already received (same
+`transactionReference`) also gets 200 and `0`, with "Duplicate notification received". A missing or
+wrong signature gets 401, and a body that is not JSON gets 400, each with the same number as
+`statusCode`. If the config or database is not ready, the answer is 503, so KCB can retry.
 
 ### Files
 
-| File in this folder | Goes to on the server |
-| --- | --- |
-| `public_html/sm-intelligence/kcb-webhook.php` | `public_html/sm-intelligence/kcb-webhook.php` |
-| `public_html/sm-intelligence/.htaccess` | replaces the existing one (adds the `kcb` rules) |
-| `smi-private/kcb-config.sample.php` | `smi-private/kcb-config.php`, filled in, permissions `600` |
-| `schema.sql` | run again in phpMyAdmin; it only creates `kcb_notifications` if missing |
+- `public_html/sm-intelligence/kcb-webhook.php` goes to the same path on the server.
+- `public_html/sm-intelligence/.htaccess` replaces the existing one (it adds the `kcb` rules).
+- `smi-private/kcb-config.sample.php` becomes `smi-private/kcb-config.php`, filled in, with
+  permissions `600`.
+- `schema.sql` is run again in phpMyAdmin. It only creates `kcb_notifications` if it is missing.
 
 ### Steps
 
@@ -173,13 +171,10 @@ the username and password you register with the callback URL on Jenga HQ. It sen
 payments; both are stored, and the bank integration service credits only successful ones. Format and
 authentication follow [Jenga's IPN guide](https://developer.jengahq.io/guides/jenga-pgw/instant-payment-notifications).
 
-| Case | HTTP | Body |
-| --- | --- | --- |
-| Accepted | 200 | `{"status":"received","reference":"..."}` |
-| Already received (same reference) | 200 | adds `"duplicate":true` |
-| Basic Auth missing or wrong | 401 | `{"status":"rejected",...}` |
-| Body not JSON | 400 | `{"status":"rejected",...}` |
-| Config or database not ready | 503 | so Jenga can retry |
+An accepted notification gets HTTP 200 with `{"status":"received","reference":"..."}`. One already
+received (same reference) also gets 200, with `"duplicate":true` added. Missing or wrong Basic Auth
+gets 401, and a body that is not JSON gets 400, both with `{"status":"rejected",...}`. If the config
+or database is not ready, the answer is 503, so Jenga can retry.
 
 Jenga does not document the reply it expects, so confirm with Equity that a 200 with this body counts as
 delivered.
@@ -197,6 +192,7 @@ delivered.
 5. **Jenga HQ.** Register the address as the IPN callback with the same username and password.
 6. **Bank integration service.** In `backend/bank-integration-service/.env.local` set
    `EQUITY_CPANEL_EXPORT_URL=https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/equity/export`,
-   `EQUITY_CPANEL_EXPORT_TOKEN` (same token), and the Jenga credentials below, then restart.
+   `EQUITY_CPANEL_EXPORT_TOKEN` (same token), and the Jenga credentials listed in the
+   [service README](../../../../backend/README.md#equity-jenga), then restart.
 7. **Link the account.** Jenga's sample notification has no account number (`bank.account` is null), so
    payments are filed under `EQUITY_ACCOUNT_NUMBER`. Link that Equity account to its customer in admin.

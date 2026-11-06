@@ -1,0 +1,340 @@
+================================================================================
+SMARTMONEY INTELLIGENCE: PHASE 2 VERIFICATION & AUDIT REPORT
+LOCAL M-PESA TRANSACTION INGESTION IMPLEMENTATION
+================================================================================
+Document: PHASE_2_VERIFICATION_REPORT.txt
+Target Project: /home/frank/AndroidStudioProjects/smartmoney
+Date Generated: 2026-10-23
+Platform: Android (Jetpack Compose, Kotlin 2.2, Room DB, Coroutines/Flow)
+Verification Scope: Static code inspection & compilation check of Phase 2 ingestion
+Status: Complete & Verified (Zero Compilation Errors)
+================================================================================
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. FILES INSPECTED
+2. DUPLICATE HANDLING FINDINGS & GUARANTEES PROVIDED
+3. ACCOUNT ASSOCIATION FINDINGS & MULTIPLE-ACCOUNT BEHAVIOR
+4. TRANSACTION FIELD PRESERVATION & DESCRIPTION FORMAT FINDINGS
+5. REVERSAL HANDLING FINDINGS
+6. RUNTIME AND ERROR-HANDLING RISKS IDENTIFIED
+7. FILES CHANGED AND RATIONALE FOR EACH CORRECTION
+8. SCHEMA OR MIGRATION IMPLICATIONS
+9. EXACT COMPILATION COMMAND AND RESULTS
+10. REMAINING RISKS FOR MANUAL / UNIT TEST PRACTICE
+11. CONFIRMATION OF TEST RESTRAINT
+12. CONFIRMATION OF SCOPE RESTRAINT
+================================================================================
+
+
+1. FILES INSPECTED
+--------------------------------------------------------------------------------
+The following files and database definitions were thoroughly inspected via static
+code analysis:
+
+- Ingestion Domain & Service:
+  * app/src/main/java/com/example/smartmoney/core/sms/ingestion/MpesaTransactionIngestionService.kt
+  * app/src/main/java/com/example/smartmoney/core/sms/ingestion/MpesaIngestionResult.kt
+
+- Local Persistence & DAOs:
+  * app/src/main/java/com/example/smartmoney/data/local/entity/TransactionEntity.kt
+  * app/src/main/java/com/example/smartmoney/data/local/dao/TransactionDao.kt
+  * app/src/main/java/com/example/smartmoney/data/local/entity/AccountEntity.kt
+  * app/src/main/java/com/example/smartmoney/data/local/dao/AccountDao.kt
+  * app/src/main/java/com/example/smartmoney/data/local/database/AppDatabase.kt
+  * app/src/main/java/com/example/smartmoney/data/local/database/Converters.kt
+
+- Room Exported Database Schemas:
+  * app/schemas/com.example.smartmoney.data.local.database.AppDatabase/4.json
+    Inspected actual SQLite table structure, primary keys, indices, and foreign keys.
+
+- Domain Models & Parsers:
+  * app/src/main/java/com/example/smartmoney/core/sms/model/ParsedFinancialMovement.kt
+  * app/src/main/java/com/example/smartmoney/core/sms/model/MpesaTransactionKind.kt
+  * app/src/main/java/com/example/smartmoney/core/sms/model/TransactionDirection.kt
+  * app/src/main/java/com/example/smartmoney/core/sms/parser/MpesaTransactionParser.kt
+
+- Repository & Application Consumers:
+  * app/src/main/java/com/example/smartmoney/core/di/AppContainer.kt
+  * app/src/main/java/com/example/smartmoney/data/repository/TransactionRepositoryImpl.kt
+  * app/src/main/java/com/example/smartmoney/data/repository/BankAccountRepositoryImpl.kt
+  * app/src/main/java/com/example/smartmoney/ui/transactions/TransactionScreen.kt
+
+
+2. DUPLICATE HANDLING FINDINGS & GUARANTEES PROVIDED
+--------------------------------------------------------------------------------
+A. Normalization Consistency:
+   - Receipts are consistently trimmed and normalized to uppercase:
+     `val reference = movement.reference.trim().uppercase(Locale.ROOT)`
+   - Syntactic format is enforced via regex: `^[A-Z0-9]{5,20}$`.
+
+B. Division of Guarantees: SQLite vs. Application Level:
+   1. SQLite Schema Enforced:
+      - `PRIMARY KEY(id)`: SQLite strictly enforces uniqueness of `TransactionEntity.id`.
+        Any attempt to insert a record with an identical ID fails immediately with an
+        `SQLiteConstraintException`.
+      - Non-null constraints on mandatory columns: `id`, `userId`, `accountId`,
+        `amount`, `transactionType`, `timestamp`.
+   2. Application Level Enforced:
+      - Uniqueness of `providerTransactionId`: In Room Schema v4 (`4.json`),
+        `providerTransactionId` is NOT defined as a UNIQUE index. Therefore,
+        preventing duplicate `providerTransactionId` values relies on the application
+        mapping `id = "mpesa_${reference}"` and conducting the pre-insert query.
+      - Absence of Foreign Key constraints: Room Schema v4 does not enforce foreign keys
+        between `transactions.accountId` and `accounts.id`. Valid account association
+        is maintained purely at the application level.
+
+C. Conflict Strategy & Overwrite Protection:
+   - `TransactionDao.insertTransaction` uses `@Insert(onConflict = OnConflictStrategy.ABORT)`.
+   - SQLite `ABORT` guarantees that existing rows in SQLite are NEVER overwritten or
+     mutated upon encountering a primary key collision.
+
+D. ID Collision vs. Legitimate Duplicate Verification:
+   - Defect Found & Corrected: Previously, querying `findTransactionByProviderIdOrId`
+     treated any match as a `Duplicate(reference)`. If an unrelated transaction had
+     `id = "mpesa_$reference"` but its `providerTransactionId` was `"DIFFERENT_REF"`,
+     it was falsely misclassified as a duplicate of `reference`.
+   - Corrected Logic: Implemented `evaluateDuplicateStatus()`:
+     * Confirmed Duplicate: Either `providerTransactionId.equals(reference)` OR
+       `id == "mpesa_$reference"` with a null or matching `providerTransactionId`.
+     * ID Collision: If `id == "mpesa_$reference"` but `providerTransactionId != reference`,
+       it is treated as an integrity conflict (`DatabaseError`) rather than a duplicate.
+
+E. Concurrency Across Repeated Calls:
+   - Duplicate prevention is NOT solely dependent on the in-memory `Mutex`.
+   - The in-memory `Mutex` serializes calls within the running process to avoid unnecessary
+     constraint exceptions.
+   - Across distinct threads, background jobs, or process restarts, SQLite's `PRIMARY KEY(id)`
+     constraint and the `SELECT` pre-check provide persistent, cross-session deduplication.
+
+
+3. ACCOUNT ASSOCIATION FINDINGS & MULTIPLE-ACCOUNT BEHAVIOR
+--------------------------------------------------------------------------------
+A. User Isolation & Explicit Account ID Scoping:
+   - Defect Found & Corrected: Previously, `resolveMpesaAccount` attempted a fallback to
+     `accountDao.getAccountById(targetAccountId)`. Because `getAccountById` does not filter
+     by `userId`, a caller supplying an account ID belonging to a different user could have
+     associated the transaction with another user's account.
+   - Corrected Logic: All account queries are strictly scoped to the authenticated `userId`
+     via `accountDao.getAccountsForUserOnce(userId)`. Explicit `targetAccountId` must match
+     either `id` or `accountId` of an account owned by `userId`.
+
+B. Elimination of False Positives for Generic WALLET / MOBILE_MONEY:
+   - Defect Found & Corrected: Previously, `isMpesaAccount` accepted any account with
+     `accountType == "WALLET"` or `accountType == "MOBILE_MONEY"`. This allowed commercial
+     bank accounts (e.g. KCB Vooma Wallet, Equity Mobile App) to be erroneously selected.
+   - Corrected Logic: `isMpesaAccount` now requires explicit branding in `institution` or
+     `accountName` matching `"M-PESA"`, `"MPESA"`, or `"SAFARICOM"`. Generic bank wallets
+     are safely rejected.
+
+C. Multiple Eligible Accounts & Ambiguity Handling:
+   - Defect Found & Corrected: When a user possessed multiple M-PESA accounts (e.g. personal
+     phone number vs. business till), previous logic arbitrarily selected the first account
+     via `LIMIT 1` or `firstOrNull`.
+   - Corrected Logic:
+     * 0 candidates -> returns `MpesaIngestionResult.MissingAccount`.
+     * Exactly 1 candidate -> deterministically associates with that account.
+     * >1 candidates -> returns `MpesaIngestionResult.AmbiguousAccount` with a descriptive
+       explanation listing candidate IDs, refusing to guess without an explicit `targetAccountId`.
+
+D. User Authentication Resolution:
+   - User identity is resolved via `(userId ?: userIdProvider?.invoke())?.trim()`.
+   - In `AppContainer.kt`, `userIdProvider` delegates to `authRepository.currentUserId()`.
+   - If no user is logged in, ingestion halts with `MissingAccount`. Accounts are never
+     created automatically and dummy IDs are never generated.
+
+
+4. TRANSACTION FIELD PRESERVATION & DESCRIPTION FORMAT FINDINGS
+--------------------------------------------------------------------------------
+A. Field Storage Breakdown:
+   1. Dedicated Database Columns in `TransactionEntity`:
+      - `id`: Deterministic primary key (`"mpesa_${reference}"`).
+      - `userId`: Resolved authenticated user ID.
+      - `accountId`: Canonical `AccountEntity.id`.
+      - `amount`: Exact `BigDecimal` (persisted as plain string without floating-point loss).
+      - `transactionType`: Direction string (`"CREDIT"` or `"DEBIT"`).
+      - `timestamp`: UTC ISO-8601 string (`yyyy-MM-dd'T'HH:mm:ss'Z'`).
+      - `providerTransactionId`: M-PESA receipt reference string.
+      - `createdAt` / `updatedAt`: UTC ISO-8601 strings.
+   2. Embedded in `description`:
+      - Counterparty name (e.g. "Sent to John Doe", "Received from Jane Doe").
+      - Counterparty phone number (e.g. "0712345678").
+      - Biller / Paybill / Till account reference (e.g. "Paybill - KPLC (Acc: 12345)").
+      - Transaction fee (e.g. " • Fee: KES 23.00").
+      - Reversal lineage (e.g. "M-PESA Reversal of ABC123XYZ").
+   3. Discarded Fields:
+      - `movement.balanceAfter`: Extracted by the parser from SMS, but omitted from
+        `TransactionEntity`. Because the UI directly displays `transaction.description`
+        as the transaction title, appending balance snapshots into `description` would
+        clutter the transaction list item. Storing balance snapshots belongs to account-level
+        ledger reconciliation in Phase 4.
+
+B. Monetary Precision:
+   - Ingestion enforces `movement.amount > BigDecimal.ZERO`.
+   - Exact `BigDecimal` precision is preserved across mapping and Room serialization.
+     No conversion to `Double` or `Float` is performed.
+
+
+5. REVERSAL HANDLING FINDINGS
+--------------------------------------------------------------------------------
+A. Reversal Distinction & Direction:
+   - Reversal messages parsed by `MpesaTransactionParser` carry:
+     * `kind = MpesaTransactionKind.REVERSAL`
+     * `direction = TransactionDirection.CREDIT`
+     * `reversedReference = <Original Receipt Reference>`
+   - The reversal has its own unique receipt reference (e.g. `RJ789XYZ12`) and deterministic
+     ID (`mpesa_RJ789XYZ12`).
+
+B. Protection Against Collisions with Original Transaction:
+   - Because the reversal's receipt reference differs from the original transaction's reference,
+     it receives a unique primary key and does not overwrite or collide with the original record.
+   - The reversal cannot be misclassified as a duplicate of the original transaction.
+
+C. Current Relational Modeling Limitations:
+   - `TransactionEntity` does not have an `originalTransactionId` or `reversalReference` column.
+   - The relationship to the original transaction is preserved solely in `description`:
+     `"M-PESA Reversal of <originalReference>"`.
+   - If the original reference was not present in the SMS, it falls back to `"M-PESA Reversal"`.
+   - Limitation: There is no relational foreign key linking the reversal to the original
+     transaction, and the original transaction's status is not mutated to `"REVERSED"` in Phase 2.
+     This limitation is intentional to avoid schema migrations in Phase 2.
+
+
+6. RUNTIME AND ERROR-HANDLING RISKS IDENTIFIED
+--------------------------------------------------------------------------------
+A. Swallowing of Coroutine Cancellation:
+   - Defect Found & Corrected: Ingestion previously caught generic `Exception` during account
+     lookup and Room persistence without checking for `CancellationException`.
+   - Corrected Logic: Added `if (e is kotlinx.coroutines.CancellationException) throw e` across
+     all `catch` blocks to respect structured concurrency.
+
+B. Timestamp Formatting and UI Parsing:
+   - Defect Found & Corrected: When formatting `movement.transactionDateTime`,
+     `ISO_LOCAL_DATE_TIME` was used (e.g. `2026-10-23T15:30:00`), which lacked a timezone
+     offset or `'Z'`.
+   - In `TransactionScreen.kt`, `Instant.parse(transaction.timestamp)` expects a UTC offset
+     or `'Z'`. A local ISO string would throw `DateTimeParseException` and trigger UI fallback.
+   - Corrected Logic: Converted local Nairobi time to UTC Instant:
+     `dt.atZone(ZoneId.of("Africa/Nairobi")).toInstant().toString()`, ensuring seamless
+     compatibility with `Instant.parse()`.
+
+C. Safe Error Propagation:
+   - SQLite constraint exceptions are caught, verified against confirmed duplicate status,
+     and only classified as `Duplicate` if proven. Unrelated constraint violations return
+     `MpesaIngestionResult.DatabaseError`.
+   - `MpesaIngestionResult.Success` is only returned after `transactionDao.insertTransaction()`
+     successfully completes without exception.
+
+
+7. FILES CHANGED AND RATIONALE FOR EACH CORRECTION
+--------------------------------------------------------------------------------
+1. `app/src/main/java/com/example/smartmoney/core/sms/ingestion/MpesaIngestionResult.kt`:
+   - Added `data class AmbiguousAccount(val reason: String, val candidateAccountIds: List<String>)`
+     to explicitly signal when multiple M-PESA accounts exist and require disambiguation.
+
+2. `app/src/main/java/com/example/smartmoney/core/sms/ingestion/MpesaTransactionIngestionService.kt`:
+   - Scoped account queries strictly to `userId`, removing cross-user account leakage.
+   - Refined `isMpesaAccount` to check for M-PESA/Safaricom branding, preventing generic
+     bank wallets (KCB, Equity) from matching.
+   - Implemented disambiguation for multiple accounts, returning `AmbiguousAccount` instead of
+     arbitrarily taking the first account.
+   - Implemented `evaluateDuplicateStatus` to prevent ID collisions with different provider references
+     from being falsely reported as duplicates.
+   - Added `CancellationException` rethrowing to preserve coroutine cancellation.
+   - Updated timestamp formatting to UTC Instant string (`...Z`) for UI compatibility.
+
+3. Mirrored Files Synchronized:
+   - `mobile/smartmoney/app/src/main/java/com/example/smartmoney/core/sms/ingestion/MpesaIngestionResult.kt`
+   - `mobile/smartmoney/app/src/main/java/com/example/smartmoney/core/sms/ingestion/MpesaTransactionIngestionService.kt`
+
+
+8. SCHEMA OR MIGRATION IMPLICATIONS
+--------------------------------------------------------------------------------
+- No schema changes or Room database migrations were introduced.
+- Database version remains at version 4 (`energy_cache_database`).
+- All duplicate prevention and account association safeguards were achieved strictly at the
+  application and DAO query layer, preserving existing user data without destructive migrations.
+- Future Schema Recommendations (Phase 4):
+  * Add a unique index on `providerTransactionId` (`@Index(value = ["providerTransactionId"], unique = true)`).
+  * Add dedicated columns for `fee: BigDecimal?` and `reversedReference: String?` if fine-grained
+    SQL aggregation or filtering by fee/reversal is required.
+
+
+9. EXACT COMPILATION COMMAND AND RESULTS
+--------------------------------------------------------------------------------
+Working Directory:
+/home/frank/AndroidStudioProjects/smartmoney
+
+Command Executed:
+$ ./gradlew :app:compileDebugKotlin
+
+Execution Output:
+--------------------------------------------------------------------------------
+Reusing configuration cache.
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+
+BUILD SUCCESSFUL in 7s
+8 actionable tasks: 2 executed, 6 up-to-date
+Configuration cache entry reused.
+--------------------------------------------------------------------------------
+Compilation Result: 0 errors, 0 warnings. Build Successful.
+
+
+10. REMAINING RISKS FOR MANUAL / UNIT TEST PRACTICE
+--------------------------------------------------------------------------------
+As requested, unit tests were neither created nor run. The following edge cases
+are documented for you to verify during your manual testing or unit test practice:
+
+1. Ambiguous Account Disambiguation:
+   - Setup a fake user with 2 M-PESA accounts ("Personal" and "Business").
+   - Ingest without `targetAccountId` -> Verify `MpesaIngestionResult.AmbiguousAccount` is returned.
+   - Ingest with `targetAccountId` -> Verify transaction attaches to the specified account.
+
+2. ID Collision vs. Duplicate Verification:
+   - Insert a mock transaction with `id = "mpesa_ABC123"` and `providerTransactionId = "XYZ999"`.
+   - Attempt to ingest a movement with reference `"ABC123"`.
+   - Verify that it returns `DatabaseError` (ID collision) instead of `Duplicate`.
+
+3. Reversal Credit Ingestion:
+   - Ingest a reversal movement with `reversedReference = "ORIG123"`.
+   - Verify that `transactionType == "CREDIT"`, description contains "M-PESA Reversal of ORIG123",
+     and the original transaction is not deleted or overwritten.
+
+4. Commercial Bank Wallet Rejection:
+   - Setup a user with only a KCB Vooma wallet (`institution = "KCB"`, `accountType = "WALLET"`).
+   - Ingest an M-PESA movement -> Verify it returns `MissingAccount` rather than attaching to KCB.
+
+5. Coroutine Cancellation:
+   - Cancel the parent coroutine job during ingestion and verify that `CancellationException`
+     is propagated rather than wrapped in `DatabaseError`.
+
+
+11. CONFIRMATION OF TEST RESTRAINT
+--------------------------------------------------------------------------------
+- [CONFIRMED] No unit test files were created or modified in `app/src/test/` or elsewhere.
+- [CONFIRMED] No test tasks (`test`, `testDebugUnitTest`, etc.) were executed.
+- [CONFIRMED] No test frameworks, mocks, or testing dependencies were added.
+
+
+12. CONFIRMATION OF SCOPE RESTRAINT
+--------------------------------------------------------------------------------
+- [CONFIRMED] No SMS permissions (READ_SMS, RECEIVE_SMS) were requested or added.
+- [CONFIRMED] No BroadcastReceivers or notification listeners were introduced.
+- [CONFIRMED] No device SMS messages were read.
+- [CONFIRMED] No bank SMS parsing logic was added.
+- [CONFIRMED] No new UI screens or Composable components were created.
+- [CONFIRMED] No network requests or backend sync calls were added.
+- [CONFIRMED] No account balances were mutated.
+- [CONFIRMED] No destructive Room database migrations were performed.
+================================================================================
+END OF VERIFICATION REPORT
+================================================================================

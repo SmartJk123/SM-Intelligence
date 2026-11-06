@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
@@ -49,8 +48,14 @@ class BudgetViewModel(
     private val _messageState = MutableStateFlow(MessageState())
     private val transactionsFlow = transactionRepository?.getTransactionsFlow(userId = userId) ?: flowOf(emptyList())
 
+    init {
+        viewModelScope.launch {
+            budgetRepository.syncBudgets(userId)
+        }
+    }
+
     val uiState: StateFlow<BudgetUiState> = combine(
-        budgetRepository.getBudgets(),
+        budgetRepository.getBudgets(userId),
         transactionsFlow,
         _messageState
     ) { budgets, transactions, messages ->
@@ -79,6 +84,12 @@ class BudgetViewModel(
         _messageState.value = MessageState()
     }
 
+    fun refreshBudgets() {
+        viewModelScope.launch {
+            budgetRepository.syncBudgets(userId)
+        }
+    }
+
     private fun calculateSummary(budget: Budget, transactions: List<Transaction>): BudgetSummary {
         val matchedDebitTransactions = transactions.filter { tx ->
             val isDebit = tx.type.equals("DEBIT", ignoreCase = true) || tx.type.equals("EXPENSE", ignoreCase = true)
@@ -88,21 +99,9 @@ class BudgetViewModel(
             isDebit && matchesCategory && matchesAccount
         }
 
-        val spentFromTx = matchedDebitTransactions.sumOf {
+        // Purely actual spent amount from logged-in user transactions (zero hardcoded simulation)
+        val spent = matchedDebitTransactions.sumOf {
             (it.amount * BigDecimal(100)).toLong()
-        }
-
-        val spent = if (transactions.isNotEmpty() && matchedDebitTransactions.isNotEmpty()) {
-            spentFromTx
-        } else {
-            // Representative category simulation matching the converted web blueprint
-            when (budget.category.lowercase()) {
-                "groceries" -> (budget.allocatedMinor * 0.72).toLong()
-                "utilities & power" -> (budget.allocatedMinor * 0.91).toLong() // approaching limit
-                "shopping" -> (budget.allocatedMinor * 1.08).toLong() // over budget
-                "dining & leisure" -> (budget.allocatedMinor * 0.45).toLong() // within budget
-                else -> (budget.allocatedMinor * 0.50).toLong()
-            }
         }
 
         val percentUsed = if (budget.allocatedMinor > 0) {

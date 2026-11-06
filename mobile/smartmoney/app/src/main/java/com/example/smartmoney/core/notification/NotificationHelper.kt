@@ -26,15 +26,24 @@ object NotificationHelper {
     private const val CHANNEL_NAME = "KCB Banking Alerts"
     private const val CHANNEL_DESC = "Instant notifications for KCB incoming and outgoing transactions"
 
+    private const val CHANNEL_ID_MPESA = "mpesa_transaction_alerts"
+    private const val CHANNEL_NAME_MPESA = "M-PESA Ingestion Alerts"
+    private const val CHANNEL_DESC_MPESA = "Instant alerts for automatically ingested M-PESA transactions"
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
+            val kcbChannel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
                 description = CHANNEL_DESC
                 enableVibration(true)
             }
+            val mpesaChannel = NotificationChannel(CHANNEL_ID_MPESA, CHANNEL_NAME_MPESA, importance).apply {
+                description = CHANNEL_DESC_MPESA
+                enableVibration(true)
+            }
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            notificationManager?.createNotificationChannel(channel)
+            notificationManager?.createNotificationChannel(kcbChannel)
+            notificationManager?.createNotificationChannel(mpesaChannel)
         }
     }
 
@@ -104,6 +113,40 @@ object NotificationHelper {
 
         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
         val notifId = "notif_" + (reference ?: UUID.randomUUID().toString().take(8))
+
+        if (notificationDao != null) {
+            val entity = NotificationEntity(
+                id = notifId,
+                title = title,
+                message = message,
+                amount = amount,
+                type = if (isCredit) "CREDIT" else "DEBIT",
+                timestamp = timestamp,
+                reference = reference,
+                isRead = false
+            )
+            notificationDao.insertNotification(entity)
+        }
+
+        postSystemNotification(context, title, message)
+    }
+
+    suspend fun recordMpesaIngestionAlert(
+        context: Context,
+        notificationDao: NotificationDao?,
+        amount: BigDecimal,
+        direction: String,
+        reference: String,
+        description: String? = null
+    ) {
+        val isCredit = direction.equals("CREDIT", ignoreCase = true)
+        val formattedAmount = DecimalFormat("#,##0.00").format(amount)
+        val title = if (isCredit) "M-PESA Inflow Received" else "M-PESA Outflow Recorded"
+        val descPart = if (!description.isNullOrBlank()) "$description • " else ""
+        val message = "${descPart}KES $formattedAmount (Ref: $reference)"
+
+        val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
+        val notifId = "notif_mpesa_$reference"
 
         if (notificationDao != null) {
             val entity = NotificationEntity(

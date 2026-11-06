@@ -7,6 +7,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 import { BankLogo } from './bank-logo';
 import { AccountApi } from './account-api';
+import { CsvCell, downloadCsv, minorToAmount } from './csv-export';
 import { LiveUpdates } from './live-updates';
 import { RouterLink } from '@angular/router';
 
@@ -68,6 +69,8 @@ interface DashboardData {
             [attr.title]="live.status() === 'live' ? 'New payments appear here automatically' : 'Live updates are reconnecting'"
             >{{ live.status() === 'live' ? 'Live' : 'Reconnecting…' }}</span
           >
+          <button class="button secondary" (click)="exportCsv()" [disabled]="loading() || !data()"
+            title="Download this overview as a CSV file">Export CSV</button>
           <button class="button secondary" (click)="load()" [disabled]="loading()">Refresh</button>
         </div>
       </header>
@@ -407,6 +410,45 @@ export class Dashboard {
     this.arrived.set(new Set(ids));
     clearTimeout(this.arrivedTimer);
     this.arrivedTimer = setTimeout(() => this.arrived.set(new Set()), 3000);
+  }
+  /**
+   * Downloads the overview as shown: summary, accounts, cash flow and the recent
+   * transactions the dashboard lists. Amounts are in KES with two decimals.
+   */
+  exportCsv() {
+    const d = this.data();
+    if (!d) return;
+    const day = (iso: string) => iso.slice(0, 10);
+    const rows: CsvCell[][] = [
+      ['Financial Overview', this.api.displayName()],
+      ['Period', day(d.period.from), day(d.period.to)],
+      ['Bank', this.bank() || 'All banks'],
+      ['Currency', d.currency],
+      [],
+      ['Summary'],
+      ['Available cash', minorToAmount(d.summary.availableCashMinor)],
+      ['Credit outstanding', minorToAmount(d.summary.creditOutstandingMinor)],
+      ['Money in', minorToAmount(d.summary.moneyInMinor)],
+      ['Money out', minorToAmount(d.summary.moneyOutMinor)],
+      ['Net cash flow', minorToAmount(d.summary.netCashFlowMinor)],
+      [],
+      ['Accounts'],
+      ['Bank', 'Account name', 'Account', 'Type', 'Available balance', 'Credit outstanding'],
+      ...d.accounts.map((a) => [a.bank, a.accountName, a.maskedIdentifier, a.accountType,
+        minorToAmount(a.availableBalanceMinor), minorToAmount(a.creditOutstandingMinor)]),
+      [],
+      ['Cash flow'],
+      ['From', 'To', 'Money in', 'Money out', 'Net'],
+      ...d.cashFlow.map((p) => [day(p.from), day(p.to), minorToAmount(p.moneyInMinor),
+        minorToAmount(p.moneyOutMinor), minorToAmount(p.moneyInMinor - p.moneyOutMinor)]),
+      [],
+      ['Recent transactions'],
+      ['Date', 'Bank', 'Account', 'Description', 'Category', 'Direction', 'Amount', 'Status'],
+      ...d.transactions.map((tx) => [day(tx.date), this.accountBank(tx.accountId), this.accountName(tx.accountId),
+        tx.description, tx.category, tx.direction, minorToAmount(tx.amountMinor), tx.status]),
+    ];
+    const bank = this.bank() ? '-' + this.bank().toLowerCase() : '';
+    downloadCsv(`smartmoney-overview${bank}-${new Date().toISOString().slice(0, 10)}.csv`, rows);
   }
   changePeriod(days: number) {
     if (this.loading() || days === this.days()) return;

@@ -1,0 +1,1273 @@
+================================================================================
+COMPREHENSIVE ARCHITECTURE DISCOVERY REPORT: ACCOUNTS FUNCTIONALITY
+Project: SmartMoney (Android Client & Spring Boot Microservices Backend)
+Author: Antigravity Autonomous Agentic Investigator
+Date: 2026-10-30
+Scope: End-to-End Analysis (UI, ViewModel, Domain, Persistence, Networking, Backend)
+================================================================================
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1.  Executive Summary
+2.  Project Structure and Relevant Files
+3.  Existing Architectural Patterns
+4.  Component Dependency Graph
+5.  Accounts UI and Navigation
+6.  ViewModel and State Management
+7.  Domain Logic and Business Rules
+8.  Data Models and Mapping
+9.  Local Persistence
+10. Remote API Communication
+11. Backend Processing and Database Operations
+12. Authentication and Authorization
+13. Coroutines and Asynchronous Execution
+14. Error Handling and Failure Scenarios
+15. Performance and Reliability Findings
+16. Existing Test Coverage
+17. Confirmed Issues and Potential Risks
+18. Missing Information and Investigation Limitations
+19. Recommended Investigation and Improvement Roadmap
+
+================================================================================
+1. EXECUTIVE SUMMARY
+================================================================================
+This report presents an evidence-based, deep architectural discovery of the Accounts
+subsystem across the SmartMoney mobile application and its corresponding backend
+microservices.
+
+Key Architectural Findings:
+1. Architectural Dualism: Two parallel account abstractions coexist in the system:
+   - "Account" (Generic/Manual/Energy Account): Originates from the Spring Boot
+     accounts-service (:8082, PostgreSQL table "accounts"). It supports ledger
+     balance, available balance, credit limits, outstanding credit, and manual
+     entry.
+   - "BankAccount" (Institutional Bank Card/Link): Focuses on financial institution
+     links (KCB, NCBA, Stanbic, Equity, M-PESA) managed primarily via the
+     bank-integration-service (:8090, PostgreSQL table "account_links").
+2. Dual Repositories & Hybrid Routing:
+   - AccountRepository / AccountRepositoryImpl handles generic account fetching,
+     syncing, and deletion via accounts-service REST endpoints (/api/accounts).
+   - BankAccountRepository / BankAccountRepositoryImpl acts as a hybrid router.
+     When linking supported Tier-1 Kenyan banks (KCB, NCBA, Stanbic, Equity), it
+     routes the creation request to bank-integration-service
+     (POST /api/v1/admin/account-links). For other institutions or offline fallback,
+     it routes to accounts-service (POST /api/accounts) or creates an offline
+     record directly in Room SQLite.
+3. Local-First Caching Architecture:
+   - The UI never depends on synchronous remote HTTP calls during rendering.
+   - All account presentations in Jetpack Compose observe Kotlin StateFlow streams
+     backed by Room database queries (AccountDao.getAccountsForUser(userId)).
+   - Local database mutations (Room SQLite "energy_cache_database", version 4)
+     immediately update the UI via reactive Flow pipelines.
+4. Asynchronous Ledger Synchronization:
+   - External bank instant payment notifications (IPNs / webhooks) land at
+     bank-integration-service (:8090), which normalizes the payload into
+     NormalizedTransactionEntity, persists it, forwards transactions to
+     transactions-service (:8083), and invokes PATCH /api/accounts/{id}/balance/adjust
+     on accounts-service (:8082) using an internal trust token (X-Internal-Token).
+5. Post-Authentication Pre-Hydration:
+   - Upon successful user login, WarmUpSyncViewModel runs a parallel pre-hydration
+     routine in the background (syncing accounts and transactions concurrently
+     using async/awaitAll) while displaying a staged 3-second progress indicator,
+     guaranteeing immediate responsiveness when DashboardScreen appears.
+6. Legacy Artifacts:
+   - Traces of deprecated Supabase/Postgrest client calls remain in orphaned classes
+     (AccountConnectionRemoteDataSource, AccountConnectionRepositoryImpl,
+     BankAccountDto comments), though active production routing has fully transitioned
+     to the unified Production Render Gateway (https://api-gateway-cbby.onrender.com/).
+
+================================================================================
+2. PROJECT STRUCTURE AND RELEVANT FILES
+================================================================================
+Below is the exhaustive catalog of every file participating in the Accounts
+functionality across client, shared infrastructure, and backend.
+
+--------------------------------------------------------------------------------
+A. Mobile Presentation Layer (Jetpack Compose & ViewModels)
+--------------------------------------------------------------------------------
+1. app/src/main/java/com/example/smartmoney/ui/accounts/AccountScreen.kt
+   - Principal Components: AccountScreen(), BankAccountCard(), AccountCard(),
+     LinkBankAccountDialog().
+   - Responsibilities: Main UI composable for viewing linked bank accounts.
+     Provides pull-to-refresh (PullToRefreshBox), empty state guidance, a bottom-end
+     FloatingActionButton to trigger account linking, sandbox simulation triggers
+     (+ Inflow / - Outflow buttons for KCB and NCBA), and an account deletion dialog.
+   - Dependencies: AccountViewModel, BankAccount domain model, BankLogo, CurrencyUtils.
+   - Dependents: DashboardScreen.kt (rendered as bottom-bar page index 1).
+   - Relevance: Direct primary presentation screen for Accounts.
+
+2. app/src/main/java/com/example/smartmoney/ui/accounts/AccountViewModel.kt
+   - Principal Classes: AccountViewModel, AccountUiState, BankIntegrationInfo,
+     AccountViewModel.Factory.
+   - Responsibilities: Manages state for the accounts screen. Combines local Room
+     Flows (bankAccountRepository.getBankAccounts()), network loading states,
+     error messages, and bank integration environment health probe data into a
+     unified uiState StateFlow. Throttles background syncs with a 30-second freshness
+     guard. Dispatches account creation, deletion, and transaction simulations.
+   - Dependencies: AccountRepository, BankAccountRepository, TransactionRepository,
+     RetrofitClient, DispatcherProvider.
+   - Dependents: AccountScreen.kt, MainActivity.kt, DashboardScreen.kt.
+   - Relevance: Central state machine and orchestrator for Accounts UI.
+
+3. app/src/main/java/com/example/smartmoney/ui/onboarding/AccountOnboardingBottomSheet.kt
+   - Principal Components: AccountOnboardingBottomSheet().
+   - Responsibilities: Displays a welcome bottom sheet when a user has no linked
+     accounts (isOnboardingActive = true), highlighting bank-grade security and
+     providing quick action to launch LinkBankAccountDialog.
+   - Dependencies: Jetpack Compose Material3, Theme colors.
+   - Dependents: HomeScreen.kt, DashboardScreen.kt.
+   - Relevance: Guides users with zero accounts into the account-linking pipeline.
+
+4. app/src/main/java/com/example/smartmoney/ui/home/HomeScreen.kt & HomeViewModel.kt
+   - Principal Components: HomeScreen(), HomeViewModel, HomeUiState.
+   - Responsibilities: Consumes AccountRepository.getAccountsFlow(userId) and
+     BankAccountRepository.getBankAccounts() to aggregate total available balance,
+     calculate financial trends, trigger card balance glows on balance changes,
+     and display linked bank cards on the home dashboard.
+   - Dependencies: AccountRepository, BankAccountRepository, TransactionRepository,
+     BudgetRepository.
+   - Dependents: DashboardScreen.kt.
+   - Relevance: Secondary consumer and display surface for account balances.
+
+5. app/src/main/java/com/example/smartmoney/ui/warmup/WarmUpSyncViewModel.kt & WarmUpSyncScreen.kt
+   - Principal Classes: WarmUpSyncViewModel, WarmUpUiState, WarmUpSyncScreen.
+   - Responsibilities: Coordinates post-login background data sync by executing
+     accountRepository.syncAccounts(userId) and transactionRepository.syncTransactions()
+     in parallel before user enters the main dashboard.
+   - Dependencies: AccountRepository, TransactionRepository, DispatcherProvider.
+   - Dependents: MainActivity.kt.
+   - Relevance: Ensures Room account cache is pre-hydrated prior to user interaction.
+
+6. app/src/main/java/com/example/smartmoney/ui/navigation/Screen.kt
+   - Principal Classes: Screen (sealed class), Screen.Accounts (object).
+   - Responsibilities: Defines destination route "accounts", title "Accounts",
+     and icon Icons.Outlined.AccountBalance for navigation within the bottom bar.
+   - Dependencies: Compose Vector Icons.
+   - Dependents: AppBottomNavigationBar.kt, MainResponsiveShell.kt, DashboardScreen.kt.
+   - Relevance: Navigation declaration for Accounts tab.
+
+--------------------------------------------------------------------------------
+B. Mobile Domain Layer
+--------------------------------------------------------------------------------
+7. app/src/main/java/com/example/smartmoney/domain/model/Account.kt
+   - Principal Classes: Account (data class, @Immutable).
+   - Responsibilities: Pure immutable domain entity representing an account in the
+     system (deposit, credit, energy). Holds id, userId, accountId (external provider
+     id), accountName, institution, accountType, maskedIdentifier, currency,
+     ledgerBalance, availableBalance, creditOutstanding, creditLimit, availableCredit,
+     accountStatus, connectionStatus, and dataSource. Uses BigDecimal for balances.
+   - Dependencies: java.math.BigDecimal, androidx.compose.runtime.Immutable.
+   - Dependents: AccountRepository, AccountEntity, AccountResponse, AccountDto,
+     HomeViewModel.
+   - Relevance: Core domain entity for accounts-service integration.
+
+8. app/src/main/java/com/example/smartmoney/domain/model/BankAccount.kt
+   - Principal Classes: BankAccount (data class, @Immutable).
+   - Responsibilities: Domain entity representing a linked bank account card.
+     Holds id, bankName, accountNumber, cardType, and balance. Computes
+     maskedAccountNumber property (e.g. "**** 1234").
+   - Dependencies: java.math.BigDecimal, androidx.compose.runtime.Immutable.
+   - Dependents: BankAccountRepository, AccountViewModel, AccountScreen,
+     HomeViewModel, BankAccountCard.
+   - Relevance: Core presentation domain entity for linked banking cards.
+
+9. app/src/main/java/com/example/smartmoney/domain/model/AccountConnection.kt
+   - Principal Classes: AccountConnection (data class, @Immutable).
+   - Responsibilities: Domain model representing the integration link status
+     (provider, status, externalIdentifier, lastSyncAt, errorMessage).
+   - Dependencies: androidx.compose.runtime.Immutable.
+   - Dependents: AccountConnectionRepository, AccountConnectionEntity,
+     AccountConnectionDto.
+   - Relevance: Provider sync status representation (currently inactive/orphaned).
+
+10. app/src/main/java/com/example/smartmoney/domain/repository/AccountRepository.kt
+    - Principal Interface: AccountRepository.
+    - Methods:
+      * getAccountsFlow(userId: String): Flow<List<Account>>
+      * syncAccounts(userId: String): Result<Unit>
+      * createAccount(account: Account): Result<Account>
+      * deleteAccount(id: String): Result<Unit>
+    - Responsibilities: Pure interface defining the contract for generic account
+      operations.
+    - Dependents: AccountRepositoryImpl, AccountViewModel, HomeViewModel,
+      WarmUpSyncViewModel, AppContainer.
+    - Relevance: Primary domain abstraction for accounts-service.
+
+11. app/src/main/java/com/example/smartmoney/domain/repository/BankAccountRepository.kt
+    - Principal Interface: BankAccountRepository.
+    - Methods:
+      * addBankAccount(bankName, accountNumber, cardType): Result<Unit>
+      * removeBankAccount(id: String): Result<Unit>
+      * getBankAccounts(): Flow<List<BankAccount>>
+      * adjustKcbBalance(delta: BigDecimal)
+      * adjustBankBalance(bankName, delta: BigDecimal, accountId?, userId?)
+    - Responsibilities: Contract for user bank card linking, balance mutations,
+      and observation.
+    - Dependents: BankAccountRepositoryImpl, AccountViewModel, HomeViewModel,
+      AnalyticsViewModel, AppContainer.
+    - Relevance: Primary domain abstraction for bank linking and card operations.
+
+12. app/src/main/java/com/example/smartmoney/domain/repository/AccountConnectionRepository.kt
+    - Principal Interface: AccountConnectionRepository.
+    - Methods: getConnectionsFlow(accountId: String), syncConnections(accountId: String).
+    - Status: Legacy interface (not bound in AppContainer).
+
+--------------------------------------------------------------------------------
+C. Mobile Data Layer (Local Persistence - Room SQLite)
+--------------------------------------------------------------------------------
+13. app/src/main/java/com/example/smartmoney/data/local/entity/AccountEntity.kt
+    - Principal Classes: AccountEntity.
+    - Database Table: "accounts" (SQLite).
+    - Indices: Index(userId), Index(accountId), Index(accountStatus), Index(userId, createdAt).
+    - Responsibilities: Local Room persistence model. Maps domain Account to/from
+      Room entity via toDomain() and fromDomain(). Includes toBankAccount() helper
+      for converting local entity records into BankAccount domain models.
+    - Dependencies: androidx.room.Entity, androidx.room.PrimaryKey, androidx.room.Index.
+    - Dependents: AccountDao, AppDatabase, AccountRepositoryImpl, BankAccountRepositoryImpl.
+    - Relevance: Definitive local source of truth for all account records on device.
+
+14. app/src/main/java/com/example/smartmoney/data/local/entity/AccountConnectionEntity.kt
+    - Principal Classes: AccountConnectionEntity.
+    - Database Table: "account_connections" (SQLite).
+    - Dependencies: androidx.room.Entity, androidx.room.PrimaryKey, androidx.room.Index(accountId).
+    - Status: Legacy table schema.
+
+15. app/src/main/java/com/example/smartmoney/data/local/dao/AccountDao.kt
+    - Principal Interface: AccountDao (@Dao).
+    - Key Queries & Mutations:
+      * getAccountsForUser(userId: String): Flow<List<AccountEntity>>
+      * getAccountsForUserOnce(userId: String): List<AccountEntity>
+      * getAccountById(id: String): AccountEntity?
+      * getAccountByBankForUser(userId: String, institution: String): AccountEntity?
+      * updateAccountBalance(userId, accountId, newBalance: BigDecimal)
+      * adjustAccountBalance(userId, accountId, delta: BigDecimal)
+      * adjustBankBalanceForUser(userId, institution, delta: BigDecimal)
+      * upsertAccount(account: AccountEntity)
+      * upsertAccounts(accounts: List<AccountEntity>)
+      * deleteAccountById(id: String)
+      * clearAccountsForUser(userId: String)
+    - Responsibilities: Executes reactive SQLite queries and atomic balance updates.
+    - Dependents: AppDatabase, AccountRepositoryImpl, BankAccountRepositoryImpl,
+      TransactionRepositoryImpl, MpesaTransactionIngestionService, RahaRepositoryImpl.
+    - Relevance: Core database access object for all account persistence operations.
+
+16. app/src/main/java/com/example/smartmoney/data/local/database/AppDatabase.kt
+    - Principal Class: AppDatabase : RoomDatabase().
+    - Database Name: "energy_cache_database".
+    - Version: 4.
+    - Entities: UserEntity, AccountEntity, AccountConnectionEntity, TransactionEntity,
+      NotificationEntity.
+    - Converters: Converters (BigDecimal <-> String).
+    - Migration Policy: fallbackToDestructiveMigration(dropAllTables = true).
+    - Relevance: Host database containing accounts table.
+
+--------------------------------------------------------------------------------
+D. Mobile Data Layer (Remote API & Network Serialization)
+--------------------------------------------------------------------------------
+17. app/src/main/java/com/example/smartmoney/data/remote/RetrofitClient.kt
+    - Principal Object: RetrofitClient.
+    - Responsibilities: Manages OkHttpClient, logging interceptor, authInterceptor
+      (injecting Authorization: Bearer <token>), and base URL configuration pointing
+      to Production Render Gateway (https://api-gateway-cbby.onrender.com/).
+      Provides lazy singletons for accountApi and bankIntegrationApi.
+    - Dependents: AccountRemoteDataSource, BankAccountRepositoryImpl,
+      AccountViewModel, TransactionRepositoryImpl.
+    - Relevance: Network transport gateway client.
+
+18. app/src/main/java/com/example/smartmoney/data/remote/api/AccountApi.kt
+    - Principal Interface: AccountApi.
+    - Data Classes: CreateAccountRequest, AccountResponse, UpdateBalanceRequest,
+      UpdateStatusRequest.
+    - Endpoints:
+      * POST "api/accounts"
+      * GET "api/accounts?userId={userId}&status={status}"
+      * GET "api/accounts/{id}?userId={userId}"
+      * PATCH "api/accounts/{id}/balance"
+      * PATCH "api/accounts/{id}/status"
+      * DELETE "api/accounts/{id}?permanent=true"
+      * DELETE "api/accounts/{id}?permanent=false"
+    - Relevance: Retrofit definitions targeting Spring Boot accounts-service.
+
+19. app/src/main/java/com/example/smartmoney/data/remote/api/BankIntegrationApi.kt
+    - Principal Interface: BankIntegrationApi.
+    - Data Classes: LinkBankRequest, BankLinkResponse, SupportedBankResponse,
+      BankTransactionResponse, IntegrationHealthResponse, SimulateTransactionRequest,
+      FlexibleStringSerializer.
+    - Endpoints:
+      * POST "api/v1/admin/account-links"
+      * GET "api/v1/admin/account-links?userId={userId}"
+      * GET "api/v1/admin/bank-integrations"
+      * GET "api/v1/admin/bank-integrations/{bankId}"
+      * DELETE "api/v1/admin/account-links/{id}"
+      * POST "api/v1/admin/demo/transactions"
+      * GET "api/v1/admin/demo/transactions"
+    - Relevance: Retrofit definitions targeting bank-integration-service.
+
+20. app/src/main/java/com/example/smartmoney/data/remote/datasource/AccountRemoteDataSource.kt
+    - Principal Class: AccountRemoteDataSource.
+    - Responsibilities: Encapsulates calls to AccountApi. Converts HTTP responses
+      to domain Account models and parses Spring Boot JSON error envelopes into
+      readable exceptions.
+    - Dependencies: AccountApi, RetrofitClient.
+    - Dependents: AccountRepositoryImpl, BankAccountRepositoryImpl, AppContainer.
+    - Relevance: Remote data gateway for accounts-service.
+
+21. app/src/main/java/com/example/smartmoney/data/repository/AccountRepositoryImpl.kt
+    - Principal Class: AccountRepositoryImpl : AccountRepository.
+    - Responsibilities: Implements getAccountsFlow (reading from localDao),
+      syncAccounts (fetching from remoteDataSource, upserting to localDao),
+      createAccount (remote create then local upsert), and deleteAccount
+      (remote delete, localDao delete, cascade delete via transactionDao).
+    - Dependencies: AccountRemoteDataSource, AccountDao, TransactionDao, DispatcherProvider.
+    - Dependents: AppContainer.
+    - Relevance: Direct repository implementation for accounts-service.
+
+22. app/src/main/java/com/example/smartmoney/data/repository/BankAccountRepositoryImpl.kt
+    - Principal Class: BankAccountRepositoryImpl : BankAccountRepository.
+    - Responsibilities: Hybrid routing:
+      1) Links supported institutions (KCB, Stanbic, NCBA, Equity) via
+         BankIntegrationApi.linkAccount().
+      2) Falls back to AccountRemoteDataSource.createAccount() or local Room
+         creation when offline.
+      3) Unlinks via BankIntegrationApi.unlinkAccount() and deletes from AccountDao
+         and TransactionDao.
+      4) Observes local AccountDao.getAccountsForUser() mapping entities to BankAccount.
+      5) Manages alias records for user ID normalization.
+      6) Performs atomic balance adjustments via AccountDao.
+    - Dependencies: AccountRemoteDataSource, AccountDao, TransactionDao, RetrofitClient.
+    - Dependents: AppContainer, AccountViewModel, HomeViewModel, AnalyticsViewModel.
+    - Relevance: Central hybrid orchestrator for banking accounts.
+
+23. app/src/main/java/com/example/smartmoney/core/di/AppContainer.kt
+    - Principal Classes: AppContainer (interface), DefaultAppContainer (class).
+    - Responsibilities: Application-level dependency injection container.
+      Constructs database singletons, repositories, and injects authRepository's
+      currentUserId() dynamically into AccountRepositoryImpl and BankAccountRepositoryImpl.
+    - Dependents: MainActivity.kt.
+    - Relevance: Dependency injection root for accounts.
+
+--------------------------------------------------------------------------------
+E. Cross-Feature Collaborators (Services Touching Accounts)
+--------------------------------------------------------------------------------
+24. app/src/main/java/com/example/smartmoney/data/repository/TransactionRepositoryImpl.kt
+    - Relevance: During syncTransactions(), queries AccountDao to match incoming
+      bank transaction account numbers against accounts owned by targetUserId.
+      Drops unlinked/unowned movements to enforce multi-tenant isolation.
+      Deletes transactions associated with an account when that account is deleted.
+
+25. app/src/main/java/com/example/smartmoney/core/sms/ingestion/MpesaTransactionIngestionService.kt
+    - Relevance: During automated M-Pesa SMS parsing, checks AccountDao for an
+      existing M-PESA or M-Shwari account. If absent, auto-creates an account with
+      dataSource = "OFFLINE_SMS". When balanceAfter is extracted from the SMS,
+      calls accountDao.updateAccountBalance().
+
+26. app/src/main/java/com/example/smartmoney/data/repository/RahaRepositoryImpl.kt
+    - Relevance: In offline/fallback chat handling, queries accountDao.getAccountsForUser()
+      to answer financial context queries (e.g. "What is my total account balance?").
+
+--------------------------------------------------------------------------------
+F. Backend Microservices Layer
+--------------------------------------------------------------------------------
+27. backend/api-gateway/src/main/resources/application.yml
+    - Routes /api/accounts/** to accounts-service (:8082).
+    - Routes /api/v1/admin/** and /api/v1/webhooks/** to bank-integration-service (:8090).
+
+28. backend/accounts-service/src/main/resources/db/migration/V1__initial_schema.sql
+    - Defines table "accounts" with UUID primary key, user_id, provider_account_id,
+      institution, account_type ('DEPOSIT', 'CREDIT'), masked_identifier,
+      currency, ledger_balance, available_balance, credit_outstanding, credit_limit,
+      account_status, connection_status, data_source ('BANK_API', 'MANUAL'),
+      JPA optimistic locking version column, and unique constraint
+      unique_provider_account UNIQUE (institution, provider_account_id).
+
+29. backend/accounts-service/src/main/java/com/smi/accounts_service/domain/Account.java
+    - JPA Entity mapping table "accounts". Annotated with @Entity, @Table, @Version,
+      @PrePersist, and @PreUpdate lifecycle callbacks.
+
+30. backend/accounts-service/src/main/java/com/smi/accounts_service/repository/AccountRepository.java
+    - Spring Data JPA repository. Includes custom atomic update query:
+      @Modifying @Query("UPDATE Account a SET a.availableBalance = a.availableBalance + :delta,
+      a.ledgerBalance = a.ledgerBalance + :delta, a.lastUpdated = :now WHERE a.id = :id")
+      int adjustAvailableBalance(@Param("id") UUID id, @Param("delta") BigDecimal delta, ...);
+
+31. backend/accounts-service/src/main/java/com/smi/accounts_service/service/AccountService.java
+    - Implements business logic: global single-registration enforcement across all users
+      via findHolder(), SHA-256 fingerprinting for manual accounts (AccountService.fingerprint),
+      optimistic-locking balance modifications, and status management.
+
+32. backend/accounts-service/src/main/java/com/smi/accounts_service/service/AccountIdentity.java
+    - Resolves user ownership by verifying Authorization: Bearer <token> against
+      identity-service (/api/auth/me). Validates internal service callers via
+      X-Internal-Token header matched against INTERNAL_SERVICE_TOKEN environment variable.
+
+33. backend/accounts-service/src/main/java/com/smi/accounts_service/controller/AccountController.java
+    - Spring RestController exposing /api/accounts CRUD endpoints. Enforces ownership
+      checks using AccountIdentity.owner(authorization).
+
+34. backend/accounts-service/src/main/java/com/smi/accounts_service/controller/ManualAccountController.java
+    - RestController exposing POST /api/accounts/manual. Hashes account numbers with
+      SHA-256 fingerprints to prevent plaintext storage of manual card/account numbers.
+
+35. backend/bank-integration-service/src/main/java/io/smartmoney/api/accountlink/AccountLinkController.java
+    - Exposes POST/GET/DELETE /api/v1/admin/account-links. Validates whether customer
+      owns the account in accounts-service before creating a link.
+
+36. backend/bank-integration-service/src/main/java/io/smartmoney/api/accountlink/AccountLinkService.java
+    - Handles account link entity persistence, dispatches historical pending transactions
+      upon link creation, runs scheduled retries (@Scheduled PT5M), and delivers
+      webhook transaction movements downstream.
+
+37. backend/bank-integration-service/src/main/java/io/smartmoney/api/accountlink/PlatformServicesClient.java
+    - REST client communicating from bank-integration-service to accounts-service (:8082)
+      and transactions-service (:8083). Injects X-Internal-Token to authenticate
+      inter-service balance adjustments and account creation.
+
+================================================================================
+3. EXISTING ARCHITECTURAL PATTERNS
+================================================================================
+The codebase demonstrates several modern Android and distributed systems patterns,
+though some boundaries exhibit pragmatic coupling:
+
+1. MVVM (Model-View-ViewModel):
+   - Presentation logic is decoupled from Jetpack Compose UI via AccountViewModel.
+   - UI components (AccountScreen, BankAccountCard) are stateless or receive state
+     via hoisted parameters and emit lambdas for user gestures.
+   - Compose observes state via collectAsState() on StateFlow<AccountUiState>.
+
+2. Clean Architecture (Partial / Pragmatic):
+   - Clear separation between UI Layer (ui/accounts), Domain Layer (domain/model,
+     domain/repository), and Data Layer (data/local, data/remote, data/repository).
+   - Domain layer contains pure Kotlin models (Account, BankAccount) with zero
+     Android SDK or Room annotations, except @Immutable for Compose compiler optimization.
+   - Note on Use Cases: There is NO intermediate UseCase or Interactor layer in the
+     mobile project. The ViewModels directly consume Repository interfaces
+     (AccountRepository, BankAccountRepository).
+
+3. Offline-First Repository Pattern with Reactive Caching:
+   - Repository methods return cold Flow streams originating from Room DAOs.
+   - Network fetches update the Room database via upsert operations; Room's internal
+     invalidation tracker automatically notifies the Flow, propagating fresh data
+     to the ViewModel and UI without manual polling loops.
+
+4. Hybrid Remote Routing (Facade / Dispatcher Pattern):
+   - BankAccountRepositoryImpl acts as a smart router. Depending on whether an
+     institution is classified as a supported integrated bank (KCB, NCBA, Stanbic,
+     Equity), it routes to bank-integration-service or accounts-service, providing
+     fallback resilience if the specialized integration service is unavailable.
+
+5. Optimistic Concurrency & Atomic Database Operations:
+   - On the backend, accounts-service uses JPA @Version optimistic locking to
+     prevent dirty writes during account modifications.
+   - For high-throughput transaction movements, it bypasses entity-level read-modify-write
+     by executing an atomic SQL UPDATE (AccountRepository.adjustAvailableBalance)
+     guaranteeing that concurrent webhook deliveries never overwrite one another.
+
+6. Anti-Corruption Layer / Adapter Mapping:
+   - DTOs, Room Entities, and Domain models are segregated.
+   - Explicit conversion extensions (toDomain(), fromDomain(), toBankAccount())
+     prevent API schema changes from rippling across presentation logic.
+
+7. Manual Dependency Injection (Container Pattern):
+   - No Hilt or Dagger annotation processing is employed.
+   - Dependencies are managed via AppContainer / DefaultAppContainer using lazy
+     initialization and supplied to ViewModels via custom ViewModelProvider.Factory
+     implementations.
+
+================================================================================
+4. COMPONENT DEPENDENCY GRAPH
+================================================================================
+
+Below is the concrete end-to-end component dependency graph tracing the entire
+stack from Compose user interactions down to database persistence:
+
+```mermaid
+flowchart TD
+    subgraph UI ["Presentation Layer (Jetpack Compose & ViewModel)"]
+        UI_Screen["AccountScreen.kt"]
+        UI_Dialog["LinkBankAccountDialog"]
+        UI_Card["BankAccountCard"]
+        VM["AccountViewModel.kt"]
+        VM_State["AccountUiState (StateFlow)"]
+    end
+
+    subgraph Domain ["Domain Layer"]
+        Repo_Bank_Intf["BankAccountRepository (Interface)"]
+        Repo_Acc_Intf["AccountRepository (Interface)"]
+        Model_Bank["BankAccount (Model)"]
+        Model_Acc["Account (Model)"]
+    end
+
+    subgraph Data_Repo ["Data Layer - Repositories"]
+        Repo_Bank_Impl["BankAccountRepositoryImpl.kt\n(Hybrid Router)"]
+        Repo_Acc_Impl["AccountRepositoryImpl.kt"]
+    end
+
+    subgraph Data_Local ["Data Layer - Local Cache (Room SQLite)"]
+        DAO_Acc["AccountDao.kt"]
+        DAO_Tx["TransactionDao.kt"]
+        DB_Room[("AppDatabase\n'energy_cache_database'\n(accounts table)")]
+    end
+
+    subgraph Data_Remote ["Data Layer - Networking (Retrofit & OkHttp)"]
+        DS_Remote["AccountRemoteDataSource.kt"]
+        API_Acc["AccountApi.kt (:8082)"]
+        API_Bank["BankIntegrationApi.kt (:8090)"]
+        Client_Retrofit["RetrofitClient.kt\n(OkHttp + JWT authInterceptor)"]
+    end
+
+    subgraph Gateway ["API Gateway"]
+        GW["Spring Cloud Gateway (:8080)\napi-gateway-cbby.onrender.com"]
+    end
+
+    subgraph Backend_Services ["Backend Microservices Layer"]
+        subgraph Acc_Svc ["accounts-service (:8082)"]
+            Ctrl_Acc["AccountController.java"]
+            Ctrl_Manual["ManualAccountController.java"]
+            Svc_Acc["AccountService.java"]
+            Identity_Acc["AccountIdentity.java"]
+            Repo_JPA_Acc["AccountRepository.java (JPA)"]
+            DB_PG_Acc[("PostgreSQL\nsmi_accounts\n(accounts table)")]
+        end
+
+        subgraph Bank_Svc ["bank-integration-service (:8090)"]
+            Ctrl_BankLink["AccountLinkController.java"]
+            Svc_BankLink["AccountLinkService.java"]
+            Client_Platform["PlatformServicesClient.java"]
+            Repo_JPA_Link["AccountLinkRepository.java"]
+            DB_PG_Bank[("PostgreSQL\nsmi_bank_integrations\n(account_links table)")]
+        end
+
+        subgraph Ident_Svc ["identity-service (:8081)"]
+            Ctrl_Auth["/api/auth/me"]
+        end
+    end
+
+    %% UI to ViewModel
+    UI_Screen -->|"Collects uiState"| VM_State
+    VM -->|"Emits state"| VM_State
+    UI_Screen -->|"User actions (add, remove, sim)"| VM
+    UI_Dialog -->|"onSave(bank, accNumber, type)"| VM
+    UI_Card -->|"onDelete, onSimulate"| VM
+
+    %% ViewModel to Domain
+    VM -->|"getBankAccounts(), addBankAccount(), removeBankAccount()"| Repo_Bank_Intf
+    VM -->|"getAccountsFlow(), syncAccounts()"| Repo_Acc_Intf
+
+    %% Domain to Repo Implementations
+    Repo_Bank_Intf -.->|"Implemented by"| Repo_Bank_Impl
+    Repo_Acc_Intf -.->|"Implemented by"| Repo_Acc_Impl
+
+    %% Repository to Local Storage
+    Repo_Bank_Impl -->|"getAccountsForUser(), upsertAccount()"| DAO_Acc
+    Repo_Bank_Impl -->|"deleteTransactionsForAccount()"| DAO_Tx
+    Repo_Acc_Impl -->|"getAccountsForUser(), upsertAccounts()"| DAO_Acc
+    DAO_Acc -->|"Reads/Writes"| DB_Room
+    DAO_Tx -->|"Cascade deletion"| DB_Room
+
+    %% Repository to Remote
+    Repo_Acc_Impl -->|"fetchAccounts(), createAccount()"| DS_Remote
+    Repo_Bank_Impl -->|"createAccount()"| DS_Remote
+    DS_Remote -->|"getAccounts(), createAccount()"| API_Acc
+    Repo_Bank_Impl -->|"linkAccount(), unlinkAccount()"| API_Bank
+
+    API_Acc --> Client_Retrofit
+    API_Bank --> Client_Retrofit
+    Client_Retrofit -->|"HTTP via Gateway"| GW
+
+    %% Gateway Routing
+    GW -->|"/api/accounts/**"| Ctrl_Acc
+    GW -->|"/api/accounts/manual"| Ctrl_Manual
+    GW -->|"/api/v1/admin/account-links/**"| Ctrl_BankLink
+
+    %% accounts-service internals
+    Ctrl_Acc -->|"Verifies token with"| Identity_Acc
+    Identity_Acc -->|"/api/auth/me"| Ctrl_Auth
+    Ctrl_Acc --> Svc_Acc
+    Ctrl_Manual --> Svc_Acc
+    Svc_Acc --> Repo_JPA_Acc
+    Repo_JPA_Acc --> DB_PG_Acc
+
+    %% bank-integration-service internals
+    Ctrl_BankLink --> Svc_BankLink
+    Svc_BankLink --> Repo_JPA_Link
+    Repo_JPA_Link --> DB_PG_Bank
+    Svc_BankLink -->|"ensureAccount(), adjustBalance()"| Client_Platform
+    Client_Platform -->|"HTTP + X-Internal-Token"| Ctrl_Acc
+```
+
+Cross-Module Collaborators (Direct Room DAO Access):
+- TransactionRepositoryImpl queries AccountDao.getAccountsForUserOnce() to match
+  incoming transactions with user-owned accounts.
+- MpesaTransactionIngestionService queries and mutates AccountDao.updateAccountBalance()
+  and auto-creates "OFFLINE_SMS" accounts.
+- RahaRepositoryImpl queries AccountDao.getAccountsForUser() to answer AI chat queries.
+
+================================================================================
+5. ACCOUNTS UI AND NAVIGATION
+================================================================================
+The Accounts UI is implemented in:
+app/src/main/java/com/example/smartmoney/ui/accounts/AccountScreen.kt
+
+1. Screen Layout & Clearance Architecture:
+   - Wrapped in Material 3 PullToRefreshBox with isRefreshing bound to uiState.isLoading.
+   - Calculates top padding clearance dynamically:
+     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+     val topClearance = statusBarTop + 64.dp
+     This prevents header cards from colliding with system status bars or display notches.
+   - Content padding accommodates bottom navigation: bottom = 100.dp.
+
+2. Account Presentation:
+   - Header displays "Linked Bank Accounts" along with a count pill: "${bankAccounts.size} Connected".
+   - If empty: Renders a placeholder Card with Icons.Default.AccountBalance instructing
+     the user to tap '+' to link an account.
+   - If populated: Renders a LazyColumn of BankAccountCard composables keyed by "bank_${bankAccount.id}".
+
+3. BankAccountCard Details:
+   - Header: BankLogo (renders custom vector/drawables for KCB, NCBA, Stanbic, Equity,
+     M-PESA), bank name, masked account number (e.g. "**** 1234"), and Card Type badge
+     (Debit / Credit).
+   - Balance section: Large bold available balance formatted via CurrencyUtils.formatKes().
+   - Status Badge: Evaluates bank environment status dynamically:
+     * KCB + Live -> "KCB Live IPN" (Green badge)
+     * KCB + Sandbox -> "KCB Sandbox" (Teal badge)
+     * NCBA + Live -> "NCBA Live IPN"
+     * NCBA + Sandbox -> "NCBA Sandbox"
+     * Default -> "Connected"
+   - Delete Button: Triggers confirmation AlertDialog before initiating account removal.
+   - Sandbox Simulation Actions:
+     When running in Sandbox mode on supported integrated banks (KCB & NCBA), card displays:
+     * "+ Inflow (KES 1k)": Executes simulateBankInflow()
+     * "- Outflow (KES 500)": Executes simulateBankOutflow()
+     Provides instant visual verification without external banking hardware.
+
+4. Account Creation Modal (LinkBankAccountDialog):
+   - Triggered via the bottom-end FloatingActionButton.
+   - Bank Selection: ExposedDropdownMenuBox populated with ["M-PESA", "NCBA", "Equity", "KCB", "Stanbic"].
+   - Account Number: OutlinedTextField restricted strictly to numeric digits via:
+     input.all { it.isDigit() } with KeyboardType.Number.
+   - Card Type: SingleChoiceSegmentedButtonRow with options ["Debit", "Credit"].
+   - Validation: Guards against blank bank or account number before invoking onSave.
+
+5. Navigation Flow:
+   - Screen.Accounts is registered in Screen.bottomBarScreens (index 1).
+   - In MainActivity.kt, AccountViewModel is instantiated with key "account_$currentUserId"
+     and passed to DashboardScreen.
+   - In DashboardScreen.kt, bottomBarPagerState routes page index 1 to AccountScreen(viewModel = accountViewModel).
+
+================================================================================
+6. VIEWMODEL AND STATE MANAGEMENT
+================================================================================
+The ViewModel is defined in:
+app/src/main/java/com/example/smartmoney/ui/accounts/AccountViewModel.kt
+
+1. UI State Models:
+   - BankIntegrationInfo:
+     val environment: String = "SANDBOX",
+     val isLive: Boolean = false,
+     val webhookActive: Boolean = false
+   - AccountUiState:
+     val bankAccounts: List<BankAccount> = emptyList(),
+     val isLoading: Boolean = false,
+     val isAddingBankAccount: Boolean = false,
+     val errorMessage: String? = null,
+     val bankEnvironments: Map<String, BankIntegrationInfo> = emptyMap()
+
+2. StateFlow Construction & Sharing Policy:
+   - bankAccounts Flow:
+     bankAccountRepository.getBankAccounts()
+       .distinctUntilChanged()
+       .stateIn(
+           scope = viewModelScope,
+           started = SharingStarted.WhileSubscribed(5_000),
+           initialValue = emptyList()
+       )
+   - Combined uiState Flow:
+     combine(bankAccounts, _isLoading, _isAddingBankAccount, _bankAccountError, _bankEnvironments)
+       .stateIn(
+           scope = viewModelScope,
+           started = SharingStarted.WhileSubscribed(5_000),
+           initialValue = AccountUiState()
+       )
+   - The 5,000ms WhileSubscribed policy prevents upstream cancellation during brief
+     configuration changes (screen rotation) while ensuring resources are released
+     when the app is backgrounded.
+
+3. Redundant Network Call Throttling (Freshness Guard):
+   - Uses private var lastSyncTimestamp = 0L and SYNC_COOLDOWN_MS = 30_000L.
+   - In refreshAccounts(force: Boolean):
+     if (!force && (System.currentTimeMillis() - lastSyncTimestamp < SYNC_COOLDOWN_MS)) return;
+   - Bypassed only when pull-to-refresh is explicitly triggered (force = true).
+
+4. Operations Orchestration:
+   - addBankAccount: Launches on dispatchers.io, sets _isAddingBankAccount = true,
+     invokes bankAccountRepository.addBankAccount(), clears errors, and posts success/error
+     callbacks back to dispatchers.main.
+   - removeAccount: Determines if target id is a bank account or generic account,
+     invokes bankAccountRepository.removeBankAccount(accountId) or repository.deleteAccount(accountId),
+     and updates local state.
+   - simulateBankTransaction: Calls bankIntegrationApi.simulateTransaction(), then
+     applies delta locally via bankAccountRepository.adjustBankBalance(), syncs
+     accounts via repository.syncAccounts(userId), and triggers transaction sync.
+
+================================================================================
+7. DOMAIN LOGIC AND BUSINESS RULES
+================================================================================
+1. Account Number Masking:
+   - Implemented in BankAccount.maskedAccountNumber and AccountEntity.maskedIdentifier:
+     If the number already begins with "*", return verbatim.
+     If length > 4, format as "**** " + trimmed.takeLast(4).
+     If length <= 4, format as "**** " + trimmed.
+   - On the backend, PlatformServicesClient masks with "***" + last4, and
+     ManualAccountController masks with "•••• " + last4.
+
+2. Monetary Precision Rules:
+   - Balances must never be stored, calculated, or transmitted as Double or Float.
+   - Mobile and backend enforce java.math.BigDecimal with standard string serialization.
+   - Database columns in PostgreSQL are typed as NUMERIC(19,4) to comply with
+     international banking reconciliation standards.
+
+3. Institution & Key Normalization:
+   - User-facing labels are uppercase / titlecase (e.g. "KCB", "NCBA", "Stanbic", "Equity").
+   - Internal API endpoints and webhook route parameters are lowercase (e.g. "kcb", "ncba").
+
+4. Multi-Tenant User Isolation & Aliasing:
+   - Mobile client handles user IDs that may be plain strings (from mock/legacy auth)
+     or valid UUIDs.
+   - In BankAccountRepositoryImpl, effectiveUserId is computed:
+     try { UUID.fromString(currentUserId).toString() }
+     catch (_: Exception) { UUID.nameUUIDFromBytes(currentUserId.toByteArray()).toString() }
+   - To prevent Room queries from failing if a query uses the raw string instead
+     of the UUID, BankAccountRepositoryImpl writes dual records to Room:
+     the primary entity under currentUserId and an alias entity under effectiveUserId
+     with id "${accountId}_alias".
+
+5. Global Single-Registration Rule:
+   - Implemented in accounts-service V1__initial_schema.sql:
+     CONSTRAINT unique_provider_account UNIQUE (institution, provider_account_id)
+   - An account number at a specific bank can only belong to one user across the entire
+     system. If User A registers account 12345678 at KCB, User B attempting to add
+     it will be rejected with HTTP 409 Conflict ("This account number is already
+     registered to another user").
+
+6. SHA-256 Fingerprinting for Self-Entered Accounts:
+   - To protect customer privacy while preserving the unique constraint,
+     ManualAccountController hashes manual account numbers:
+     AccountService.fingerprint(bank, accountNumber) = sha256("account:" + bank + ":" + accountNumber.trim())
+   - The plain account number is NEVER persisted in the database for manual entries.
+
+================================================================================
+8. DATA MODELS AND MAPPING
+================================================================================
+The following table summarizes the data representations across all layers:
+
+Layer            Model Name               Key Fields & Characteristics
+--------------------------------------------------------------------------------
+UI State         AccountUiState           bankAccounts: List<BankAccount>,
+                                          isLoading: Boolean, isAddingBankAccount,
+                                          errorMessage: String?, bankEnvironments: Map
+Domain (Bank)    BankAccount              id, bankName, accountNumber, cardType,
+                                          balance: BigDecimal, maskedAccountNumber (computed)
+Domain (Ledger)  Account                  id, userId, accountId, accountName, institution,
+                                          accountType (DEPOSIT/CREDIT), maskedIdentifier,
+                                          currency, ledgerBalance, availableBalance,
+                                          creditOutstanding, creditLimit, availableCredit,
+                                          accountStatus, connectionStatus, dataSource
+Local DB (Room)  AccountEntity            Matches domain Account; SQLite columns;
+                                          Indices on userId, accountId, accountStatus;
+                                          Converters: BigDecimal <-> String
+Local DB (Conn)  AccountConnectionEntity  id, accountId, provider, connectionStatus,
+                                          externalIdentifier, lastSyncAt, errorMessage
+API Request      CreateAccountRequest     userId, providerAccountId, accountName,
+                                          institution, accountType, maskedIdentifier,
+                                          currency, initialBalance, creditLimit, dataSource
+API Response     AccountResponse          id, userId, providerAccountId, accountName,
+                                          institution, accountType, maskedIdentifier,
+                                          currency, ledgerBalance, availableBalance,
+                                          creditOutstanding, creditLimit, accountStatus...
+Bank Link Req    LinkBankRequest          bankId ("kcb"), accountNumber, userId,
+                                          accountName, accountId, cardType
+Bank Link Resp   BankLinkResponse         id: Long?, bankId, accountNumber, userId,
+                                          accountId, accountName, pendingDeliveries: Int
+Legacy Network   AccountDto               Snake_case fields: user_id, account_id,
+                                          available_balance (Supabase Postgrest relic)
+Legacy Bank DTO  BankAccountDto           id, user_id, bank_name, account_number, card_type
+                                          NOTE: Lacks balance field entirely!
+Backend Entity   com.smi...Account        JPA entity matching PostgreSQL accounts table;
+                                          @Version integer, NUMERIC(19,4), @PrePersist
+Backend Link     AccountLinkEntity        JPA entity matching PostgreSQL account_links;
+                                          bankId, accountNumber, userId, accountId
+
+Model Mapping Trajectories:
+1. Remote Ingestion:
+   AccountResponse (Retrofit)
+   -> AccountResponse.toDomain() -> Account (Domain)
+   -> AccountEntity.fromDomain() -> AccountEntity (Room)
+   -> AccountEntity.toBankAccount() -> BankAccount (Domain / UI)
+2. Card Creation:
+   User Input (Screen)
+   -> LinkBankRequest (Retrofit)
+   -> BankLinkResponse (Retrofit)
+   -> BankAccount (Domain) + AccountEntity (Room)
+3. Direct Fallback Creation:
+   User Input (Screen)
+   -> CreateAccountRequest (Retrofit)
+   -> AccountResponse (Retrofit)
+   -> Account (Domain)
+   -> AccountEntity.fromDomain() -> AccountEntity (Room)
+
+Discrepancies & Anomalies Identified:
+- Casing Drift: Legacy AccountDto uses snake_case ("user_id", "provider_account_id"),
+  while AccountResponse uses camelCase ("userId", "providerAccountId").
+- Missing Balance in BankAccountDto: The legacy BankAccountDto has no balance field.
+  Its toDomain() method instantiates BankAccount with default BigDecimal.ZERO.
+- Provider Identifier Dual Meaning: In Account, accountId holds the external provider's
+  account number, while id is the UUID. In BankAccount, accountNumber holds the provider
+  number and id is the primary key.
+
+================================================================================
+9. LOCAL PERSISTENCE
+================================================================================
+1. Database Architecture:
+   - Database class: com.example.smartmoney.data.local.database.AppDatabase
+   - Database name: "energy_cache_database"
+   - SQLite version: 4
+   - Tables: accounts, account_connections, transactions, notifications, users.
+   - Type Converters: Converters class converts BigDecimal to plain string via
+     toPlainString() and parses via BigDecimal(string), guaranteeing no precision drift.
+
+2. Table Definition: accounts (AccountEntity)
+   - Primary Key: id (String / UUID)
+   - Indices:
+     * Index(value = ["userId"]) -> Scopes all user queries
+     * Index(value = ["accountId"]) -> Quick lookup by external account number
+     * Index(value = ["accountStatus"]) -> Filters active vs closed
+     * Index(value = ["userId", "createdAt"]) -> Fast chronological ordering
+   - Balance columns: ledgerBalance, availableBalance, creditOutstanding, creditLimit, availableCredit.
+
+3. Reactive Observation:
+   - AccountDao.getAccountsForUser(userId: String): Flow<List<AccountEntity>>
+   - When any upsert or update occurs in SQLite, Room emits a new List<AccountEntity>
+     to all active Flow collectors.
+   - BankAccountRepositoryImpl maps this via .map { list -> list.map { it.toBankAccount() } }
+     and dispatches on dispatchers.default.
+
+4. Balance Updates & Mutation API:
+   - Direct Balance Set:
+     UPDATE accounts SET availableBalance = :newBalance, ledgerBalance = :newBalance
+     WHERE userId = :userId AND (id = :accountId OR accountId = :accountId)
+   - Atomic Balance Delta Adjustment:
+     UPDATE accounts SET availableBalance = availableBalance + :delta,
+     ledgerBalance = ledgerBalance + :delta
+     WHERE userId = :userId AND (id = :accountId OR accountId = :accountId)
+   - Institution-level Adjustment:
+     UPDATE accounts SET availableBalance = availableBalance + :delta,
+     ledgerBalance = ledgerBalance + :delta
+     WHERE id = (SELECT id FROM accounts WHERE userId = :userId AND
+     (UPPER(institution) = UPPER(:institution) OR UPPER(accountName) LIKE '%' || UPPER(:institution) || '%')
+     ORDER BY createdAt ASC LIMIT 1)
+
+5. Cascade Cleanup on Account Removal:
+   - When an account is removed in BankAccountRepositoryImpl or AccountRepositoryImpl:
+     1. localDao.deleteAccountById(id)
+     2. transactionDao.deleteTransactionsForAccount(userId, id)
+     This prevents orphaned transactions from lingering in the local ledger.
+
+6. Destructive Migration Risk:
+   - AppDatabase specifies: .fallbackToDestructiveMigration(dropAllTables = true).
+   - If the database schema version is incremented without an explicit Migration
+     implementation, Room wipes all SQLite tables, causing total local data loss
+     until the next network pre-hydration sync.
+
+================================================================================
+10. REMOTE API COMMUNICATION
+================================================================================
+1. Unified API Gateway Configuration:
+   - All mobile traffic routes through the unified Production Render Gateway:
+     https://api-gateway-cbby.onrender.com/ (fallback: http://127.0.0.1:8080/).
+   - Routes managed by Gateway:
+     * /api/accounts/** -> accounts-service (:8082)
+     * /api/v1/admin/** -> bank-integration-service (:8090)
+     * /api/v1/webhooks/** -> bank-integration-service (:8090)
+     * /api/auth/** -> identity-service (:8081)
+     * /api/transactions/** -> transactions-service (:8083)
+
+2. Endpoints on accounts-service (AccountApi.kt):
+   - POST /api/accounts: Creates a new account.
+     Request: CreateAccountRequest. Response: 201 Created with AccountResponse.
+   - GET /api/accounts: Fetches accounts for a user.
+     Params: userId (query), status (query, optional). Response: 200 OK with List<AccountResponse>.
+   - GET /api/accounts/{id}: Fetches a single account by UUID.
+     Response: 200 OK with AccountResponse (or 404 Not Found).
+   - PATCH /api/accounts/{id}/balance: Updates balance.
+     Request: UpdateBalanceRequest. Response: 200 OK with AccountResponse.
+   - PATCH /api/accounts/{id}/status: Updates account status or connection status.
+     Request: UpdateStatusRequest. Response: 200 OK with AccountResponse.
+   - DELETE /api/accounts/{id}?permanent=true: Deletes account permanently.
+     Response: 200 OK with AccountResponse.
+   - DELETE /api/accounts/{id}?permanent=false: Closes account without hard deletion.
+     Response: 200 OK with AccountResponse.
+
+3. Endpoints on bank-integration-service (BankIntegrationApi.kt):
+   - POST /api/v1/admin/account-links: Links a customer bank account.
+     Request: LinkBankRequest. Response: 201 Created with BankLinkResponse.
+   - GET /api/v1/admin/account-links: Lists account links.
+     Params: userId (query, optional). Response: 200 OK with List<BankLinkResponse>.
+   - DELETE /api/v1/admin/account-links/{id}: Unlinks account.
+     Response: 204 No Content.
+   - GET /api/v1/admin/bank-integrations/{bankId}: Probes bank health / environment.
+     Response: 200 OK with IntegrationHealthResponse (checks SANDBOX vs PRODUCTION).
+   - POST /api/v1/admin/demo/transactions: Triggers simulated transaction movement.
+     Request: SimulateTransactionRequest. Response: 200 OK with BankTransactionResponse.
+
+4. OkHttp Client & Interceptors:
+   - authInterceptor: Intercepts every outgoing request; if tokenProvider returns
+     a non-blank token and the header Authorization is absent, adds:
+     Authorization: Bearer <token>.
+   - HttpLoggingInterceptor: Level.BODY in debug builds.
+   - Timeouts: Connect 60s, Read 60s, Write 60s.
+
+================================================================================
+11. BACKEND PROCESSING AND DATABASE OPERATIONS
+================================================================================
+1. accounts-service Architecture:
+   - Framework: Spring Boot 3 WebMVC, Spring Data JPA, Flyway, PostgreSQL.
+   - Schema: smi_accounts database, table accounts.
+   - Controllers:
+     * AccountController: Standard CRUD for authenticated users and internal services.
+     * ManualAccountController: Handles manual card registration with SHA-256 fingerprinting.
+   - Account Creation Lifecycle:
+     1. AccountController.createAccount() checks caller identity via AccountIdentity.
+        If caller is not internal service (lacks X-Internal-Token), request.userId
+        is forcibly overwritten with identity.owner(authorization).
+     2. AccountService.createAccount() checks findHolder(institution, providerAccountId).
+        If already held by any user, throws DuplicateAccountException (409 Conflict).
+     3. Instantiates Account JPA entity with status ACTIVE and connection status CONNECTED.
+     4. Saves to PostgreSQL via AccountRepository.save().
+
+2. Atomic Balance Adjustment Pipeline:
+   - PATCH /api/accounts/{id}/balance/adjust
+   - Protected: Only callers providing X-Internal-Token matching INTERNAL_SERVICE_TOKEN
+     are authorized; all other callers receive 403 Forbidden.
+   - Executes SQL UPDATE in one statement:
+     UPDATE Account a SET a.availableBalance = a.availableBalance + :delta,
+     a.ledgerBalance = a.ledgerBalance + :delta, a.lastUpdated = :now WHERE a.id = :id
+   - Returns updated AccountResponse entity.
+
+3. bank-integration-service Linking & Delivery Pipeline:
+   - AccountLinkController.link():
+     * If caller is a customer (ROLE_CUSTOMER), verifies platform.ownsAccount(userId, accountId, institution, accountNumber).
+       If false, throws 403 Forbidden ("You can only link an account you have saved yourself").
+     * Calls AccountLinkService.link().
+     * If existingAccountId is not provided, calls platform.ensureAccount() which POSTs
+       to accounts-service (/api/accounts) with X-Internal-Token.
+     * Persists AccountLinkEntity in PostgreSQL (smi_bank_integrations).
+     * Dispatches any earlier pending webhook transactions via deliverPending().
+   - Incoming Bank Webhooks (KCB, NCBA, Stanbic, Equity):
+     * Bank sends Instant Payment Notification (IPN) to /api/v1/webhooks/{bank}.
+     * Webhook controller validates RSA/HMAC signature and parses payload into NormalizedTransactionEntity.
+     * Checks idempotency: if transactionReference was already processed, acknowledges 200 OK.
+     * Dispatches transaction to transactions-service (:8083) via PlatformServicesClient.recordTransaction().
+     * Upon confirmation (Recorded.CREATED), calls PlatformServicesClient.adjustBalance(accountId, delta),
+       which updates accounts-service.
+   - Outage Recovery:
+     * If downstream accounts-service or transactions-service is down, the movement's
+       forwardedAt timestamp remains null.
+     * AccountLinkService runs a scheduled background task every 5 minutes:
+       @Scheduled(initialDelayString = "PT5M", fixedDelayString = "PT5M")
+       public void retryPending()
+       Retries delivery until services recover, guaranteeing zero lost financial movements.
+
+================================================================================
+12. AUTHENTICATION AND AUTHORIZATION
+================================================================================
+1. Authentication Architecture:
+   - Mobile:
+     User signs in via AuthRemoteDataSource.login(). JWT access token is stored in
+     UserPreferencesRepository (smartmoney_prefs).
+     RetrofitClient.tokenProvider supplies token to authInterceptor, injecting
+     Authorization: Bearer <jwt> on all HTTP calls.
+   - Backend:
+     accounts-service does not maintain internal JWT verification secrets.
+     Instead, AccountIdentity.owner(authorization) calls identity-service:
+     GET /api/auth/me with the incoming Authorization header.
+     If valid, identity-service returns user JSON containing UUID id.
+     If expired or missing, AccountIdentity throws ResponseStatusException(HttpStatus.UNAUTHORIZED).
+
+2. Authorization Boundaries:
+   - User Isolation:
+     In AccountController, getAccountsByUserId(), getAccountById(), updateBalance(),
+     and deleteAccount() verify that the requested account's userId matches the
+     authenticated caller's UUID. Attempting to access another user's account returns
+     404 Not Found or 403 Forbidden.
+   - Internal Service Trust Delegation:
+     Calls between microservices (e.g. bank-integration-service -> accounts-service)
+     pass header X-Internal-Token: ${INTERNAL_SERVICE_TOKEN}.
+     When present and verified by AccountIdentity.isInternalService(token),
+     accounts-service permits administrative operations (such as balance adjustments
+     or linking on behalf of a user) without requiring an interactive user session.
+   - Customer Link Authorization:
+     In bank-integration-service, AccountLinkController checks caller authorities:
+     A customer can ONLY link an account if accounts-service already holds a matching
+     account record for them (verified by platform.ownsAccount()). This prevents
+     malicious users from linking stranger bank account numbers to steal notifications.
+
+================================================================================
+13. COROUTINES AND ASYNCHRONOUS EXECUTION
+================================================================================
+1. Dispatcher Architecture:
+   - Abstracted via com.example.smartmoney.core.coroutine.DispatcherProvider:
+     * io: CoroutineDispatcher = Dispatchers.IO
+     * default: CoroutineDispatcher = Dispatchers.Default
+     * main: CoroutineDispatcher = Dispatchers.Main
+     * unconfined: CoroutineDispatcher = Dispatchers.Unconfined
+   - Production uses DefaultDispatcherProvider; unit tests inject TestDispatcherProvider
+     backed by StandardTestDispatcher or UnconfinedTestDispatcher for deterministic testing.
+
+2. Coroutine Scope Lifecycle:
+   - ViewModels use viewModelScope. All launched jobs are automatically cancelled
+     when the ViewModel is cleared (onCleared()).
+   - Long-lived database operations (e.g. database clearing on logout in MainActivity)
+     use CoroutineScope(Dispatchers.IO).launch.
+
+3. Flow Execution & Thread Hopping:
+   - Flow streams from Room DAOs execute SQLite queries on Room's query executor pool.
+   - BankAccountRepositoryImpl applies .flowOn(dispatchers.default) during entity-to-domain
+     mapping to keep the Android main thread free of CPU mapping overhead.
+   - ViewModel state collection uses .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ...).
+   - In AccountViewModel, network operations run on dispatchers.io, then explicitly
+     switch via withContext(dispatchers.main) before executing caller UI lambdas
+     (onSuccess, onError).
+
+4. Parallel Pre-Hydration Pipeline:
+   - In WarmUpSyncViewModel:
+     coroutineScope {
+         val accJob = async { accountRepository.syncAccounts(userId) }
+         val txJob = async { transactionRepository.syncTransactions(userId = userId) }
+         awaitAll(accJob, txJob)
+     }
+   - Both network requests execute concurrently over OkHttp's asynchronous thread pool,
+     cutting total sync latency in half.
+
+================================================================================
+14. ERROR HANDLING AND FAILURE SCENARIOS
+================================================================================
+1. Complete Offline Scenario:
+   - When device is completely disconnected from internet:
+     * AccountScreen continues to display cached accounts from Room SQLite without errors.
+     * If user pulls to refresh, AccountRepositoryImpl.syncAccounts() catches
+       IOException/SocketTimeoutException and returns Result.failure(e).
+     * AccountViewModel catches failure, dismisses loading spinner, and sets _bankAccountError.
+     * If user adds a bank account while offline, BankAccountRepositoryImpl catches network
+       failure and executes offline fallback: generates a UUID, creates Account model with
+       dataSource = "MANUAL", saves to Room AccountDao, and updates UI state immediately.
+
+2. Network Timeout & Server 5xx Outages:
+   - OkHttp 60-second timeouts prevent indefinite socket hangs.
+   - AccountRemoteDataSource parses error envelopes via parseErrorMessage():
+     Extracts Spring Boot JSON fields: "message", "details", or "error".
+     If response body is unparseable HTML or plain text, returns "HTTP $code: $message".
+   - Surfaced to user via Material 3 SnackbarHostState.showSnackbar().
+
+3. Duplicate Account Conflicts (HTTP 409):
+   - When an account number is already linked globally, backend returns 409 Conflict.
+   - Bank-integration-service catches 409: checks if the existing account belongs to
+     the same user (a re-link); if so, reactivates it to ACTIVE. If it belongs to
+     another user, throws refusal message to the client.
+
+4. Unauthenticated / Session Expiry (HTTP 401 / 403):
+   - When auth token is invalid or expired, backend returns 401 Unauthorized.
+   - MainActivity handles user logout by calling appContainer.database.clearAllTables()
+     and resetting UserProfileManager and authViewModel.
+
+5. Concurrent Balance Modifications:
+   - Handled at database level:
+     * Room SQLite: DAO balance adjustments execute within SQLite transactions.
+     * Backend PostgreSQL: Atomic UPDATE ... SET availableBalance = availableBalance + :delta
+       eliminates read-modify-write lost updates.
+
+================================================================================
+15. PERFORMANCE AND RELIABILITY FINDINGS
+================================================================================
+The investigation identified several concrete findings across performance and reliability:
+
+Finding 1: Architectural Dualism (Account vs BankAccount)
+- Source Path:
+  mobile/.../domain/model/Account.kt & mobile/.../domain/model/BankAccount.kt
+  mobile/.../data/repository/AccountRepositoryImpl.kt & mobile/.../data/repository/BankAccountRepositoryImpl.kt
+- Evidence: Both repositories are injected into AccountViewModel and HomeViewModel.
+  AccountScreen only displays bankAccounts, while AccountRepository is used for syncing.
+- Impact: High architectural complexity, redundant data conversions, and potential
+  for state divergence between the two repositories.
+- Classification: Architectural Improvement Opportunity.
+
+Finding 2: Dual User ID Representation and Alias Records in Room Cache
+- Source Path: mobile/.../data/repository/BankAccountRepositoryImpl.kt (lines 84-88, 152-154, 205-207)
+- Evidence:
+  val effectiveUserId = try { UUID.fromString(currentUserId).toString() }
+  catch (_: Exception) { UUID.nameUUIDFromBytes(currentUserId.toByteArray()).toString() }
+  if (effectiveUserId != currentUserId) {
+      localDao.upsertAccount(entity.copy(id = "${accountId}_alias", userId = effectiveUserId))
+  }
+- Impact: Duplicates account records in Room SQLite under synthetic ID keys
+  ("${id}_alias") to handle mismatched string vs UUID user IDs. Can skew balance
+  aggregations if queries do not filter out "_alias" records.
+- Classification: Confirmed Issue / Technical Debt.
+
+Finding 3: 30-Second Freshness Guard Blocks User Refresh
+- Source Path: mobile/.../ui/accounts/AccountViewModel.kt (lines 66-67, 153-157)
+- Evidence:
+  private val SYNC_COOLDOWN_MS = 30_000L
+  if (!force && (now - lastSyncTimestamp < SYNC_COOLDOWN_MS)) return;
+- Impact: Prevents redundant HTTP calls during normal navigation, but if a background
+  sync failed silently, subsequent screen visits within 30 seconds will show stale
+  cache without re-attempting network sync unless user performs a manual pull-to-refresh.
+- Classification: Potential Risk / Design Tradeoff.
+
+Finding 4: Destructive Migration Policy in AppDatabase
+- Source Path: mobile/.../data/local/database/AppDatabase.kt (line 54)
+- Evidence: .fallbackToDestructiveMigration(dropAllTables = true)
+- Impact: Incrementing the Room database version without writing explicit Migration
+  objects drops all user tables, erasing offline transactions, accounts, and notifications.
+- Classification: Confirmed Risk.
+
+Finding 5: Dead / Unused Composable in AccountScreen.kt
+- Source Path: mobile/.../ui/accounts/AccountScreen.kt (lines 790-846)
+- Evidence: AccountCard(account: Account, onDelete: () -> Unit) is declared but
+  never invoked anywhere in the file or project. AccountScreen exclusively uses
+  BankAccountCard.
+- Impact: Dead code cluttering source file.
+- Classification: Code Cleanup Opportunity.
+
+Finding 6: Orphaned Supabase Classes in Codebase
+- Source Path:
+  mobile/.../data/remote/datasource/AccountConnectionRemoteDataSource.kt
+  mobile/.../data/repository/AccountConnectionRepositoryImpl.kt
+- Evidence: Still imports io.github.jan.supabase.SupabaseClient and references
+  postgrest["account_connections"]. These classes are not bound in AppContainer.kt
+  or used in any ViewModel.
+- Impact: Misleading dependencies and architectural residue from earlier migration.
+- Classification: Technical Debt.
+
+================================================================================
+16. EXISTING TEST COVERAGE
+================================================================================
+The test suite was inspected across mobile and backend:
+
+1. Mobile Tests:
+   - AccountApiSerializationTest.kt:
+     * Tests CreateAccountRequest serialization against exact backend property names.
+     * Tests AccountResponse deserialization and domain mapping with BigDecimal.
+     * Tests UpdateBalanceRequest and UpdateStatusRequest serialization.
+     * Coverage: High for serialization contracts; 0% for network failure modes.
+   - BankAccountIntegrationTest.kt:
+     * Tests BankAccount masking logic for various account number formats.
+     * Tests BankAccountDto serialization and round-trip mapping.
+     * Tests FakeBankAccountRepository operations (add, get, remove).
+     * Coverage: Good for domain models and masking; lacks Room DAO integration.
+   - AccountViewModelCoroutineTest.kt:
+     * Tests AccountViewModel.refreshAccounts() using TestDispatcherProvider.
+     * Verifies deterministic execution of async coroutines.
+     * Coverage: Basic unit test; lacks testing for addBankAccount, removeAccount,
+       or simulation error flows.
+
+2. Backend Tests:
+   - AccountControllerTest.java:
+     * MockMvc tests for POST /api/accounts, GET /api/accounts, GET /api/accounts/{id},
+       PATCH /api/accounts/{id}/balance, DELETE /api/accounts/{id}.
+     * Verifies HTTP status codes, validation rejections (400), and duplicate refusals (409).
+   - AccountOnboardingTest.java:
+     * Comprehensive end-to-end integration test with real database.
+     * Verifies ownership enforcement via identity mock.
+     * Verifies duplicate account rejection across different users.
+     * Verifies SHA-256 fingerprinting for manual self-entered accounts.
+     * Verifies legacy fingerprint backward compatibility.
+   - AccountLinkTests.java (in bank-integration-service):
+     * Tests webhook delivery of transactions arriving before and after account linking.
+     * Tests simulated demo account linking.
+     * Tests retry mechanism across simulated downstream service outages.
+     * Tests conflict handling when linking already-linked accounts.
+
+Coverage Gaps:
+- Mobile: No Room DAO unit tests using in-memory Room database.
+- Mobile: No Compose UI tests (createComposeRule) verifying AccountScreen interactions.
+- Mobile: BankAccountRepositoryImpl hybrid fallback routing is not covered by automated unit tests.
+
+================================================================================
+17. CONFIRMED ISSUES AND POTENTIAL RISKS
+================================================================================
+1. [CONFIRMED ISSUE] Alias Record Pollution in Room SQLite:
+   BankAccountRepositoryImpl writes duplicate rows with suffix "_alias" into the
+   accounts table to bridge String and UUID representations of user IDs. If queries
+   in other components (such as reports or analytics) fail to filter out "_alias"
+   keys, account counts and balances will be duplicated.
+
+2. [CONFIRMED ISSUE] Orphaned Supabase AccountConnection Pipeline:
+   AccountConnectionRemoteDataSource and AccountConnectionRepositoryImpl remain in
+   the project and import deprecated Supabase packages, creating confusion about
+   the system's single source of truth.
+
+3. [CONFIRMED ISSUE] Dead AccountCard Composable:
+   AccountScreen.kt contains 56 lines of dead code implementing an unused AccountCard
+   composable.
+
+4. [POTENTIAL RISK] Direct Balance Mutation vs Ledger Inconsistency:
+   AccountDao exposes updateAccountBalance() and adjustAccountBalance() which modify
+   the account balance directly without creating a corresponding TransactionEntity.
+   MpesaTransactionIngestionService and BankAccountRepositoryImpl utilize these
+   methods, creating potential discrepancies between total account balance and the
+   sum of ledger transactions.
+
+5. [POTENTIAL RISK] Destructive Database Migration in Production:
+   AppDatabase uses fallbackToDestructiveMigration(dropAllTables = true). Any schema
+   change without migration scripts will purge offline user data.
+
+================================================================================
+18. MISSING INFORMATION AND INVESTIGATION LIMITATIONS
+================================================================================
+1. Production Push Notification Infrastructure:
+   The investigation confirmed local heads-up notifications (NotificationHelper)
+   and Room persistence (NotificationEntity), but could not verify whether Firebase
+   Cloud Messaging (FCM) is connected in the cloud to push background bank webhook
+   events when the Android app process is terminated.
+
+2. Live Open Banking Production Credentials:
+   The investigation verified sandbox endpoints and simulation mechanisms for KCB,
+   NCBA, Stanbic, and Equity. Production mutual TLS (mTLS) certificates and bank
+   signing keys are injected via environment variables on Render and were not
+   inspected to prevent secret exposure.
+
+================================================================================
+19. RECOMMENDED INVESTIGATION AND IMPROVEMENT ROADMAP
+================================================================================
+Phase 1: Code Hygiene & Dead Code Removal (Immediate)
+- Remove orphaned AccountConnectionRemoteDataSource, AccountConnectionRepositoryImpl,
+  and AccountConnectionDao if provider status tracking is not planned.
+- Delete unused AccountCard composable from AccountScreen.kt.
+- Remove deprecated Supabase client references from build files and DTO docstrings.
+
+Phase 2: Domain Model & Repository Consolidation
+- Consolidate Account and BankAccount into a single unified domain model.
+- Merge AccountRepository and BankAccountRepository into a single AccountRepository
+  that encapsulates all hybrid routing, caching, and balance adjustments behind one
+  cohesive interface.
+- Eliminate the dual-repository injection pattern in AccountViewModel and HomeViewModel.
+
+Phase 3: Identity & User ID Normalization
+- Enforce strict UUID parsing at the authentication boundary (AuthRemoteDataSource).
+- Remove the synthetic "_alias" record insertion hack in BankAccountRepositoryImpl.
+- Standardize all local and backend user ID fields to canonical UUID format.
+
+Phase 4: Ledger-Driven Balance Integrity
+- Enforce that account balance adjustments always record an accompanying transaction
+  record in Room and backend ledger services, eliminating balance drift.
+- Ensure MpesaTransactionIngestionService balance updates write an audit trail.
+
+Phase 5: Room Migration Hardening
+- Implement explicit Room Migration(3, 4) and Migration(4, 5) classes.
+- Remove fallbackToDestructiveMigration(dropAllTables = true) before publishing
+  production releases to safeguard user data.
+
+================================================================================
+END OF ARCHITECTURAL DISCOVERY REPORT
+================================================================================

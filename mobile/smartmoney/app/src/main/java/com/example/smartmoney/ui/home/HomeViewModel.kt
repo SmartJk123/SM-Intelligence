@@ -1,5 +1,7 @@
 package com.example.smartmoney.ui.home
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,8 +27,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
@@ -99,11 +99,20 @@ class HomeViewModel(
         val budgets = snapshot.budgets
 
         val trendCalc = TransactionTrendCalculator.calculateTrendSummary(transactions)
-        val calculatedBalance = accounts.fold(BigDecimal.ZERO) { acc, a -> acc.add(a.availableBalance) }
-        val finalBalance = if (calculatedBalance > BigDecimal.ZERO || accounts.isNotEmpty()) {
+        
+        // Exclude M-Shwari / investment accounts so totalBalance strictly displays liquid cash
+        val isMshwariOrInvestment = { a: Account ->
+            a.institution.contains("M-Shwari", ignoreCase = true) ||
+            a.accountName.contains("M-Shwari", ignoreCase = true) ||
+            a.accountType.equals("INVESTMENT", ignoreCase = true)
+        }
+        val liquidAccounts = accounts.filterNot(isMshwariOrInvestment)
+        val calculatedBalance = liquidAccounts.fold(BigDecimal.ZERO) { acc, a -> acc.add(a.availableBalance) }
+        val finalBalance = if (calculatedBalance > BigDecimal.ZERO || liquidAccounts.isNotEmpty()) {
             calculatedBalance
         } else {
-            bankAccounts.fold(BigDecimal.ZERO) { acc, b -> acc.add(b.balance) }
+            bankAccounts.filterNot { it.bankName.contains("M-Shwari", ignoreCase = true) || it.cardType.equals("Investment", ignoreCase = true) }
+                .fold(BigDecimal.ZERO) { acc, b -> acc.add(b.balance) }
         }
         val isOnboarding = accounts.isEmpty() && bankAccounts.isEmpty()
         val showSheet = isOnboarding && !dismissedWelcome
@@ -173,6 +182,29 @@ class HomeViewModel(
 
     init {
         refresh()
+    }
+
+    /**
+     * Updates the selected month for the Overview analytics section.
+     */
+    fun selectMonth(month: YearMonth) {
+        _selectedMonth.value = month
+    }
+
+    /**
+     * Shifts the selected analytics month one month into the past.
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun previousMonth() {
+        _selectedMonth.value = _selectedMonth.value.minusMonths(1)
+    }
+
+    /**
+     * Shifts the selected analytics month one month into the future.
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun nextMonth() {
+        _selectedMonth.value = _selectedMonth.value.plusMonths(1)
     }
 
     /**

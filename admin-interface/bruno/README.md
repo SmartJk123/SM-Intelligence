@@ -49,12 +49,16 @@ A summary of `28 (28 Failed)` with `Tests 0/0`, blank status codes in the list a
 a duration under 200 ms means nothing answered. A live service takes seconds and
 prints a status code on every line.
 
-Start the backend first, in its own window, and leave it running:
+Start the backend first, in its own windows, and leave it running: api-gateway on
+8080 (the `local` environment calls it) and the bank service behind it:
 
 ```powershell
-cd "C:\Users\user\Desktop\ECLECTICS\SM-Intelligence\admin-interface\backend"
-.\run-local.ps1
+cd "C:\Users\user\Desktop\ECLECTICS\SM-Intelligence"
+.\backend\bank-integration-service\run-local.ps1
 ```
+
+`.\start-local.ps1` at the repository root starts the gateway and every other
+service in one go.
 
 `Tests 0/0` is the part to remember. Requests that reached a real service and
 failed an assertion would still be counted as tests.
@@ -79,28 +83,25 @@ Two details matter here.
 1. Open Bruno and choose **Open Collection**.
 2. Select `admin-interface/bruno/SmartMoney Sandbox`. The folder is the one that
    holds `bruno.json`.
-3. Pick an environment in the top right, `local` or `tunnel`.
+3. Pick an environment in the top right: `local`, `tunnel` or `render`.
 4. Start the backend, then run the folders from the top down.
 
 ## Environments
 
-| Environment | Base URL | Use |
-| --- | --- | --- |
-| `local` | `http://localhost:8080` | Everything while the service runs on this machine |
-| `tunnel` | Replace with your tunnel host | Proving the bank can reach the notification address |
+Each environment file in `environments/` sets just two values, `baseUrl` and
+`bankId`. Neither is secret.
 
-## What to put in the environment
+- `local` calls `http://localhost:8080` (api-gateway) with `bankId` `kcb`. Use it
+  for everything while the services run on this machine.
+- `tunnel` calls your tunnel host (replace `https://replace-this-with-your-tunnel-host`)
+  with `bankId` `stanbic`. Use it to prove a bank can reach the notification address.
+- `render` calls the deployed api-gateway (replace the placeholder with its URL)
+  with `bankId` `kcb`.
 
-This is the whole file. Nothing else is needed.
-
-| Name | `local` value | `tunnel` value | Secret |
-| --- | --- | --- | --- |
-| `baseUrl` | `http://localhost:8080` | `https://your-tunnel-host` | No |
-| `bankId` | `kcb` | `stanbic` | No |
-
-There are no credentials in the collection because the service has no
-authentication while `PERMIT_ALL` is true. Both values above are safe to commit,
-and both are already committed in `environments/`.
+The collection carries no credentials. The admin API requires an admin token, so
+the admin requests only pass against a local bank service started with
+`PERMIT_ALL=true`. That switch is for local testing only, and the service refuses
+to start with it on the deployed `postgres` profile.
 
 ## Keeping it safe while collaborating
 
@@ -109,14 +110,14 @@ committed to the repository and visible to everyone with access, including in
 the git history after it is removed. The rules this collection follows:
 
 - No secret has a value in any `.bru` file. There are none today, and the rule
-  is what keeps it that way when authentication is switched on.
+  is what keeps it that way when authentication is added to the requests.
 - `admin-interface/bruno/.gitignore` excludes `.env`, `.env.*` and any
   `*.local.bru`, so a personal file or a filled in credential file cannot be
   committed by accident.
 - Use `*.local.bru` for an environment file that holds your own values. It is
   ignored, and the shared files stay clean.
 - The bank credentials for the service never come near this folder. They live in
-  `backend/.env.local`, which the backend has its own ignore rule for.
+  `backend/bank-integration-service/.env.local`, which git ignores.
 
 To confirm a file is protected before committing anything, ask git directly:
 
@@ -127,7 +128,7 @@ git check-ignore -v "admin-interface/bruno/SmartMoney Sandbox/.env"
 That prints the ignore rule that matched. No output means the file is not
 ignored and would be committed.
 
-### When authentication is switched on
+### Adding authentication to the requests
 
 Create `SmartMoney Sandbox/.env` by copying `.env.example`, fill in the two
 values, and reference them from the environment file rather than typing them in:
@@ -138,24 +139,26 @@ adminPassword: {{process.env.SM_ADMIN_PASSWORD}}
 ```
 
 The CLI loads `.env` from the collection root, interpolates those names, and
-masks the values in its output. Switching the requests from `auth: none` to
-`auth: basic` is the remaining step. That part has not been exercised yet,
-because the service runs unauthenticated today.
+masks the values in its output. Switching the requests from `auth: none` to an
+admin token is the remaining step. That part has not been exercised yet.
 
 Bruno has a secret store for the desktop application as well. Whichever route you
 take, the test is the same: the value must not appear in any `.bru` file.
 
 ## What the requests cover
 
-| Folder | Purpose |
-| --- | --- |
-| `00 Smoke` | Health, the landing page, the dashboard statistics |
-| `01 Integrations` | The calls the Bank Integrations page makes, including the notification address to give the bank |
-| `02 Credentials` | Which credentials the service has loaded, without returning a value |
-| `03 Connection Tests` | The four step connection test, which is what moves the API and webhook tiles |
-| `04 Webhooks` | The notification address answering, plus a sample notification in each bank's shape. The NCBA sample carries a hash that cannot be right, so a FAIL result is the expected answer while verification is on |
-| `05 Callback Registration` | Registering the callback with Stanbic, and the empty answer KCB is expected to give |
-| `06 Events` | The recent activity list |
+- `00 Smoke`: health, the landing page and the dashboard statistics.
+- `01 Integrations`: the calls the Bank Integrations page makes, including the
+  notification address to give the bank.
+- `02 Credentials`: which credentials the service has loaded, without returning a value.
+- `03 Connection Tests`: the four step connection test, which is what moves the API
+  and webhook tiles.
+- `04 Webhooks`: the notification address answering, plus a sample notification in
+  each bank's shape. The NCBA sample carries a hash that cannot be right, so a FAIL
+  result is the expected answer while verification is on.
+- `05 Callback Registration`: registering the callback with Stanbic, and the empty
+  answer KCB is expected to give.
+- `06 Events`: the recent activity list.
 
 Two requests in `04 Webhooks` can legitimately answer `401`, and the NCBA sample
 answers `200` with a `FAIL` result. Read the note in the request before treating
@@ -163,10 +166,10 @@ either as a fault.
 
 ## Files in this folder
 
-| File | Committed | Purpose |
-| --- | --- | --- |
-| `run-collection.ps1` | Yes | Runs the collection with the right flags and the right working directory |
-| `.gitignore` | Yes | Keeps credentials out of the repository |
-| `SmartMoney Sandbox/` | Yes | The collection itself |
-| `SmartMoney Sandbox/.env.example` | Yes | The shape of the file to copy, with no values in it |
-| `SmartMoney Sandbox/.env` | No | Your own values, ignored by git |
+- `run-collection.ps1` (committed) runs the collection with the right flags and the
+  right working directory.
+- `.gitignore` (committed) keeps credentials out of the repository.
+- `SmartMoney Sandbox/` (committed) is the collection itself.
+- `SmartMoney Sandbox/.env.example` (committed) is the shape of the file to copy,
+  with no values in it.
+- `SmartMoney Sandbox/.env` (not committed) holds your own values and is ignored by git.

@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forecasts-service
+  namespace: smi
+  labels:
+    app: forecasts-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: forecasts-service
+  template:
+    metadata:
+      labels:
+        app: forecasts-service
+    spec:
+      containers:
+        - name: forecasts-service
+          image: smi-forecasts-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8087
+              name: http
+          envFrom:
+            - configMapRef:
+                name: smi-config
+            - secretRef:
+                name: smi-secrets
+          env:
+            - name: PORT
+              value: "8087"
+            - name: DB_SCHEMA
+              value: "forecasts"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8087
+            initialDelaySeconds: 40
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8087
+            initialDelaySeconds: 25
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: forecasts-service
+  namespace: smi
+  labels:
+    app: forecasts-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8087
+      targetPort: 8087
+      protocol: TCP
+      name: http
+  selector:
+    app: forecasts-service

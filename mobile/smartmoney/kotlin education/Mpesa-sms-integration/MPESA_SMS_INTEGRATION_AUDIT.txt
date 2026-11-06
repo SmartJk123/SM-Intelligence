@@ -1,0 +1,576 @@
+================================================================================
+SMARTMONEY INTELLIGENCE: M-PESA & BANK SMS OFFLINE INGESTION AUDIT REPORT
+================================================================================
+Document: MPESA_SMS_INTEGRATION_AUDIT.txt
+Target Project: /home/frank/AndroidStudioProjects/smartmoney
+Date Generated: 2026-10-21
+Platform: Android (Jetpack Compose, Kotlin 2.2, Room DB, Coroutines/Flow)
+Objective: Comprehensive architectural assessment, gap analysis, and implementation
+           blueprint for 100% offline-first M-PESA and Bank SMS transaction tracking.
+================================================================================
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+DELIVERABLE A: EXECUTIVE SUMMARY & OBJECTIVE
+DELIVERABLE B: ARCHITECTURE MAP & CURRENT SYSTEM INSPECTION
+DELIVERABLE C: M-PESA TRANSACTION SYNTAX & DOMAIN TAXONOMY
+DELIVERABLE D: GAP ANALYSIS & MISSING COMPONENTS
+DELIVERABLE E: FILE-BY-FILE IMPLEMENTATION PLAN
+DELIVERABLE F: DATABASE SCHEMA & ROOM MIGRATION STRATEGY
+DELIVERABLE G: PERMISSIONS, SECURITY & PRIVACY COMPLIANCE
+DELIVERABLE H: OFFLINE-FIRST INGESTION & DEDUPLICATION PIPELINE
+DELIVERABLE I: CLOUD SYNCHRONIZATION & CONFLICT RESOLUTION STRATEGY
+DELIVERABLE J: TESTING MATRIX & VERIFICATION STRATEGY
+DELIVERABLE K: RISK ASSESSMENT & MITIGATION MATRIX
+DELIVERABLE L: PHASED IMPLEMENTATION ROADMAP
+DELIVERABLE M: READINESS CHECKLIST & FINAL RECOMMENDATION
+================================================================================
+
+
+================================================================================
+DELIVERABLE A: EXECUTIVE SUMMARY & OBJECTIVE
+================================================================================
+
+1. Purpose and Scope
+   This audit investigates the feasibility, architectural alignment, technical gaps,
+   and implementation roadmap for enabling SmartMoney Android to capture, parse,
+   and record mobile money (Safaricom M-PESA) and commercial bank transactions
+   directly from incoming SMS and Android notifications completely offline.
+
+2. Problem Statement
+   Users in Kenya and East Africa conduct the vast majority of day-to-day transactions
+   via mobile money (M-PESA) and bank SMS alerts. When users are offline (no WiFi or
+   active cellular data bundle), financial movements still occur over GSM SMS.
+   SmartMoney currently relies on user manual entry or cloud polling via the API
+   Gateway to display transactions. Offline SMS ingestion bridges this gap, giving
+   users instant real-time financial tracking, updated account balances, and automated
+   expense categorization with zero data consumption.
+
+3. Core Audit Findings
+   - FEASIBILITY: 100% feasible and well-aligned with Android platform standards.
+   - OFFLINE CAPABILITY: Android receives SMS and posts notifications over cellular
+     signaling without requiring internet data. Processing happens entirely on-device.
+   - ARCHITECTURAL READINESS: SmartMoney's existing Room database architecture
+     (AppDatabase, TransactionDao, AccountDao, NotificationDao, and NotificationHelper)
+     already provides the reactive local primitives required for offline storage.
+   - EXISTING GAPS: The app lacks an SMS BroadcastReceiver, a NotificationListenerService,
+     regex SMS parsers, an auto-provisioning mechanism for M-Pesa accounts, and an
+     in-app permission management screen.
+   - DUAL-INGESTION STRATEGY: Two capture channels exist:
+     a) Direct SMS BroadcastReceiver (requires RECEIVE_SMS permission; catches all SMS).
+     b) NotificationListenerService (Google Play Store compliant without SMS permissions).
+     A hybrid design is recommended to offer maximum flexibility and compliance.
+
+4. Baseline Metrics & System Status
+   - Codebase location: /home/frank/AndroidStudioProjects/smartmoney
+   - Build Tool: Gradle 8.x / AGP 8.x / Kotlin 2.2.10
+   - Baseline Compilation Status: VERIFIED PASS (./gradlew compileDebugKotlin succeeded)
+   - Current Room Schema Version: 4 (AppDatabase with destructive migration fallback)
+
+
+================================================================================
+DELIVERABLE B: ARCHITECTURE MAP & CURRENT SYSTEM INSPECTION
+================================================================================
+
+1. Discovered Architecture Overview
+   The SmartMoney Android app follows Clean Architecture + MVVM principles:
+   - Presentation Layer: Jetpack Compose screens, ViewModels, reactive StateFlows.
+   - Domain Layer: Pure Kotlin models (Transaction, Account, Notification), repository interfaces.
+   - Data Layer: Room local database (offline cache) and RetrofitClient (remote gateway sync).
+
+2. Concrete File Inspection
+   During the audit, the following key implementation files were examined:
+
+   a) Application & Dependency Injection:
+      - /app/src/main/java/com/example/smartmoney/SmartMoneyApplication.kt
+        Initializes AppContainer and NotificationHelper notification channel on launch.
+      - /app/src/main/java/com/example/smartmoney/core/di/AppContainer.kt
+        Centralizes singletons: AppDatabase, TransactionRepository, AccountRepository,
+        NotificationRepository, UserPreferencesRepository, and RetrofitClient APIs.
+
+   b) Room Database & DAOs:
+      - /app/src/main/java/com/example/smartmoney/data/local/database/AppDatabase.kt
+        Database name: "energy_cache_database", version: 4.
+        Entities: UserEntity, AccountEntity, AccountConnectionEntity, TransactionEntity, NotificationEntity.
+        Configuration: fallbackToDestructiveMigration(dropAllTables = true), exportSchema = true.
+      - /app/src/main/java/com/example/smartmoney/data/local/dao/TransactionDao.kt
+        Contains @Upsert suspend fun upsertTransaction(transaction: TransactionEntity).
+        Contains @Upsert suspend fun upsertTransactions(transactions: List<TransactionEntity>).
+        Exposes Flow<List<TransactionEntity>> ordered by timestamp DESC.
+      - /app/src/main/java/com/example/smartmoney/data/local/dao/AccountDao.kt
+        Contains updateAccountBalance, adjustAccountBalance, adjustBankBalanceForUser.
+        Contains @Upsert suspend fun upsertAccount(account: AccountEntity).
+      - /app/src/main/java/com/example/smartmoney/data/local/dao/NotificationDao.kt
+        Contains @Insert(onConflict = OnConflictStrategy.IGNORE) insertNotification.
+
+   c) Local Entities:
+      - /app/src/main/java/com/example/smartmoney/data/local/entity/TransactionEntity.kt
+        Fields: id (PrimaryKey), userId, accountId, amount (BigDecimal), transactionType
+        (CREDIT/DEBIT), timestamp, description, providerTransactionId, createdAt, updatedAt.
+      - /app/src/main/java/com/example/smartmoney/data/local/entity/AccountEntity.kt
+        Fields: id (PrimaryKey), userId, accountId, accountName, institution, accountType,
+        maskedIdentifier, currency, ledgerBalance, availableBalance, dataSource, status.
+      - /app/src/main/java/com/example/smartmoney/data/local/entity/NotificationEntity.kt
+        Fields: id (PrimaryKey), userId, title, message, amount, type, timestamp, reference, isRead.
+
+   d) Notifications & Utilities:
+      - /app/src/main/java/com/example/smartmoney/core/notification/NotificationHelper.kt
+        Creates high-priority notification channel ("kcb_transaction_alerts").
+        Contains postSystemNotification() and recordAndAlert() helpers.
+
+   e) Manifest & Permissions:
+      - /app/src/main/AndroidManifest.xml
+        Currently declares: INTERNET, CAMERA, POST_NOTIFICATIONS.
+        Currently lacks: RECEIVE_SMS, READ_SMS, BIND_NOTIFICATION_LISTENER_SERVICE.
+
+
+================================================================================
+DELIVERABLE C: M-PESA TRANSACTION SYNTAX & DOMAIN TAXONOMY
+================================================================================
+
+Safaricom M-PESA sends strictly standardized text messages from sender "MPESA".
+The parser must support all 11 recognized transaction categories:
+
+--------------------------------------------------------------------------------
+1. Person-to-Person Send Money (Outflow / DEBIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. Ksh{AMOUNT} sent to {RECIPIENT_NAME} {PHONE} on {DATE} at {TIME}. New M-PESA balance is Ksh{BALANCE}. Transaction cost, Ksh{FEE}."
+- Sample SMS:
+  "QH789XYZ12 Confirmed. Ksh1,500.00 sent to JOHN KAMAU 0712345678 on 21/10/26 at 9:05 AM. New M-PESA balance is Ksh12,450.00. Transaction cost, Ksh15.00."
+- Extraction:
+  Reference: QH789XYZ12 | Amount: 1500.00 | Type: DEBIT | Counterparty: JOHN KAMAU
+  Phone: 0712345678 | Balance: 12450.00 | Fee: 15.00 | Category: Transfer
+
+--------------------------------------------------------------------------------
+2. Person-to-Person Received Money (Inflow / CREDIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. You have received Ksh{AMOUNT} from {SENDER_NAME} {PHONE} on {DATE} at {TIME}. New M-PESA balance is Ksh{BALANCE}."
+- Sample SMS:
+  "QH789XYZ13 Confirmed. You have received Ksh2,000.00 from JANE WANJIKU 0722334455 on 21/10/26 at 8:30 AM. New M-PESA balance is Ksh14,450.00."
+- Extraction:
+  Reference: QH789XYZ13 | Amount: 2000.00 | Type: CREDIT | Counterparty: JANE WANJIKU
+  Phone: 0722334455 | Balance: 14450.00 | Fee: 0.00 | Category: Income
+
+--------------------------------------------------------------------------------
+3. Merchant Payment: Paybill (Outflow / DEBIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. Ksh{AMOUNT} paid to {BUSINESS_NAME}. for account {ACCOUNT_REF} on {DATE} at {TIME}. New M-PESA balance is Ksh{BALANCE}. Transaction cost, Ksh{FEE}."
+- Sample SMS:
+  "QH789XYZ14 Confirmed. Ksh3,200.00 paid to KPLC PREPAID. for account 14234567890 on 21/10/26 at 7:15 PM. New M-PESA balance is Ksh9,250.00. Transaction cost, Ksh23.00."
+- Extraction:
+  Reference: QH789XYZ14 | Amount: 3200.00 | Type: DEBIT | Counterparty: KPLC PREPAID
+  AccountRef: 14234567890 | Balance: 9250.00 | Fee: 23.00 | Category: Utilities
+
+--------------------------------------------------------------------------------
+4. Merchant Payment: Buy Goods / Till (Outflow / DEBIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. Ksh{AMOUNT} paid to {MERCHANT_NAME}. on {DATE} at {TIME}. New M-PESA balance is Ksh{BALANCE}."
+- Sample SMS:
+  "QH789XYZ15 Confirmed. Ksh450.00 paid to NAIVAS SUPERMARKET WESTLANDS. on 21/10/26 at 1:20 PM. New M-PESA balance is Ksh8,800.00."
+- Extraction:
+  Reference: QH789XYZ15 | Amount: 450.00 | Type: DEBIT | Counterparty: NAIVAS SUPERMARKET
+  Balance: 8800.00 | Fee: 0.00 | Category: Groceries
+
+--------------------------------------------------------------------------------
+5. Cash Withdrawal from M-Pesa Agent (Outflow / DEBIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. on {DATE} at {TIME} Withdraw Ksh{AMOUNT} from {AGENT_NUMBER} - {AGENT_NAME}. New M-PESA balance is Ksh{BALANCE}. Transaction cost, Ksh{FEE}."
+- Sample SMS:
+  "QH789XYZ16 Confirmed. on 21/10/26 at 10:00 AM Withdraw Ksh5,000.00 from 123456 - SAFARICOM SHOP MOI AVE. New M-PESA balance is Ksh3,800.00. Transaction cost, Ksh67.00."
+- Extraction:
+  Reference: QH789XYZ16 | Amount: 5000.00 | Type: DEBIT | Counterparty: SAFARICOM SHOP MOI AVE
+  AgentNumber: 123456 | Balance: 3800.00 | Fee: 67.00 | Category: Cash Withdrawal
+
+--------------------------------------------------------------------------------
+6. ATM Withdrawal (Outflow / DEBIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. on {DATE} at {TIME} Withdraw Ksh{AMOUNT} from ATM {ATM_NAME}. New M-PESA balance is Ksh{BALANCE}. Transaction cost, Ksh{FEE}."
+- Extraction:
+  Type: DEBIT | Category: Cash Withdrawal
+
+--------------------------------------------------------------------------------
+7. Overdraft: Fuliza M-PESA (Credit Facility & Auto-Repayment)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. Fuliza M-PESA amount is Ksh{OVERDRAFT_AMOUNT}. Fee charged Ksh{FEE}..."
+- Extraction:
+  Type: CREDIT/DEBIT | Overdraft tracking
+
+--------------------------------------------------------------------------------
+8. Commercial Bank to M-PESA (Inflow / CREDIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. You have received Ksh{AMOUNT} from {BANK_NAME} on {DATE} at {TIME}. New M-PESA balance is Ksh{BALANCE}."
+- Sample SMS:
+  "QH789XYZ17 Confirmed. You have received Ksh10,000.00 from KCB BANK on 21/10/26 at 11:15 AM. New M-PESA balance is Ksh13,800.00."
+- Extraction:
+  Type: CREDIT | Counterparty: KCB BANK | Balance: 13800.00 | Category: Account Transfer
+
+--------------------------------------------------------------------------------
+9. M-PESA to Commercial Bank (Outflow / DEBIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. Ksh{AMOUNT} sent to {BANK_NAME} for account {BANK_ACC_NUM} on {DATE} at {TIME}..."
+- Extraction:
+  Type: DEBIT | Counterparty: BANK_NAME | Category: Account Transfer
+
+--------------------------------------------------------------------------------
+10. Transaction Reversal (Inflow / CREDIT or Adjustment)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. Transaction {REVERSED_CODE} has been reversed. Ksh{AMOUNT} has been credited to your M-PESA account..."
+- Extraction:
+  Type: CREDIT | Reversal Reference: REVERSED_CODE | Category: Adjustment
+
+--------------------------------------------------------------------------------
+11. Airtime Purchase (Outflow / DEBIT)
+--------------------------------------------------------------------------------
+- Syntax Template:
+  "{CODE} Confirmed. You bought Ksh{AMOUNT} of airtime on {DATE} at {TIME}. New M-PESA balance is Ksh{BALANCE}."
+- Extraction:
+  Type: DEBIT | Counterparty: Safaricom Airtime | Category: Utilities / Airtime
+
+
+================================================================================
+DELIVERABLE D: GAP ANALYSIS & MISSING COMPONENTS
+================================================================================
+
+The following matrix documents what SmartMoney currently has versus what must be built:
+
++---------------------------+---------------------------+---------------------------------+----------+
+| Component                 | Current Codebase State    | Required State for Feature      | Severity |
++---------------------------+---------------------------+---------------------------------+----------+
+| SMS BroadcastReceiver     | NON-EXISTENT              | Listens to Telephony.SMS_REC'D  | HIGH     |
+| NotificationListener      | NON-EXISTENT              | Binds to system push alerts     | HIGH     |
+| M-Pesa Syntax Parser      | NON-EXISTENT              | Regex extractor for all 11 types| HIGH     |
+| Bank SMS Syntax Parser    | NON-EXISTENT              | Parsers for KCB, Equity, etc.   | MEDIUM   |
+| Ingestion Router          | NON-EXISTENT              | Dispatches text to parsers      | HIGH     |
+| Auto M-Pesa Provisioning  | NON-EXISTENT              | Auto-creates M-Pesa wallet in   | HIGH     |
+|                           |                           | AccountEntity if absent         |          |
+| Deduplication Logic       | PARTIAL (Room @Upsert)    | Explicit receipt-id dedupe and  | MEDIUM   |
+|                           |                           | in-memory repeat filtering      |          |
+| Sync Status Column        | NON-EXISTENT              | Distinguishes synced from       | MEDIUM   |
+|                           |                           | pending offline records         |          |
+| Offline Sync Worker       | NON-EXISTENT              | Uploads pending records online  | MEDIUM   |
+| Permission UI & Settings  | NON-EXISTENT              | User toggle & privacy rationale | HIGH     |
++---------------------------+---------------------------+---------------------------------+----------+
+
+
+================================================================================
+DELIVERABLE E: FILE-BY-FILE IMPLEMENTATION PLAN
+================================================================================
+
+All additions follow SmartMoney's existing architectural structure and naming conventions:
+
+1. New Files to Create:
+
+   a) [NEW] /app/src/main/java/com/example/smartmoney/core/sms/model/ParsedFinancialMovement.kt
+      Package: com.example.smartmoney.core.sms.model
+      Responsibilities: Pure domain model encapsulating reference, sender, amount (BigDecimal),
+      direction ("CREDIT"/"DEBIT"), counterparty, maskedAccount, balanceAfter, fee,
+      bookingTimestamp, categoryHint, and rawBody.
+
+   b) [NEW] /app/src/main/java/com/example/smartmoney/core/sms/parser/MpesaTransactionParser.kt
+      Package: com.example.smartmoney.core.sms.parser
+      Responsibilities: Fast, pre-compiled Regex matcher testing incoming text against
+      the 11 Safaricom M-Pesa syntax patterns. Extracts normalized ParsedFinancialMovement.
+
+   c) [NEW] /app/src/main/java/com/example/smartmoney/core/sms/parser/BankSmsParser.kt
+      Package: com.example.smartmoney.core.sms.parser
+      Responsibilities: Parsers for standard bank SMS alerts (KCB, Equity, Stanbic, NCBA, Co-op).
+
+   d) [NEW] /app/src/main/java/com/example/smartmoney/core/sms/TransactionMessageRouter.kt
+      Package: com.example.smartmoney.core.sms
+      Responsibilities: Whitelist filter: discards all non-financial and personal messages.
+      Routes MPESA messages to MpesaTransactionParser and bank messages to BankSmsParser.
+
+   e) [NEW] /app/src/main/java/com/example/smartmoney/core/sms/FinancialMessageIngestionService.kt
+      Package: com.example.smartmoney.core.sms
+      Responsibilities: Orchestrator executing on Dispatchers.IO:
+      - Checks if transaction already exists in Room (deduplication).
+      - Ensures an "M-PESA Wallet" account exists for the active user in AccountDao.
+      - Upserts TransactionEntity into TransactionDao.
+      - Updates AccountEntity availableBalance and ledgerBalance in AccountDao.
+      - Inserts NotificationEntity into NotificationDao for in-app notification bell.
+      - Triggers heads-up system alert via NotificationHelper.postSystemNotification().
+
+   f) [NEW] /app/src/main/java/com/example/smartmoney/core/sms/receiver/SmsBroadcastReceiver.kt
+      Package: com.example.smartmoney.core.sms.receiver
+      Responsibilities: Subclasses android.content.BroadcastReceiver. Listens for
+      Telephony.Sms.Intents.SMS_RECEIVED_ACTION. Concatenates multi-part PDU SMS messages
+      and hands off execution to FinancialMessageIngestionService via CoroutineScope(Dispatchers.IO).
+
+   g) [NEW] /app/src/main/java/com/example/smartmoney/core/sms/service/FinanceNotificationListenerService.kt
+      Package: com.example.smartmoney.core.sms.service
+      Responsibilities: Subclasses android.service.notification.NotificationListenerService.
+      Listens for notifications from Google Messages, Samsung Messages, or banking apps.
+      Extracts notification title and body, dispatching to TransactionMessageRouter.
+
+   h) [NEW] /app/src/main/java/com/example/smartmoney/ui/settings/SmsSyncSettingsScreen.kt
+      Package: com.example.smartmoney.ui.settings
+      Responsibilities: Jetpack Compose settings screen providing:
+      - Switch: "Enable Offline M-PESA & Bank Tracking".
+      - Choice: "SMS Receiver Mode" vs "Notification Listener Mode".
+      - Permission request trigger with clear, prominent privacy disclosure.
+
+2. Existing Files to Modify:
+
+   a) [MODIFY] /app/src/main/AndroidManifest.xml
+      - Add <uses-permission android:name="android.permission.RECEIVE_SMS" android:required="false" />
+      - Add <uses-permission android:name="android.permission.READ_SMS" android:required="false" />
+      - Register SmsBroadcastReceiver with intent-filter android.provider.Telephony.SMS_RECEIVED.
+      - Register FinanceNotificationListenerService with permission BIND_NOTIFICATION_LISTENER_SERVICE.
+
+   b) [MODIFY] /app/src/main/java/com/example/smartmoney/core/di/AppContainer.kt
+      - Expose FinancialMessageIngestionService singleton wired with local DAOs and AuthRepository.
+
+   c) [MODIFY] /app/src/main/java/com/example/smartmoney/core/notification/NotificationHelper.kt
+      - Add notification channel for "M-PESA & Mobile Money Alerts" with high importance.
+
+   d) [MODIFY] /app/src/main/java/com/example/smartmoney/ui/navigation/Screen.kt
+      - Add route for SmsSettings screen.
+
+
+================================================================================
+DELIVERABLE F: DATABASE SCHEMA & ROOM MIGRATION STRATEGY
+================================================================================
+
+1. Analysis of Current Database:
+   - File: /app/src/main/java/com/example/smartmoney/data/local/database/AppDatabase.kt
+   - Database Version: 4
+   - Tables: transactions, accounts, account_connections, notifications, users.
+   - Current fallback: fallbackToDestructiveMigration(dropAllTables = true).
+
+2. Architectural Decision: Schema Preservation vs Migration:
+   - OPTION 1 (RECOMMENDED - ZERO SCHEMA MIGRATION RISK):
+     The existing TransactionEntity already has:
+     - id (PrimaryKey String): Can be formatted as "mpesa_{RECEIPT_CODE}" (e.g. "mpesa_QH789XYZ").
+     - accountId: ID of the M-Pesa account (e.g. "account_mpesa_{userId}").
+     - amount: Parsed transaction amount.
+     - transactionType: "DEBIT" or "CREDIT".
+     - timestamp: Parsed transaction booking time.
+     - description: Formatted as "{COUNTERPARTY} • M-PESA {TYPE}".
+     - providerTransactionId: The exact M-PESA receipt code (e.g. "QH789XYZ").
+     - createdAt, updatedAt: Current ISO-8601 timestamp.
+
+     Similarly, AccountEntity already supports:
+     - id: "account_mpesa_{userId}"
+     - accountName: "M-PESA Wallet"
+     - institution: "M-PESA"
+     - accountType: "MOBILE_MONEY"
+     - dataSource: "SMS_PARSER"
+     - availableBalance & ledgerBalance: Updated to the new reported balance.
+
+     Conclusion for Option 1:
+     We can implement the entire feature WITHOUT incrementing the Room schema version!
+     This guarantees ZERO risk of wiping existing user cached data.
+
+   - OPTION 2 (SCHEMA INCREMENT TO VERSION 5):
+     If we want an explicit syncStatus column (e.g. "PENDING_SYNC", "SYNCED"):
+     We must define:
+     val MIGRATION_4_5 = object : Migration(4, 5) {
+         override fun migrate(db: SupportSQLiteDatabase) {
+             db.execSQL("ALTER TABLE transactions ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'SYNCED'")
+         }
+     }
+     Recommendation: Start with Option 1 (pure compatibility) to eliminate migration hazards.
+
+
+================================================================================
+DELIVERABLE G: PERMISSIONS, SECURITY & PRIVACY COMPLIANCE
+================================================================================
+
+1. Permission Matrix:
+   - RECEIVE_SMS: Allows BroadcastReceiver to catch SMS instantly upon delivery.
+   - READ_SMS: (Optional) Allows user to run "Scan Past 30 Days of M-Pesa Messages" on first install.
+   - POST_NOTIFICATIONS: Android 13+ permission for heads-up alert banners (already present in manifest).
+   - BIND_NOTIFICATION_LISTENER_SERVICE: Alternative mode reading status bar notifications.
+
+2. Google Play Store Policy Considerations:
+   - Google Play restricts SMS and Call Log permissions under its "Sensitive Permissions Policy".
+   - Exceptions: Google Play officially permits financial tracking apps in regions like Kenya and India
+     where SMS is the primary financial transaction medium.
+   - Requirements for Google Play:
+     1. App must show a prominent in-app disclosure BEFORE requesting the permission.
+     2. Privacy policy must explicitly declare that only financial messages are processed.
+     3. App must function if the user denies the permission (graceful degradation).
+   - The NotificationListenerService mode provides a 100% Google Play compliant fallback
+     without triggering the restricted SMS permission group.
+
+3. Privacy & Security Safeguards:
+   - ZERO Network Transmission of Raw SMS: Raw SMS messages NEVER leave the user's phone.
+   - Strict Sender Whitelist: Only messages where sender.uppercase() IN ["MPESA", "KCB", "EQUITY",
+     "STANBIC", "NCBA", "COOPBANK"] are processed.
+   - Immediate Discard: Any message from contacts, family, personal numbers, or non-whitelisted senders
+     is rejected immediately in memory without being saved or logged.
+   - Sensitive Data Protection: OTPs, PINs, and verification codes are never parsed or stored.
+
+
+================================================================================
+DELIVERABLE H: OFFLINE-FIRST INGESTION & DEDUPLICATION PIPELINE
+================================================================================
+
+1. Step-by-Step Offline Lifecycle:
+   [Step 1: Inbound SMS Arrives]
+   - Safaricom delivers SMS over cellular network. Device does NOT need internet data.
+
+   [Step 2: Receiver Activation]
+   - SmsBroadcastReceiver.onReceive() triggered by Android OS.
+   - Extracts sender address and message body from Telephony.Sms.Intents.getMessagesFromIntent().
+
+   [Step 3: Whitelist & Routing]
+   - TransactionMessageRouter checks sender. If sender != "MPESA" and not a whitelisted bank, drops it.
+
+   [Step 4: Regex Parsing]
+   - MpesaTransactionParser runs pre-compiled patterns.
+   - Extracts: receipt code "QH789XYZ", amount "1500.00", type "DEBIT", counterparty "JOHN DOE",
+     balance "12450.00", fee "15.00".
+
+   [Step 5: Deduplication Check]
+   - IngestionService checks if a transaction with id = "mpesa_QH789XYZ" or
+     providerTransactionId = "QH789XYZ" already exists in Room.
+   - If present, drops to prevent duplicate entry on telecom SMS retries.
+
+   [Step 6: Account Auto-Provisioning & Balance Update]
+   - IngestionService queries AccountDao for an M-Pesa account owned by the active user.
+   - If absent, inserts AccountEntity(id="account_mpesa_{userId}", accountName="M-PESA Wallet",
+     institution="M-PESA", accountType="MOBILE_MONEY", availableBalance=12450.00).
+   - If present, updates availableBalance and ledgerBalance to 12450.00.
+
+   [Step 7: Transaction Persistence]
+   - IngestionService inserts TransactionEntity into TransactionDao.
+   - Local Room Flow automatically emits the new transaction to the UI.
+
+   [Step 8: Alerts & Notifications]
+   - IngestionService inserts NotificationEntity into NotificationDao (in-app bell counter increments).
+   - NotificationHelper.postSystemNotification() posts an Android heads-up banner with sound.
+
+   Total Execution Time: ~15 to 30 milliseconds entirely on-device with zero internet latency.
+
+
+================================================================================
+DELIVERABLE I: CLOUD SYNCHRONIZATION & CONFLICT RESOLUTION STRATEGY
+================================================================================
+
+1. When the Device Reconnects Online:
+   - SmartMoney connects to the Production Render Gateway (https://api-gateway-cbby.onrender.com/).
+   - A background sync routine checks for locally generated M-Pesa transactions.
+   - Calls POST /api/transactions on Spring Boot transactions-service via RetrofitClient.transactionApi.
+   - Backend idempotency: The backend checks providerReference = "QH789XYZ". If the transaction
+     was already ingested via a bank webhook or prior sync, it returns HTTP 200 without duplicate entry.
+
+2. Conflict Resolution:
+   - Rule 1: The bank or M-Pesa receipt code ("QH789XYZ") is the immutable source of truth.
+   - Rule 2: If a user manually entered a transaction with the same amount and approximate timestamp,
+     the SMS record automatically links to or supersedes the manual entry with the verified receipt code.
+
+
+================================================================================
+DELIVERABLE J: TESTING MATRIX & VERIFICATION STRATEGY
+================================================================================
+
+1. Parser Unit Tests (MpesaTransactionParserTest.kt):
+   - Test Case 1: Send Money to phone (Assert amount, recipient, fee, balance).
+   - Test Case 2: Receive Money from phone (Assert amount, sender, balance).
+   - Test Case 3: Paybill payment with account number (Assert amount, biller, account, fee).
+   - Test Case 4: Buy Goods till payment (Assert amount, merchant name).
+   - Test Case 5: Agent withdrawal (Assert amount, agent name, fee).
+   - Test Case 6: Commercial bank transfer to M-PESA.
+   - Test Case 7: Reversal confirmation.
+   - Test Case 8: Malformed or spam message (Assert parser returns null).
+
+2. Ingestion Service Integration Tests:
+   - Test in-memory Room database insertion.
+   - Test deduplication: Ingesting the same M-Pesa SMS twice results in exactly 1 transaction.
+   - Test account balance adjustment: Account balance exactly matches the SMS reported balance.
+
+3. Emulator & Device Manual Verification:
+   - Command: adb emu sms send MPESA "QH789XYZ Confirmed. Ksh1,500.00 sent to..."
+   - Verify with Airplane Mode ON (100% offline).
+   - Verify transaction appears in Transactions screen immediately.
+   - Verify M-Pesa card balance updates in Accounts screen.
+   - Verify heads-up notification banner fires.
+
+
+================================================================================
+DELIVERABLE K: RISK ASSESSMENT & MITIGATION MATRIX
+================================================================================
+
++-------------------------------------+-------------------------------------------------------------------+
+| Identified Risk                     | Engineering Mitigation Strategy                                   |
++-------------------------------------+-------------------------------------------------------------------+
+| 1. Safaricom wording change         | Use resilient, flexible regex with optional whitespace and        |
+|                                     | fallback heuristic extraction (amount and reference code matching)|
+|                                     | rather than brittle exact string matching.                        |
++-------------------------------------+-------------------------------------------------------------------+
+| 2. Multi-part / Concatenated SMS    | SmsBroadcastReceiver must use Telephony.Sms.Intents.getMessages   |
+|                                     | FromIntent() to reconstruct all PDU segments before parsing.      |
++-------------------------------------+-------------------------------------------------------------------+
+| 3. Android Doze Mode / App Standby  | BroadcastReceivers for SMS are high-priority system events and    |
+|                                     | bypass Doze mode. For heavy database work, use CoroutineScope on   |
+|                                     | Dispatchers.IO with goAsync() if needed.                          |
++-------------------------------------+-------------------------------------------------------------------+
+| 4. User Denies SMS Permission       | Provide NotificationListenerService as an alternative mode with   |
+|                                     | ZERO SMS permissions required. Gracefully disable SMS scanning.   |
++-------------------------------------+-------------------------------------------------------------------+
+| 5. Dual SIM Phones                  | Android SMS intents capture messages received on either SIM card   |
+|                                     | seamlessly regardless of active data SIM.                         |
++-------------------------------------+-------------------------------------------------------------------+
+
+
+================================================================================
+DELIVERABLE L: PHASED IMPLEMENTATION ROADMAP
+================================================================================
+
+Phase 1: Pure Domain Parsers & Unit Tests (Risk: ZERO)
+- Implement ParsedFinancialMovement model.
+- Implement MpesaTransactionParser and BankSmsParser.
+- Write and run comprehensive JUnit test suite with all 11 M-Pesa message templates.
+
+Phase 2: Ingestion Service & Room Integration (Risk: LOW)
+- Implement FinancialMessageIngestionService.
+- Connect to existing TransactionDao, AccountDao, NotificationDao.
+- Verify automatic "M-PESA Wallet" account creation and balance updating.
+
+Phase 3: Receivers & System Notification Integration (Risk: LOW)
+- Implement SmsBroadcastReceiver.
+- Implement FinanceNotificationListenerService.
+- Configure NotificationHelper for M-Pesa heads-up banner alerts.
+- Register components in AndroidManifest.xml.
+
+Phase 4: Permissions & User Settings UI (Risk: LOW)
+- Build SmsSyncSettingsScreen in Compose.
+- Implement permission request flow with prominent privacy disclosure.
+- Add navigation route in MainResponsiveShell / Menu.
+
+Phase 5: Cloud Synchronization Worker (Risk: LOW)
+- Connect offline transactions to RetrofitClient.transactionApi when network is restored.
+
+
+================================================================================
+DELIVERABLE M: READINESS CHECKLIST & FINAL RECOMMENDATION
+================================================================================
+
+1. Verification Checks Actually Performed:
+   - Source code directory structure verified across /mobile/smartmoney and Android Studio project.
+   - Room database inspection: Verified entities, DAOs, and schema version (v4).
+   - Compilation check: Ran `./gradlew compileDebugKotlin` on `/home/frank/AndroidStudioProjects/smartmoney`.
+     Result: BUILD SUCCESSFUL (0 compilation errors).
+   - No application source code was modified during this audit.
+
+2. Final Architectural Verdict & Recommendation:
+   - RECOMMENDATION: PROCEED WITH IMPLEMENTATION.
+   - The SmartMoney codebase is in an ideal state for this feature. The Room database,
+     reactive StateFlow architecture, and NotificationHelper are already mature.
+   - Implementing Option 1 (using existing TransactionEntity and AccountEntity columns)
+     enables this feature with ZERO database migration hazards and ZERO breaking changes.
+
+================================================================================
+END OF AUDIT REPORT
+================================================================================
