@@ -1,0 +1,3 @@
+sed -i 's/import com.example.smartmoney.ui.transactions.TransactionViewModel/import com.example.smartmoney.ui.transactions.TransactionViewModel\nimport com.example.smartmoney.ui.analytics.AnalyticsViewModel\nimport com.example.smartmoney.ui.analytics.AnalyticsScreen/' /home/frank/AndroidStudioProjects/smartmoney/app/src/main/java/com/example/smartmoney/ui/dashboard/DashboardScreen.kt
+
+sed -i 's/rahaViewModel: RahaViewModel? = null,/rahaViewModel: RahaViewModel? = null,\n    analyticsViewModel: AnalyticsViewModel? = null,/' /home/frank/AndroidStudioProjects/smartmoney/app/src/main/java/com/example/smartmoney/ui/dashboard/DashboardScreen.kt

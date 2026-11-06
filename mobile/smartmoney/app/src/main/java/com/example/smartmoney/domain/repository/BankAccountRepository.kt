@@ -44,4 +44,19 @@ interface BankAccountRepository {
      * @param delta The positive (credit) or negative (debit) amount to apply.
      */
     suspend fun adjustKcbBalance(delta: BigDecimal)
+
+    /**
+     * Adjusts the balance of a specific bank account in the local database.
+     *
+     * @param bankName The institution name (e.g. "KCB", "NCBA", "Stanbic", "Equity").
+     * @param delta The positive (credit) or negative (debit) amount to apply.
+     * @param accountId Optional specific account identifier to prevent cross-account balance leaks.
+     * @param userId Optional target user id to prevent cross-user leaks.
+     */
+    suspend fun adjustBankBalance(
+        bankName: String,
+        delta: BigDecimal,
+        accountId: String? = null,
+        userId: String? = null
+    )
 }

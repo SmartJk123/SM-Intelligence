@@ -85,6 +85,27 @@ data class AuthResponse(
     val message: String? = null
 )
 
+@Serializable
+data class UserProfileResponse(
+    @SerialName("id")
+    val id: String? = null,
+
+    @SerialName("name")
+    val name: String? = null,
+
+    @SerialName("emailAddress")
+    val emailAddress: String? = null,
+
+    @SerialName("phoneNumber")
+    val phoneNumber: String? = null,
+
+    @SerialName("accountType")
+    val accountType: String? = null,
+
+    @SerialName("organizationName")
+    val organizationName: String? = null
+)
+
 /**
  * Retrofit API interface for authentication endpoints exposed by the Spring Boot backend.
  */
@@ -107,4 +128,11 @@ interface AuthApi {
     suspend fun login(
         @Body request: LoginRequest
     ): Response<AuthResponse>
+
+    /**
+     * Retrieves currently authenticated user profile.
+     * Backend endpoint: GET /api/auth/me
+     */
+    @retrofit2.http.GET("api/auth/me")
+    suspend fun getCurrentUser(): Response<UserProfileResponse>
 }

@@ -130,8 +130,6 @@ fun MenuScreen(
         ) {
             Column {
                 val financeScreens = listOf(
-                    Screen.Accounts to "Bank balances, cards & linked accounts",
-                    Screen.Transactions to "Statements, token purchases & history",
                     Screen.CashFlow to "Real-time inflow & outflow trajectory",
                     Screen.Budgets to "Monthly utility & energy targets",
                     Screen.Investments to "Clean energy portfolio & assets",
@@ -156,46 +154,6 @@ fun MenuScreen(
         }
 
         Spacer(modifier = Modifier.height(20.dp))
-
-        // 3. ACCOUNT Group
-        Text(
-            text = "ACCOUNT",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = sectionHeaderColor,
-            letterSpacing = 1.5.sp,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-        )
-
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = cardBg),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
-        ) {
-            Column {
-                val accountScreens = listOf(
-                    Screen.Notifications to "Alerts, billing notices & reminders",
-                    Screen.Settings to "Profile, dark mode & app preferences"
-                )
-
-                accountScreens.forEachIndexed { index, (screen, subtitle) ->
-                    MenuItemRow(
-                        screen = screen,
-                        subtitle = subtitle,
-                        onClick = { onNavigate(screen) }
-                    )
-                    if (index < accountScreens.size - 1) {
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
 
         // 4. User Profile & Sign Out Section
         ElevatedCard(

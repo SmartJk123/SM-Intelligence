@@ -12,6 +12,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import com.example.smartmoney.data.remote.RetrofitClient
 import java.math.BigDecimal
 
 class InvoiceViewModel : ViewModel() {
@@ -115,5 +119,39 @@ class InvoiceViewModel : ViewModel() {
         _dueDate.value = ""
         _invoiceNumber.value = ""
         _extractedText.value = ""
+    }
+
+    suspend fun uploadInvoiceToBackend(fileBytes: ByteArray, filename: String = "invoice.jpg"): Result<com.example.smartmoney.domain.model.Invoice> {
+        val mediaType = "image/jpeg".toMediaTypeOrNull()
+        val requestFile = fileBytes.toRequestBody(mediaType)
+        val filePart = MultipartBody.Part.createFormData("file", filename, requestFile)
+        val textType = "text/plain".toMediaTypeOrNull()
+
+        val vendorBody = _vendor.value.toRequestBody(textType)
+        val invNumBody = _invoiceNumber.value.takeIf { it.isNotBlank() }?.toRequestBody(textType)
+        val amountBody = _amount.value.toRequestBody(textType)
+        val currencyBody = _currency.value.toRequestBody(textType)
+        val dateBody = _invoiceDate.value.toRequestBody(textType)
+        val dueBody = _dueDate.value.takeIf { it.isNotBlank() }?.toRequestBody(textType)
+
+        return try {
+            val response = RetrofitClient.invoiceApi.uploadInvoice(
+                file = filePart,
+                vendor = vendorBody,
+                invoiceNumber = invNumBody,
+                amount = amountBody,
+                currency = currencyBody,
+                invoiceDate = dateBody,
+                dueDate = dueBody
+            )
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                val err = response.errorBody()?.string() ?: "Failed to upload invoice (HTTP ${response.code()})"
+                Result.failure(Exception(err))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

@@ -266,7 +266,8 @@ interface BankIntegrationApi {
     @GET("api/v1/admin/demo/transactions")
     suspend fun getKcbTransactions(
         @Query("userId") userId: String? = null,
-        @Query("since") since: String? = null
+        @Query("since") since: String? = null,
+        @Query("accountNumber") accountNumber: String? = null
     ): Response<List<BankTransactionResponse>>
 
     @GET("api/v1/admin/bank-integrations/{bankId}")
@@ -300,6 +301,11 @@ interface BankIntegrationApi {
      */
     @POST("api/v1/admin/demo/transactions")
     suspend fun simulateKcbTransaction(
+        @Body request: SimulateTransactionRequest? = null
+    ): Response<BankTransactionResponse>
+
+    @POST("api/v1/admin/demo/transactions")
+    suspend fun simulateTransaction(
         @Body request: SimulateTransactionRequest? = null
     ): Response<BankTransactionResponse>
 

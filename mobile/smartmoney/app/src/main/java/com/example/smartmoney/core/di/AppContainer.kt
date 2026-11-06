@@ -5,10 +5,10 @@ import com.example.smartmoney.core.coroutine.DefaultDispatcherProvider
 import com.example.smartmoney.core.coroutine.DispatcherProvider
 import com.example.smartmoney.data.local.UserPreferencesRepository
 import com.example.smartmoney.data.local.database.AppDatabase
+import com.example.smartmoney.data.remote.RetrofitClient
 import com.example.smartmoney.data.remote.datasource.AccountRemoteDataSource
 import com.example.smartmoney.data.remote.datasource.AuthRemoteDataSource
 import com.example.smartmoney.data.remote.datasource.TransactionRemoteDataSource
-import com.example.smartmoney.data.remote.supabase.SupabaseClientProvider
 import com.example.smartmoney.data.repository.AccountRepositoryImpl
 import com.example.smartmoney.data.repository.AuthRepositoryImpl
 import com.example.smartmoney.data.repository.BankAccountRepositoryImpl
@@ -39,6 +39,7 @@ interface AppContainer {
     val investmentRepository: InvestmentRepository
     val userPreferencesRepository: UserPreferencesRepository
     val rahaRepository: com.example.smartmoney.domain.repository.RahaRepository
+    val mpesaTransactionIngestionService: com.example.smartmoney.core.sms.ingestion.MpesaTransactionIngestionService
 
     /**
      * Creates or provides a [BankAccountRepository] scoped to a specific user ID.
@@ -58,8 +59,15 @@ class DefaultAppContainer(
         AppDatabase.getDatabase(context)
     }
 
+    override val userPreferencesRepository: UserPreferencesRepository by lazy {
+        UserPreferencesRepository(context)
+    }
+
     private val authRemoteDataSource: AuthRemoteDataSource by lazy {
-        AuthRemoteDataSource()
+        AuthRemoteDataSource(
+            authApi = RetrofitClient.authApi,
+            userPreferencesRepository = userPreferencesRepository
+        )
     }
 
     override val authRepository: AuthRepository by lazy {
@@ -74,6 +82,8 @@ class DefaultAppContainer(
         AccountRepositoryImpl(
             remoteDataSource = accountRemoteDataSource,
             localDao = database.accountDao(),
+            transactionDao = database.transactionDao(),
+            userIdProvider = { authRepository.currentUserId() },
             dispatchers = dispatchers
         )
     }
@@ -82,6 +92,7 @@ class DefaultAppContainer(
         BankAccountRepositoryImpl(
             remoteDataSource = accountRemoteDataSource,
             localDao = database.accountDao(),
+            transactionDao = database.transactionDao(),
             userIdProvider = { authRepository.currentUserId() ?: "default-user" },
             dispatchers = dispatchers
         )
@@ -91,6 +102,7 @@ class DefaultAppContainer(
         return BankAccountRepositoryImpl(
             remoteDataSource = accountRemoteDataSource,
             localDao = database.accountDao(),
+            transactionDao = database.transactionDao(),
             userId = userId,
             dispatchers = dispatchers
         )
@@ -106,7 +118,7 @@ class DefaultAppContainer(
 
     override val transactionRepository: TransactionRepository by lazy {
         TransactionRepositoryImpl(
-            remoteDataSource = TransactionRemoteDataSource(SupabaseClientProvider.getClient()),
+            remoteDataSource = TransactionRemoteDataSource(RetrofitClient.transactionApi),
             localDao = database.transactionDao(),
             accountDao = database.accountDao(),
             notificationDao = database.notificationDao(),
@@ -117,23 +129,36 @@ class DefaultAppContainer(
     }
 
     override val budgetRepository: BudgetRepository by lazy {
-        BudgetRepositoryImpl()
+        BudgetRepositoryImpl(
+            context = context,
+            budgetApi = RetrofitClient.budgetApi,
+            userIdProvider = { authRepository.currentUserId() },
+            dispatchers = dispatchers
+        )
     }
 
     override val investmentRepository: InvestmentRepository by lazy {
-        InvestmentRepositoryImpl()
-    }
-
-    override val userPreferencesRepository: UserPreferencesRepository by lazy {
-        UserPreferencesRepository(context)
+        InvestmentRepositoryImpl(
+            context = context,
+            userIdProvider = { authRepository.currentUserId() }
+        )
     }
 
     override val rahaRepository: com.example.smartmoney.domain.repository.RahaRepository by lazy {
         com.example.smartmoney.data.repository.RahaRepositoryImpl(
-            rahaApi = com.example.smartmoney.data.remote.RetrofitClient.rahaApi,
+            rahaApi = RetrofitClient.rahaApi,
             accountDao = database.accountDao(),
             userIdProvider = { authRepository.currentUserId() },
             investmentRepository = investmentRepository,
+            dispatchers = dispatchers
+        )
+    }
+
+    override val mpesaTransactionIngestionService: com.example.smartmoney.core.sms.ingestion.MpesaTransactionIngestionService by lazy {
+        com.example.smartmoney.core.sms.ingestion.MpesaTransactionIngestionService(
+            transactionDao = database.transactionDao(),
+            accountDao = database.accountDao(),
+            userIdProvider = { authRepository.currentUserId() },
             dispatchers = dispatchers
         )
     }

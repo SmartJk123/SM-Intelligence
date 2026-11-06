@@ -27,26 +27,40 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,6 +81,7 @@ fun NotificationsScreen(
     val notifications by viewModel.notifications.collectAsState()
     val unreadCount by viewModel.unreadCount.collectAsState()
     val selectedFilter by viewModel.selectedFilter.collectAsState()
+    var selectedNotification by remember { mutableStateOf<Notification?>(null) }
 
     val bgColor = if (isDark) SmartMoneyColors.DarkBackground else SmartMoneyColors.SlateBackground
     val cardBgColor = if (isDark) SmartMoneyColors.DarkSurface else MaterialTheme.colorScheme.surface
@@ -169,12 +184,27 @@ fun NotificationsScreen(
                         notification = notif,
                         isDark = isDark,
                         containerColor = cardBgColor,
-                        onClick = { viewModel.markAsRead(notif.id) },
+                        onClick = {
+                            viewModel.markAsRead(notif.id)
+                            selectedNotification = notif.copy(isRead = true)
+                        },
                         onDelete = { viewModel.deleteNotification(notif.id) }
                     )
                 }
             }
         }
+    }
+
+    selectedNotification?.let { notif ->
+        NotificationDetailBottomSheet(
+            notification = notif,
+            isDark = isDark,
+            onDismiss = { selectedNotification = null },
+            onDelete = {
+                viewModel.deleteNotification(notif.id)
+                selectedNotification = null
+            }
+        )
     }
 }
 
@@ -436,5 +466,290 @@ private fun formatTimestamp(timestamp: String): String {
         }
     } catch (_: Exception) {
         timestamp
+    }
+}
+
+private fun formatDetailedTimestamp(timestamp: String): String {
+    return try {
+        if (timestamp.contains("T")) {
+            val parts = timestamp.split("T")
+            val date = parts[0]
+            val time = parts[1].take(8)
+            "$date at $time"
+        } else {
+            timestamp
+        }
+    } catch (_: Exception) {
+        timestamp
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotificationDetailBottomSheet(
+    notification: Notification,
+    isDark: Boolean,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val clipboardManager = LocalClipboardManager.current
+    var isCopied by remember { mutableStateOf(false) }
+
+    val isCredit = notification.type.equals("CREDIT", ignoreCase = true)
+    val isDebit = notification.type.equals("DEBIT", ignoreCase = true)
+
+    val accentColor = when {
+        isCredit -> Color(0xFF2E7D32)
+        isDebit -> Color(0xFFD32F2F)
+        else -> if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen
+    }
+    val accentBg = accentColor.copy(alpha = 0.12f)
+    val typeIcon = when {
+        isCredit -> Icons.AutoMirrored.Filled.TrendingUp
+        isDebit -> Icons.AutoMirrored.Filled.TrendingDown
+        else -> Icons.Outlined.Notifications
+    }
+
+    val typeLabel = when {
+        isCredit -> "Inflow (Deposit / Credit)"
+        isDebit -> "Outflow (Payment / Debit)"
+        else -> "System Alert"
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = if (isDark) SmartMoneyColors.DarkSurface else MaterialTheme.colorScheme.surface,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .background(
+                        color = (if (isDark) Color.White else Color.Black).copy(alpha = 0.2f),
+                        shape = CircleShape
+                    )
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            // Header Row: Type pill + Close button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = accentBg
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = typeIcon,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = typeLabel,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Close",
+                        tint = if (isDark) SmartMoneyColors.DarkTextSecondary else SmartMoneyColors.TextMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Notification Title
+            Text(
+                text = notification.title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isDark) SmartMoneyColors.DarkTextPrimary else SmartMoneyColors.TextPrimary
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = formatDetailedTimestamp(notification.timestamp),
+                fontSize = 12.sp,
+                color = if (isDark) SmartMoneyColors.DarkTextSecondary else SmartMoneyColors.TextMuted
+            )
+
+            // Amount Card if present
+            if (notification.amount != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = accentBg
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = if (isCredit) "Total Inflow" else "Total Outflow",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = accentColor.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        val sign = if (isCredit) "+" else "-"
+                        val formatted = DecimalFormat("#,##0.00").format(notification.amount)
+                        Text(
+                            text = "$sign KES $formatted",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Message Body Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = (if (isDark) Color.White else Color.Black).copy(alpha = 0.04f)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Notification Message",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) SmartMoneyColors.DarkTextSecondary else SmartMoneyColors.TextMuted
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = notification.message,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        color = if (isDark) SmartMoneyColors.DarkTextPrimary else SmartMoneyColors.TextPrimary
+                    )
+                }
+            }
+
+            // Reference / Details metadata
+            if (!notification.reference.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = (if (isDark) Color.White else Color.Black).copy(alpha = 0.04f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "Reference Code",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) SmartMoneyColors.DarkTextSecondary else SmartMoneyColors.TextMuted
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = notification.reference,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isDark) SmartMoneyColors.DarkTextPrimary else SmartMoneyColors.TextPrimary
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(notification.reference))
+                                isCopied = true
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isCopied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+                                contentDescription = "Copy reference",
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isCopied) "Copied" else "Copy",
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Action Buttons (Delete & Close)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDelete,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFFE53935)
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Delete", fontWeight = FontWeight.SemiBold)
+                }
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDark) SmartMoneyColors.PaleMintGreen else SmartMoneyColors.DarkSlateGreen,
+                        contentColor = if (isDark) SmartMoneyColors.DarkSlateGreen else Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(text = "Done", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
     }
 }

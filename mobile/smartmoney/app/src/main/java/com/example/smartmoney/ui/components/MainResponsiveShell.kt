@@ -225,7 +225,15 @@ fun MainResponsiveShell(
                     ScaffoldDefaults.contentWindowInsets
                 },
                 topBar = {
-                    if (!isBottomBarScreen && currentRoute != Screen.Notifications.route) {
+                    val noTopBarRoutes = setOf(
+                        Screen.Notifications.route,
+                        Screen.Analytics.route,
+                        Screen.Budgets.route,
+                        Screen.CashFlow.route,
+                        Screen.Reports.route,
+                        Screen.Investments.route
+                    )
+                    if (!isBottomBarScreen && currentRoute !in noTopBarRoutes) {
                         AppTopBar(
                             title = Screen.allScreens.find { it.route == currentRoute }?.title ?: "Overview",
                             userName = userName,
