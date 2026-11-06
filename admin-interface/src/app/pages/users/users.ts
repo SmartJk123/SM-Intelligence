@@ -1,6 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { AppUser } from '../../core/data';
+import { ActivatedRoute } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs';
+import { AppUser, CUSTOMER_FILTERS } from '../../core/data';
 import { AuthService } from '../../core/auth.service';
 import { CsvExportService } from '../../core/csv-export.service';
 import { ToastService } from '../../core/toast.service';
@@ -13,7 +16,7 @@ import { KpiCard } from '../../shared/kpi-card';
 import { SurfaceCard } from '../../shared/surface-card';
 import { UserDetail } from './user-detail';
 
-const EXPORT_HEADERS = ['Name', 'Email', 'Organisation', 'Role', 'Status', 'Last login'];
+const EXPORT_HEADERS = ['Name', 'Email', 'Account type', 'Organisation', 'Role', 'Status', 'Last login'];
 const NEVER_SIGNED_IN = 'Never signed in';
 
 /**
@@ -41,6 +44,14 @@ export class Users {
 
   private readonly detail = viewChild(UserDetail);
 
+  /** ?type=individual or ?type=organisation from the Customers menu; undefined shows everyone. */
+  protected readonly customerFilter = toSignal(
+    inject(ActivatedRoute).queryParamMap.pipe(
+      map((params) => CUSTOMER_FILTERS.find((filter) => filter.query === params.get('type'))),
+    ),
+  );
+  protected readonly heading = computed(() => this.customerFilter()?.label ?? 'All customers');
+
   protected readonly statusFilters = ['All', 'Active', 'Suspended', NEVER_SIGNED_IN];
   protected readonly query = signal('');
   protected readonly statusFilter = signal('All');
@@ -48,16 +59,21 @@ export class Users {
   protected readonly openInEdit = signal(false);
   protected readonly busy = signal(false);
   protected readonly headings = [
-    'User',
+    'Customer',
     'Email',
     'Organisation',
-    'Role',
+    'Account type',
     'Status',
     'Last login',
     'Action',
   ];
 
-  protected readonly users = computed<AppUser[]>(() => this.userService.users());
+  protected readonly users = computed<AppUser[]>(() => {
+    const filter = this.customerFilter();
+    const all = this.userService.users();
+    // Individuals and Organisations are customers only; platform staff appear under All customers.
+    return filter ? all.filter((user) => !user.isAdmin && user.accountType === filter.accountType) : all;
+  });
   protected readonly selected = computed<UserSummary | undefined>(() => {
     const id = this.selectedId();
     // Read users() so the panel refreshes after a change.
@@ -134,18 +150,18 @@ export class Users {
   protected exportCsv(): void {
     const rows = this.filtered();
     if (rows.length === 0) {
-      this.toasts.show('Nothing to export', 'warning', 'No users match the current filters.');
+      this.toasts.show('Nothing to export', 'warning', 'No customers match the current filters.');
       return;
     }
     this.csv.download(
-      `smartmoney-users-${this.csv.stamp()}.csv`,
+      `smartmoney-customers-${this.customerFilter()?.query ?? 'all'}-${this.csv.stamp()}.csv`,
       EXPORT_HEADERS,
-      rows.map((user) => [user.name, user.email, user.org, user.role, user.status, user.lastLogin]),
+      rows.map((user) => [user.name, user.email, accountTypeLabel(user), user.org, user.role, user.status, user.lastLogin]),
     );
     this.toasts.show(
       'Export ready',
       'success',
-      `${rows.length} user${rows.length === 1 ? '' : 's'} written to CSV.`,
+      `${rows.length} customer${rows.length === 1 ? '' : 's'} written to CSV.`,
     );
   }
 
@@ -164,7 +180,7 @@ export class Users {
         this.csv.download(
           `smartmoney-user-${user.id}-${this.csv.stamp()}.csv`,
           EXPORT_HEADERS,
-          [[user.name, user.email, user.org, user.role, user.status, user.lastLogin]],
+          [[user.name, user.email, accountTypeLabel(user), user.org, user.role, user.status, user.lastLogin]],
         );
         this.toasts.show('Row exported', 'success', `${user.name} written to CSV.`);
         break;
@@ -234,4 +250,8 @@ function failureMessage(error: unknown): string {
     if (error.status === 403) return 'Your account is not allowed to do this.';
   }
   return 'The change could not be saved. Please try again.';
+}
+
+function accountTypeLabel(user: AppUser): string {
+  return user.accountType === 'ORGANIZATION' ? 'Organisation' : 'Individual';
 }

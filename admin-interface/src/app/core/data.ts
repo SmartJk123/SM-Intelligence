@@ -51,7 +51,18 @@ export interface AppUser {
   role: string;
   status: UserStatus;
   lastLogin: string;
+  /** INDIVIDUAL or ORGANIZATION, as chosen at sign up or by the admin who added them. */
+  accountType: CustomerType;
+  isAdmin: boolean;
 }
+
+export type CustomerType = 'INDIVIDUAL' | 'ORGANIZATION';
+
+/** The ?type= values the Customers menu uses, and the account type each one shows. */
+export const CUSTOMER_FILTERS: { query: string; label: string; accountType: CustomerType }[] = [
+  { query: 'individual', label: 'Individuals', accountType: 'INDIVIDUAL' },
+  { query: 'organisation', label: 'Organisations', accountType: 'ORGANIZATION' },
+];
 
 export interface Transaction {
   id: string;
@@ -75,23 +86,31 @@ export interface ReconciliationRecord {
 }
 
 export interface AppNotification {
-  id: number;
+  id: string;
   title: string;
   desc: string;
   severity: Severity;
   cat: string;
   time: string;
+  /** ISO timestamp from the backend. */
+  createdAt: string;
   read: boolean;
 }
 
 export interface AuditLog {
-  id: number;
+  id: string;
+  /** Formatted for display; occurredAt is the ISO value. */
   time: string;
+  occurredAt: string;
+  /** Email of whoever acted, or "System". */
   user: string;
+  /** Customer, Staff or System. */
   role: string;
   action: string;
   resource: string;
+  detail: string;
   ip: string;
+  /** Success or Failed. */
   result: string;
 }
 
@@ -149,7 +168,6 @@ export const RECONCILE: ReconciliationRecord[] = [];
 
 export const NOTIFICATIONS: AppNotification[] = [];
 
-export const AUDIT_LOGS: AuditLog[] = [];
 
 export const CHART_DATA: ChartPoint[] = [];
 
@@ -157,10 +175,23 @@ export type NavGroup = 'Overview' | 'Operations' | 'System';
 
 export const NAV_GROUPS: NavGroup[] = ['Overview', 'Operations', 'System'];
 
-export const NAV: { id: Page; label: string; icon: string; group: NavGroup }[] = [
+export const NAV: {
+  id: Page;
+  label: string;
+  icon: string;
+  group: NavGroup;
+  /** Sub-items that open the same page with ?type=, shown indented under the parent. */
+  children?: { label: string; query: string }[];
+}[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', group: 'Overview' },
   { id: 'organisations', label: 'Organisations', icon: 'apartment', group: 'Operations' },
-  { id: 'users', label: 'Users', icon: 'group', group: 'Operations' },
+  {
+    id: 'users',
+    label: 'Customers',
+    icon: 'group',
+    group: 'Operations',
+    children: CUSTOMER_FILTERS.map(({ label, query }) => ({ label, query })),
+  },
   { id: 'bank-integrations', label: 'Bank Integrations', icon: 'account_balance', group: 'Operations' },
   { id: 'bank-accounts', label: 'Bank Accounts', icon: 'account_balance_wallet', group: 'Operations' },
   { id: 'transactions', label: 'Transactions', icon: 'swap_vert', group: 'Operations' },
@@ -191,8 +222,8 @@ export const PAGE_META: Record<Page, PageMeta> = {
   },
   users: {
     eyebrow: 'Operations',
-    title: 'Users',
-    subtitle: 'Access, roles and sign in activity for every user on the platform.',
+    title: 'Customers',
+    subtitle: 'Individuals and organisations on the platform: access, account type and sign in activity.',
   },
   'bank-integrations': {
     eyebrow: 'Operations',
@@ -239,7 +270,7 @@ export const PAGE_META: Record<Page, PageMeta> = {
 export const PAGE_LABELS: Record<Page, string> = {
   dashboard: 'Dashboard',
   organisations: 'Organisations',
-  users: 'Users',
+  users: 'Customers',
   'bank-integrations': 'Bank Integrations',
   'bank-accounts': 'Bank Accounts',
   transactions: 'Transactions',
@@ -256,7 +287,9 @@ export const NOTIFICATION_DESTINATIONS: Record<string, Page> = {
   Transaction: 'transactions',
   Organisation: 'organisations',
   User: 'users',
+  Customer: 'users',
   Security: 'audit-logs',
+  System: 'dashboard',
 };
 
 export const SEVERITY_COLORS: Record<Severity, string> = {

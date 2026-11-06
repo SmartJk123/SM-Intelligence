@@ -12,7 +12,9 @@ export class LoginPage {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
 
-  protected readonly step = signal<'login'>('login');
+  protected readonly step = signal<'login' | 'mfa'>('login');
+  protected readonly code = signal('');
+  private mfaToken = '';
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly error = signal('');
@@ -32,12 +34,44 @@ export class LoginPage {
     this.error.set('');
     this.loading.set(true);
     try {
-      await this.auth.login(email, this.password());
+      const mfaToken = await this.auth.login(email, this.password());
+      if (mfaToken) {
+        this.mfaToken = mfaToken;
+        this.password.set('');
+        this.step.set('mfa');
+        return;
+      }
       void this.router.navigate(['/admin', 'dashboard']);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Sign in failed. Please try again.');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected async submitCode(event: Event): Promise<void> {
+    event.preventDefault();
+    if (this.loading()) return;
+    if (!this.code().trim()) {
+      this.error.set('Enter the code from your authenticator app.');
+      return;
+    }
+    this.error.set('');
+    this.loading.set(true);
+    try {
+      await this.auth.verifyMfa(this.mfaToken, this.code());
+      void this.router.navigate(['/admin', 'dashboard']);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Verification failed. Please try again.');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  protected backToPassword(): void {
+    this.step.set('login');
+    this.code.set('');
+    this.mfaToken = '';
+    this.error.set('');
   }
 }

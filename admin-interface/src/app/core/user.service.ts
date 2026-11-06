@@ -45,6 +45,9 @@ export class UserService {
 
   readonly users = () => this.usersState().map(toAppUser);
 
+  /** The full records, for reports that need sign-up dates and verification. */
+  readonly summaries = this.usersState.asReadonly();
+
   /** The full record behind a table row, for the detail panel. */
   summary(id: string): UserSummary | undefined {
     return this.usersState().find((user) => user.id === id);
@@ -97,6 +100,8 @@ function toAppUser(user: UserSummary): AppUser {
           : 'Individual',
     status: user.status === 'SUSPENDED' ? 'Suspended' : 'Active',
     lastLogin: formatLastLogin(user.lastLoginAt),
+    accountType: user.accountType === 'ORGANIZATION' ? 'ORGANIZATION' : 'INDIVIDUAL',
+    isAdmin: user.role === 'PLATFORM_ADMIN',
   };
 }
 

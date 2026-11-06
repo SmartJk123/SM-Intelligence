@@ -129,7 +129,7 @@
         style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
       >
         @for (environment of environments; track environment) {
-          <option [value]="environment">{{ environment }}</option>
+          <option [value]="environment" [selected]="environment === settings().environment">{{ environment }}</option>
         }
       </select>
     </div>

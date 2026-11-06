@@ -119,14 +119,8 @@ Sections render conditionally from WorkspacePage.page.
           }
           @if (editing === 'accounts') {
             <p class="ws-muted">
-              Only the last four digits are retained by the mock API. Enter fictional account
-              details.
-            </p>
-          }
-          @if (editing === 'transactions') {
-            <p class="ws-muted">
-              Manual records do not update account balance snapshots. Cash flow uses posted
-              deposit-account records.
+              Only a fingerprint and the last four digits of the account number are stored. Payments
+              your bank reports for this account appear on your dashboard automatically.
             </p>
           }
           <div class="ws-actions">
@@ -209,17 +203,17 @@ Sections render conditionally from WorkspacePage.page.
           }
         </div>
         <p class="ws-muted">
-          Balance snapshots are independent of the date filter. No live bank connection is
-          established.
+          Balances update as your bank reports payments; the date filter does not change them.
         </p>
       }
       @case ('transactions') {
         <div class="ws-section-title">
           <h2>Transaction ledger</h2>
-          <button class="button" (click)="open('transactions')" [disabled]="!d.accounts.length">
-            + Add transaction
-          </button>
+          <span class="live-pill" [class.on]="live.status() === 'live'">{{ live.status() === 'live' ? 'Live' : 'Reconnecting…' }}</span>
         </div>
+        @if (!d.accounts.length) {
+          <p class="ws-notice">Add a bank account first. Its transactions appear here as your bank reports them.</p>
+        }
         <div class="ws-scope">
           <label
             >Search<input
@@ -255,7 +249,6 @@ Sections render conditionally from WorkspacePage.page.
                   <th>Account</th>
                   <th>Status</th>
                   <th>Amount (KES)</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -274,20 +267,11 @@ Sections render conditionally from WorkspacePage.page.
                       {{ t.direction === 'CREDIT' ? '+' : '−'
                       }}{{ t.amountMinor / 100 | currency: 'KES' : '' }}
                     </td>
-                    <td>
-                      <button
-                        class="ws-link"
-                        (click)="open('transactions', t)"
-                        [attr.aria-label]="'Edit ' + t.description"
-                      >
-                        Edit
-                      </button>
-                    </td>
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="6">
-                      No matching transactions. Try a wider date range or add a record.
+                    <td colspan="5">
+                      No matching transactions. Try a wider date range, another account or clear the search.
                     </td>
                   </tr>
                 }
@@ -609,6 +593,9 @@ Sections render conditionally from WorkspacePage.page.
           <label class="ws-inline-check"
             ><input type="checkbox" [(ngModel)]="unreadOnly" />Unread only</label
           >
+          <button class="button secondary" (click)="markAllRead()" [disabled]="!unreadIds.length || pending()">
+            Mark all as read
+          </button>
         </div>
         @for (a of visibleAlerts; track a.id) {
           <article class="ws-card ws-notification" [class.read]="a.read">
@@ -681,9 +668,96 @@ Sections render conditionally from WorkspacePage.page.
             </div>
           </dl>
           <p class="ws-muted">
-            Preferences control in-app alerts. Identity, password changes and email/SMS delivery
-            require backend integration.
+            Alert preferences decide which warnings appear under Notifications.
           </p>
+        </article>
+        <article class="ws-card">
+          <h2><span aria-hidden="true">🔒</span> Password</h2>
+          <form class="ws-form-grid" (submit)="$event.preventDefault(); changePassword()">
+            <label for="current-password">Current password
+              <input id="current-password" name="currentPassword" type="password" autocomplete="current-password"
+                [(ngModel)]="passwordForm.current" required /></label>
+            <label for="new-password">New password <small>(at least 8 characters)</small>
+              <input id="new-password" name="newPassword" type="password" autocomplete="new-password" minlength="8"
+                [(ngModel)]="passwordForm.next" required /></label>
+            <label for="confirm-password">Confirm new password
+              <input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password"
+                [(ngModel)]="passwordForm.confirm" required /></label>
+            <div class="ws-actions">
+              <button class="button" [disabled]="securityBusy()">{{ securityBusy() ? 'Saving…' : 'Change password' }}</button>
+            </div>
+          </form>
+          @if (passwordMessage()) { <p class="ws-notice" role="status">{{ passwordMessage() }}</p> }
+          <p class="ws-muted">Changing your password signs out your other devices. Forgot it?
+            <a class="ws-link" routerLink="/forgot-password">Reset it by email</a>.</p>
+        </article>
+        <article class="ws-card">
+          <div class="ws-section-title">
+            <div>
+              <h2><span aria-hidden="true">🛡️</span> Two-factor authentication</h2>
+              <p>Ask for a code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy) when you sign in.</p>
+            </div>
+            <span class="ws-tag">{{ security()?.mfaEnabled ? 'On' : 'Off' }}</span>
+          </div>
+          @if (!security()?.mfaEnabled && !mfaSetup()) {
+            <button class="button" (click)="startMfa()" [disabled]="securityBusy() || !security()">Set up authenticator app</button>
+          }
+          @if (mfaSetup(); as setup) {
+            <ol class="ws-steps">
+              <li>
+                @if (setup.qrDataUrl) {
+                  Scan this code with your authenticator app:
+                  <img class="ws-qr" [src]="setup.qrDataUrl" alt="QR code for your authenticator app" width="180" height="180" />
+                } @else {
+                  In your authenticator app choose "Enter a setup key" and type this key
+                  (or <a class="ws-link" [href]="setup.otpauthUri">open it in your authenticator app</a> on this phone):
+                }
+                <code class="ws-code">{{ setup.secret }}</code>
+              </li>
+              <li>Save these one-time recovery codes somewhere safe. Each works once if you lose your phone:
+                <code class="ws-code">{{ setup.backupCodes.join('  ') }}</code>
+              </li>
+              <li>
+                <form class="ws-inline-form" (submit)="$event.preventDefault(); enableMfa()">
+                  <label for="mfa-code">Enter the 6-digit code from the app
+                    <input id="mfa-code" name="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8"
+                      [(ngModel)]="mfaCode" required /></label>
+                  <button class="button" [disabled]="securityBusy()">Turn on</button>
+                  <button class="button secondary" type="button" (click)="mfaSetup.set(null)">Cancel</button>
+                </form>
+              </li>
+            </ol>
+          }
+          @if (security()?.mfaEnabled) {
+            <form class="ws-inline-form" (submit)="$event.preventDefault(); disableMfa()">
+              <label for="mfa-off-password">Password
+                <input id="mfa-off-password" name="mfaOffPassword" type="password" autocomplete="current-password"
+                  [(ngModel)]="mfaDisable.password" required /></label>
+              <label for="mfa-off-code">Code from the app
+                <input id="mfa-off-code" name="mfaOffCode" inputmode="numeric" autocomplete="one-time-code" maxlength="12"
+                  [(ngModel)]="mfaDisable.code" required /></label>
+              <button class="button secondary" [disabled]="securityBusy()">Turn off</button>
+            </form>
+          }
+          @if (mfaMessage()) { <p class="ws-notice" role="status">{{ mfaMessage() }}</p> }
+        </article>
+        <article class="ws-card">
+          <h2><span aria-hidden="true">💻</span> Signed-in devices</h2>
+          @for (s of security()?.sessions ?? []; track s.id) {
+            <div class="ws-session">
+              <div>
+                <strong>{{ s.device }}</strong>
+                <small>{{ s.ipAddress || 'Address unknown' }} · signed in {{ s.signedInAt | date: 'd MMM y, HH:mm' }}</small>
+              </div>
+              @if (s.current) {
+                <span class="ws-tag">This device</span>
+              } @else {
+                <button class="button secondary small" (click)="revokeSession(s.id)" [disabled]="securityBusy()">Sign out</button>
+              }
+            </div>
+          } @empty {
+            <p class="ws-muted">{{ security() ? 'No other devices are signed in.' : 'Loading your devices…' }}</p>
+          }
         </article>
         <article class="ws-card">
           <h2>Change history</h2>
@@ -692,7 +766,7 @@ Sections render conditionally from WorkspacePage.page.
           } @empty {
             <p>No saved changes yet.</p>
           }
-          <p class="ws-muted">Development activity history; not a production audit log.</p>
+          <p class="ws-muted">Changes made in this workspace, newest first.</p>
         </article>
       }
     }

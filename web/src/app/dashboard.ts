@@ -69,14 +69,14 @@ interface DashboardData {
             [attr.title]="live.status() === 'live' ? 'New payments appear here automatically' : 'Live updates are reconnecting'"
             >{{ live.status() === 'live' ? 'Live' : 'Reconnecting…' }}</span
           >
-          <button class="button secondary" (click)="exportCsv()" [disabled]="loading() || !data()"
+          <button class="button primary" (click)="exportCsv()" [disabled]="loading() || !data()"
             title="Download this overview as a CSV file">Export CSV</button>
           <button class="button secondary" (click)="load()" [disabled]="loading()">Refresh</button>
         </div>
       </header>
       <div class="dashboard-toolbar">
         <span>{{
-          api.kind() === 'organization' ? 'Company overview' : 'Personal overview'
+          api.kind() === 'organization' ? 'Organisation overview' : 'Personal overview'
         }}</span>
         <label class="overview-bank">Bank
           <select [value]="bank()" (change)="changeBank($any($event.target).value)" [disabled]="loading()">

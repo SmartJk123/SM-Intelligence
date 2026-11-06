@@ -1564,3 +1564,63 @@ html[data-theme='dark'] .workspace-shell .dashboard-metrics article { padding:18
   align-items: center;
   gap: 10px;
 }
+
+/* Profile and Settings: password, two-factor setup and signed-in devices. */
+.ws-steps {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 14px;
+  color: var(--ws-ink);
+}
+.ws-qr {
+  display: block;
+  margin: 10px 0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 6px;
+}
+.ws-code {
+  display: block;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--ws-soft);
+  border: 1px solid var(--ws-line);
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.ws-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+.ws-inline-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ws-muted);
+}
+.ws-session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ws-line);
+}
+.ws-session:last-of-type {
+  border-bottom: 0;
+}
+.ws-session div {
+  display: grid;
+  gap: 2px;
+}
+.ws-session small {
+  color: var(--ws-muted);
+}

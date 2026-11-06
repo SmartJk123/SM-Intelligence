@@ -2,7 +2,10 @@
 import { matchesNotification, NotificationItem } from './notification-filter';
 import { WorkspaceIcon } from './workspace-icon';
 import { FinanceChart, CategoryChart } from './finance-chart';
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, effect, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom, timeout } from 'rxjs';
+import { LiveUpdates } from './live-updates';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -24,6 +27,20 @@ type EditField = {
   options?: { value: string; label: string }[];
 };
 
+/** Two-factor status and signed-in devices, from GET /api/account/security. */
+interface AccountSecurity {
+  mfaEnabled: boolean;
+  emailVerified: boolean;
+  sessions: { id: string; device: string; ipAddress: string | null; signedInAt: string; current: boolean }[];
+}
+
+interface MfaSetup {
+  secret: string;
+  otpauthUri: string;
+  backupCodes: string[];
+  qrDataUrl: string | null;
+}
+
 @Component({
   imports: [CurrencyPipe, DatePipe, FormsModule, RouterLink, BankLogo, FinanceChart, CategoryChart, WorkspaceIcon],
   templateUrl: './workspace-page.html',
@@ -31,6 +48,24 @@ type EditField = {
 
 // Navigation metadata supplies the visible page title to avoid duplicating labels.
 export class WorkspacePage implements OnInit, OnDestroy {
+  private http = inject(HttpClient);
+  readonly live = inject(LiveUpdates);
+  readonly security = signal<AccountSecurity | null>(null);
+  readonly securityBusy = signal(false);
+  readonly passwordMessage = signal('');
+  readonly mfaMessage = signal('');
+  readonly mfaSetup = signal<MfaSetup | null>(null);
+  passwordForm = { current: '', next: '', confirm: '' };
+  mfaCode = '';
+  mfaDisable = { password: '', code: '' };
+
+  constructor() {
+    // A payment arriving while a page is open refreshes it in place.
+    effect(() => {
+      if (this.live.lastUpdate() === null) return;
+      void this.load(true);
+    });
+  }
   private api = inject(WorkspaceApi);
   private accountsApi = inject(AccountApi);
   private route = inject(ActivatedRoute);
@@ -65,6 +100,7 @@ export class WorkspacePage implements OnInit, OnDestroy {
       this.category = '';
       this.account = this.route.snapshot.queryParamMap.get('account') ?? '';
       void this.load();
+      if (this.page === 'settings') void this.loadSecurity();
     });
   }
   ngOnDestroy() {
@@ -88,17 +124,112 @@ export class WorkspacePage implements OnInit, OnDestroy {
       } as Record<string, string>
     )[this.page];
   }
-  async load() {
-    this.loading.set(true);
-    this.error.set('');
+  /** background: a live update; keeps the page on screen and keeps what is there if it fails. */
+  async load(background = false) {
+    if (background && (this.loading() || !this.data() || this.editing)) return;
+    if (!background) {
+      this.loading.set(true);
+      this.error.set('');
+    }
     try {
       this.data.set(await this.api.load());
-    } catch {
-      this.error.set('We couldn’t load this page. Check the account service and try again.');
+    } catch (e: any) {
+      if (background) return;
+      this.error.set(e?.error?.error ?? 'We couldn’t load this page. Check the account service and try again.');
       this.data.set(null);
     } finally {
-      this.loading.set(false);
+      if (!background) this.loading.set(false);
     }
+  }
+
+  get unreadIds() {
+    return this.notificationItems.filter((n) => !n.read).map((n) => n.id);
+  }
+
+  async markAllRead() {
+    if (this.unreadIds.length) await this.markRead(this.unreadIds);
+    this.live.markAllRead();
+  }
+
+  async loadSecurity() {
+    try {
+      this.security.set(await firstValueFrom(this.http.get<AccountSecurity>('/api/account/security').pipe(timeout(15000))));
+    } catch {
+      this.passwordMessage.set('Security settings could not be loaded. Please refresh.');
+    }
+  }
+
+  private async securityCall<T>(run: () => Promise<T>, onError: (message: string) => void): Promise<T | null> {
+    this.securityBusy.set(true);
+    try {
+      return await run();
+    } catch (e: any) {
+      onError(e?.error?.error ?? 'That did not work. Please try again.');
+      return null;
+    } finally {
+      this.securityBusy.set(false);
+    }
+  }
+
+  async changePassword() {
+    this.passwordMessage.set('');
+    const { current, next, confirm } = this.passwordForm;
+    if (!current || !next) return this.passwordMessage.set('Enter your current and new password.');
+    if (next.length < 8) return this.passwordMessage.set('The new password needs at least 8 characters.');
+    if (next !== confirm) return this.passwordMessage.set('The new passwords do not match.');
+    const done = await this.securityCall(
+      () => firstValueFrom(this.http.post('/api/account/password', { currentPassword: current, newPassword: next }).pipe(timeout(15000))),
+      (m) => this.passwordMessage.set(m),
+    );
+    if (done) {
+      this.passwordForm = { current: '', next: '', confirm: '' };
+      this.passwordMessage.set('Password changed. Your other devices have been signed out.');
+      await Promise.all([this.loadSecurity(), this.load(true)]);
+    }
+  }
+
+  async startMfa() {
+    this.mfaMessage.set('');
+    const setup = await this.securityCall(
+      () => firstValueFrom(this.http.post<MfaSetup>('/api/account/mfa/setup', {}).pipe(timeout(15000))),
+      (m) => this.mfaMessage.set(m),
+    );
+    if (setup) this.mfaSetup.set(setup);
+  }
+
+  async enableMfa() {
+    this.mfaMessage.set('');
+    const done = await this.securityCall(
+      () => firstValueFrom(this.http.post('/api/account/mfa/enable', { code: this.mfaCode }).pipe(timeout(15000))),
+      (m) => this.mfaMessage.set(m),
+    );
+    if (done) {
+      this.mfaSetup.set(null);
+      this.mfaCode = '';
+      this.mfaMessage.set('Two-factor authentication is on. You will be asked for a code each time you sign in.');
+      await this.loadSecurity();
+    }
+  }
+
+  async disableMfa() {
+    this.mfaMessage.set('');
+    const done = await this.securityCall(
+      () => firstValueFrom(this.http.post('/api/account/mfa/disable', this.mfaDisable).pipe(timeout(15000))),
+      (m) => this.mfaMessage.set(m),
+    );
+    if (done) {
+      this.mfaDisable = { password: '', code: '' };
+      this.mfaMessage.set('Two-factor authentication is off.');
+      await this.loadSecurity();
+    }
+  }
+
+  async revokeSession(id: string) {
+    const done = await this.securityCall(
+      () => firstValueFrom(this.http.delete('/api/account/sessions/' + id).pipe(timeout(15000))),
+      (m) => this.passwordMessage.set(m),
+    );
+    if (done !== null) await this.loadSecurity();
   }
   get validRange() {
     return !!this.start && !!this.end && this.start <= this.end;
