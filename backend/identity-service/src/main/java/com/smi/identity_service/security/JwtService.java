@@ -28,19 +28,41 @@ public class JwtService {
     }
 
     public String generateToken(User user) {
+        return generateToken(user, null);
+    }
+
+    /**
+     * An access token for one signed-in session. sessionId is the refresh token
+     * row behind it (claim "sid"): revoking that row ends this token too.
+     */
+    public String generateToken(User user, UUID sessionId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(user.getId().toString())
                 .claim("email", user.getEmailAddress())
                 .claim("accountType", user.getAccountType())
                 .claim("name", user.getName())
-                .claim("role", user.getRole())
+                .claim("role", user.getRole());
+        if (sessionId != null) {
+            builder.claim("sid", sessionId.toString());
+        }
+        return builder
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(signingKey)
                 .compact();
+    }
+
+    /** The session id of a token issued with one, or null. */
+    public UUID extractSessionId(String token) {
+        try {
+            String sid = extractAllClaims(token).get("sid", String.class);
+            return sid == null ? null : UUID.fromString(sid);
+        } catch (Exception error) {
+            return null;
+        }
     }
 
     public UUID extractUserId(String token) {

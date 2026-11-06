@@ -28,6 +28,11 @@ spring:
               uri: ${IDENTITY_SERVICE_URL:http://${IDENTITY_SERVICE_HOSTPORT:localhost:8081}}
               predicates:
                 - Path=/api/v1/admin/users/**
+            # Admin portal: audit log, notifications, email outbox, email templates, staff, roles and settings.
+            - id: identity-admin-activity
+              uri: ${IDENTITY_SERVICE_URL:http://${IDENTITY_SERVICE_HOSTPORT:localhost:8081}}
+              predicates:
+                - Path=/api/v1/admin/audit-events,/api/v1/admin/audit-events/**,/api/v1/admin/notifications,/api/v1/admin/notifications/**,/api/v1/admin/email-outbox,/api/v1/admin/email-outbox/**,/api/v1/admin/email-templates,/api/v1/admin/email-templates/**,/api/v1/admin/staff,/api/v1/admin/staff/**,/api/v1/admin/staff-roles,/api/v1/admin/staff-roles/**,/api/v1/admin/settings,/api/v1/admin/settings/**
             - id: accounts-service
               uri: ${ACCOUNTS_SERVICE_URL:http://${ACCOUNTS_SERVICE_HOSTPORT:localhost:8082}}
               predicates:
@@ -56,6 +61,10 @@ spring:
               uri: ${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
               predicates:
                 - Path=/api/v1/admin/demo/**
+            - id: bank-integration-admin-transactions
+              uri: ${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
+              predicates:
+                - Path=/api/v1/admin/transactions,/api/v1/admin/transactions/**
             - id: bank-integration-account-links
               uri: ${BANK_INTEGRATION_SERVICE_URL:http://${BANK_INTEGRATION_SERVICE_HOSTPORT:localhost:8090}}
               predicates:

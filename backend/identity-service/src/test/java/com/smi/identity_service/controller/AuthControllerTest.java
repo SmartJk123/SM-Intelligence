@@ -58,6 +58,18 @@ class AuthControllerTest {
     @Mock
     private MfaService mfaService;
 
+    @Mock
+    private com.smi.identity_service.service.EmailService emailService;
+
+    @Mock
+    private com.smi.identity_service.activity.ActivityLog activity;
+
+    @Mock
+    private com.smi.identity_service.settings.PlatformSettings settings;
+
+    @Mock
+    private com.smi.identity_service.security.AdminAccounts adminAccounts;
+
     @InjectMocks
     private AuthController authController;
 
@@ -76,7 +88,7 @@ class AuthControllerTest {
         mockUser.setAccountType("INDIVIDUAL");
 
         when(userService.registerUser(any(RegisterRequest.class))).thenReturn(mockUser);
-        when(jwtService.generateToken(mockUser)).thenReturn("mocked.jwt.token");
+        when(refreshTokenService.issue(mockUser)).thenReturn(new com.smi.identity_service.service.RefreshTokenService.Issued("mocked.jwt.token", "refresh-token", null));
         when(jwtService.getExpirationMs()).thenReturn(86400000L);
 
         RegisterRequest request = new RegisterRequest("Jane Doe", "jane@example.com", "password123", "+254712345678");
@@ -114,7 +126,7 @@ class AuthControllerTest {
         User mockUser = new User(userId, "Jane Doe", "jane@example.com", "hashed_pwd");
 
         when(userService.authenticate(any(LoginRequest.class))).thenReturn(mockUser);
-        when(jwtService.generateToken(mockUser)).thenReturn("login.jwt.token");
+        when(refreshTokenService.issue(mockUser)).thenReturn(new com.smi.identity_service.service.RefreshTokenService.Issued("login.jwt.token", "refresh-token", null));
         when(jwtService.getExpirationMs()).thenReturn(86400000L);
 
         LoginRequest request = new LoginRequest("jane@example.com", "password123");
@@ -175,7 +187,7 @@ class AuthControllerTest {
         mockUser.setAccountType("INDIVIDUAL");
 
         when(userService.registerUser(any(RegisterRequest.class))).thenReturn(mockUser);
-        when(jwtService.generateToken(mockUser)).thenReturn("mobile.jwt.token");
+        when(refreshTokenService.issue(mockUser)).thenReturn(new com.smi.identity_service.service.RefreshTokenService.Issued("mobile.jwt.token", "refresh-token", null));
         when(jwtService.getExpirationMs()).thenReturn(86400000L);
 
         String mobileJson = """
@@ -208,7 +220,7 @@ class AuthControllerTest {
         User mockUser = new User(userId, "Frank Mwangi", "frank@example.com", "+254712345678", "hashed_pwd");
 
         when(userService.authenticate(any(LoginRequest.class))).thenReturn(mockUser);
-        when(jwtService.generateToken(mockUser)).thenReturn("mobile.login.token");
+        when(refreshTokenService.issue(mockUser)).thenReturn(new com.smi.identity_service.service.RefreshTokenService.Issued("mobile.login.token", "refresh-token", null));
         when(jwtService.getExpirationMs()).thenReturn(86400000L);
 
         String mobileJson = """

@@ -1,5 +1,8 @@
 package com.smi.identity_service.health;
 
+import com.smi.identity_service.activity.ActivityLog;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import com.smi.identity_service.service.PasswordResetMailer;
 import java.time.Clock;
 import java.time.Duration;
@@ -103,6 +106,20 @@ public class ServiceHealthMonitor {
         return parsed;
     }
 
+    private ActivityLog activity;
+
+    /** Optional so the tests can build the monitor on its own. Alerts also appear on the admin bell. */
+    @Autowired(required = false)
+    public void setActivityLog(ActivityLog activity) {
+        this.activity = activity;
+    }
+
+    private void notifyAdmins(String severity, String title, String message) {
+        if (activity != null) {
+            activity.notifyAdmins("System", severity, title, message);
+        }
+    }
+
     @Scheduled(initialDelayString = "${app.health-monitor.initial-delay:PT2M}",
             fixedDelayString = "${app.health-monitor.interval:PT1M}")
     public void checkAll() {
@@ -119,7 +136,9 @@ public class ServiceHealthMonitor {
             if (state.alerting) {
                 Duration down = Duration.between(state.problemSince, now);
                 log.info("Health monitor: {} is healthy again after {}", name, readable(down));
-                email("RESOLVED: " + name + " is healthy again",
+                notifyAdmins("INFO", name + " is healthy again",
+                    "It had a problem for " + readable(down) + ". Last problem: " + state.lastProblem);
+            email("RESOLVED: " + name + " is healthy again",
                         name + " is healthy again.\n\n"
                                 + "It had a problem from " + EAST_AFRICA.format(state.problemSince)
                                 + " until " + EAST_AFRICA.format(now) + " (" + readable(down) + ").\n"
@@ -137,6 +156,7 @@ public class ServiceHealthMonitor {
             state.alerting = true;
             state.lastEmailAt = now;
             log.warn("Health monitor: {} has a problem: {}", name, result.problem());
+            notifyAdmins("CRITICAL", name + " is " + headline(result.problem()), result.problem());
             email("ALERT: " + name + " is " + headline(result.problem()), describe(name, url, state, now, false));
         } else if (state.alerting && !now.isBefore(state.lastEmailAt.plus(reminderInterval))) {
             state.lastEmailAt = now;
@@ -159,7 +179,29 @@ public class ServiceHealthMonitor {
                 + " while this lasts, and an email when it is resolved.\n";
     }
 
+    private com.smi.identity_service.settings.PlatformSettings settings;
+
+    /** Optional: Settings, Notifications can turn these emails off or send them elsewhere. */
+    @Autowired(required = false)
+    public void setSettings(com.smi.identity_service.settings.PlatformSettings settings) {
+        this.settings = settings;
+    }
+
     private void email(String subject, String body) {
+        List<String> to = recipients;
+        if (settings != null) {
+            if (!settings.flag("notifications", "emailServiceAlerts")) {
+                return;
+            }
+            var chosen = settings.list("notifications", "recipients");
+            if (!chosen.isEmpty()) {
+                to = List.copyOf(chosen);
+            }
+        }
+        sendTo(to, subject, body);
+    }
+
+    private void sendTo(List<String> recipients, String subject, String body) {
         for (String to : recipients) {
             mailer.send(to, "[SM-Intelligence] " + subject, body);
         }

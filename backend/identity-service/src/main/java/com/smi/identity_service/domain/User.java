@@ -91,6 +91,10 @@ public class User {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
+    /** The staff role of a PLATFORM_ADMIN. Null means full access. */
+    @Column(name = "staff_role_id")
+    private UUID staffRoleId;
+
     @Version
     @Column(name = "version", nullable = false)
     private Integer version = 0;
@@ -306,6 +310,14 @@ public class User {
 
     public void setLastLoginAt(OffsetDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    public UUID getStaffRoleId() {
+        return staffRoleId;
+    }
+
+    public void setStaffRoleId(UUID staffRoleId) {
+        this.staffRoleId = staffRoleId;
     }
 
     public Integer getVersion() {

@@ -2,6 +2,8 @@ package com.smi.identity_service.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.smi.identity_service.activity.ActivityLog;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
@@ -66,9 +68,18 @@ public class EmailVerificationMailer {
                 + "If you did not sign up for SM-Intelligence, you can safely ignore this email.\n");
     }
 
+    private ActivityLog activity;
+
+    /** Optional so the mailer can still be built on its own in tests. */
+    @Autowired(required = false)
+    public void setActivityLog(ActivityLog activity) {
+        this.activity = activity;
+    }
+
     public boolean send(String to, String subject, String text) {
         if (sender == null) {
             log.warn("SMTP_HOST is not set, so the email \"{}\" was not sent", subject);
+            record(to, subject, text, "NOT_CONFIGURED", "SMTP is not set up");
             return false;
         }
         SimpleMailMessage message = new SimpleMailMessage();
@@ -79,10 +90,19 @@ public class EmailVerificationMailer {
         try {
             sender.send(message);
             log.info("Sent the email \"{}\"", subject);
+            record(to, subject, text, "SENT", null);
             return true;
         } catch (MailException error) {
             log.warn("Could not send the email \"{}\": {}", subject, error.getMessage());
+            record(to, subject, text, "FAILED", error.getMessage());
             return false;
+        }
+    }
+
+    /** The outbox copy hides the token in the verification link (see ActivityLog.recordEmail). */
+    private void record(String to, String subject, String text, String status, String error) {
+        if (activity != null) {
+            activity.recordEmail(to, subject, text, "EMAIL_VERIFICATION", status, error);
         }
     }
 }
