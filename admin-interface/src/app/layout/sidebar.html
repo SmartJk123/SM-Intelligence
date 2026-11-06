@@ -23,7 +23,7 @@
 
   <!-- Navigation -->
   <nav class="flex-1 min-h-0 px-3.5 py-4 space-y-5 overflow-auto">
-    @for (group of navGroups; track group.name) {
+    @for (group of navGroups(); track group.name) {
       <div>
         <p class="px-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style="color: var(--text-3)">
           {{ group.name }}
@@ -48,7 +48,32 @@
                 [style.color]="isActive(item.id) ? '#fff' : '#fff'"
               >{{ unread() }}</span>
             }
+            @if (item.children) {
+              <button
+                type="button"
+                class="w-6 h-6 -mr-1 rounded-lg flex items-center justify-center transition-transform"
+                [style.transform]="isExpanded(item.id) ? 'rotate(180deg)' : 'none'"
+                [attr.aria-expanded]="isExpanded(item.id)"
+                [attr.aria-label]="(isExpanded(item.id) ? 'Hide ' : 'Show ') + item.label + ' types'"
+                (click)="toggle(item.id, $event)"
+              ><span class="icon icon-sm">expand_more</span></button>
+            }
           </a>
+          @if (item.children && isExpanded(item.id)) {
+            <div class="ml-7 mt-0.5 mb-1 pl-2.5 border-l space-y-0.5 animate-fade-in" style="border-color: var(--border)">
+              @for (child of item.children; track child.query) {
+                <a
+                  [routerLink]="['/admin', item.id]"
+                  [queryParams]="{ type: child.query }"
+                  class="block px-3 py-1.5 rounded-xl text-[12.5px] font-medium transition-all"
+                  [style.background]="isChildActive(item.id, child.query) ? 'var(--primary-soft)' : 'transparent'"
+                  [style.color]="isChildActive(item.id, child.query) ? 'var(--primary-ink)' : 'var(--text-2)'"
+                  [attr.aria-current]="isChildActive(item.id, child.query) ? 'page' : null"
+                  (click)="closed.emit()"
+                >{{ child.label }}</a>
+              }
+            </div>
+          }
         }
       </div>
     }
