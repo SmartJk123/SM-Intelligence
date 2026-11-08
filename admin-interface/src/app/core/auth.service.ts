@@ -26,6 +26,9 @@ interface LoginResponse {
   role?: string;
   name?: string;
   emailAddress?: string;
+  /** True when the account has two-factor authentication: send mfaToken and the code to verifyMfa. */
+  mfaRequired?: boolean;
+  mfaToken?: string;
 }
 
 /**
@@ -61,8 +64,12 @@ export class AuthService {
     return false;
   };
 
-  /** @throws Error with a message safe to show the operator. */
-  async login(email: string, password: string): Promise<void> {
+  /**
+   * Signs in. With two-factor authentication on, resolves to the MFA token to
+   * send with the authenticator code (verifyMfa) instead of signing in.
+   * @throws Error with a message safe to show the operator.
+   */
+  async login(email: string, password: string): Promise<string | void> {
     let response: LoginResponse;
     try {
       response = await firstValueFrom(
@@ -76,10 +83,38 @@ export class AuthService {
         throw new Error('Incorrect email address or password.');
       }
       if (error instanceof HttpErrorResponse && error.status === 403) {
-        throw new Error('This account has been suspended. Contact support to restore access.');
+        throw new Error(error.error?.code === 'DOMAIN_NOT_ALLOWED'
+          ? 'Staff sign in is limited to approved email domains (Settings, Security).'
+          : 'This account has been suspended. Contact support to restore access.');
+      }
+      if (error instanceof HttpErrorResponse && error.status === 429) {
+        throw new Error(error.error?.message ?? 'Too many failed attempts. Wait a few minutes and try again.');
       }
       throw new Error('Could not reach the identity service. Confirm it is running and try again.');
     }
+    if (response.mfaRequired && response.mfaToken) {
+      return response.mfaToken;
+    }
+    this.accept(response);
+  }
+
+  /** Completes a two-factor sign in with the code from the authenticator app or a recovery code. */
+  async verifyMfa(mfaToken: string, code: string): Promise<void> {
+    let response: LoginResponse;
+    try {
+      response = await firstValueFrom(
+        this.http.post<LoginResponse>(`${IDENTITY_AUTH_BASE_URL}/mfa/verify`, { mfaToken, code: code.replace(/\s/g, '') }),
+      );
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && (error.status === 401 || error.status === 400)) {
+        throw new Error('That code is not correct, or the sign in took too long. Check the time on your phone and try again.');
+      }
+      throw new Error('Could not reach the identity service. Confirm it is running and try again.');
+    }
+    this.accept(response);
+  }
+
+  private accept(response: LoginResponse): void {
     if (response.role !== 'PLATFORM_ADMIN') {
       throw new Error('This account is not an administrator of this platform.');
     }
@@ -95,6 +130,13 @@ export class AuthService {
   }
 
   logout(): void {
+    const token = this.tokenState();
+    if (token) {
+      // Ends this session at identity-service too, so it leaves the list of signed-in devices.
+      this.http
+        .post(`${IDENTITY_AUTH_BASE_URL}/logout`, null, { headers: { Authorization: `Bearer ${token}` } })
+        .subscribe({ error: () => undefined });
+    }
     this.tokenState.set(null);
     try {
       sessionStorage.removeItem(TOKEN_STORAGE_KEY);

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { AUDIT_LOGS, AuditLog } from '../../core/data';
+import { AuditService } from '../../core/audit.service';
+import { AuditLog } from '../../core/data';
 import { CsvExportService } from '../../core/csv-export.service';
 import { ToastService } from '../../core/toast.service';
 import { ActionMenu, ActionMenuItem } from '../../shared/action-menu';
@@ -7,8 +8,13 @@ import { Badge } from '../../shared/badge';
 import { KpiCard } from '../../shared/kpi-card';
 import { SurfaceCard } from '../../shared/surface-card';
 
-const EXPORT_HEADERS = ['Timestamp', 'User', 'Role', 'Action', 'Resource', 'IP', 'Result'];
+const EXPORT_HEADERS = ['Timestamp', 'Who', 'Type', 'Action', 'Resource', 'Detail', 'IP', 'Result'];
 
+/**
+ * The platform audit trail: every sign up, sign in (and failed attempt), sign out
+ * and password reset by customers, and every change staff make. Read from
+ * identity-service; the newest 500 entries are shown.
+ */
 @Component({
   selector: 'app-audit-logs',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -19,50 +25,59 @@ const EXPORT_HEADERS = ['Timestamp', 'User', 'Role', 'Action', 'Resource', 'IP',
 export class AuditLogs {
   private readonly csv = inject(CsvExportService);
   private readonly toasts = inject(ToastService);
+  protected readonly audit = inject(AuditService);
 
-  protected readonly logs = AUDIT_LOGS;
   protected readonly resultFilters = ['All', 'Success', 'Failed'];
+  protected readonly actorFilters = ['Everyone', 'Customers', 'Staff', 'System'];
 
   protected readonly query = signal('');
   protected readonly resultFilter = signal('All');
+  protected readonly actorFilter = signal('Everyone');
 
-  protected readonly total = AUDIT_LOGS.length;
-  protected readonly successCount = AUDIT_LOGS.filter((log) => log.result === 'Success').length;
-  protected readonly failedCount = AUDIT_LOGS.filter((log) => log.result !== 'Success').length;
-  protected readonly actorCount = new Set(AUDIT_LOGS.map((log) => log.user)).size;
+  private readonly logs = this.audit.logs;
+  protected readonly total = computed(() => this.logs().length);
+  protected readonly successCount = computed(() => this.logs().filter((log) => log.result === 'Success').length);
+  protected readonly failedCount = computed(() => this.logs().filter((log) => log.result !== 'Success').length);
+  protected readonly signInsToday = computed(() => {
+    const today = new Date().toDateString();
+    return this.logs().filter((log) => log.action === 'Signed in' && new Date(log.occurredAt).toDateString() === today)
+      .length;
+  });
 
   protected readonly filtered = computed<AuditLog[]>(() => {
     const term = this.query().trim().toLowerCase();
     const result = this.resultFilter();
-    return AUDIT_LOGS.filter((log) => {
+    const actor = this.actorFilter();
+    const role = actor === 'Customers' ? 'Customer' : actor;
+    return this.logs().filter((log) => {
       const matchesResult = result === 'All' || log.result === result;
+      const matchesActor = actor === 'Everyone' || log.role === role;
       const matchesTerm =
         term.length === 0 ||
         log.user.toLowerCase().includes(term) ||
         log.action.toLowerCase().includes(term) ||
         log.resource.toLowerCase().includes(term) ||
+        log.detail.toLowerCase().includes(term) ||
         log.ip.includes(term);
-      return matchesResult && matchesTerm;
+      return matchesResult && matchesActor && matchesTerm;
     });
   });
 
   protected readonly rowMenu: ActionMenuItem[] = [
     { id: 'view', label: 'View entry' },
-    { id: 'copy', label: 'Copy resource id' },
-    { id: 'actor', label: 'Filter by this actor' },
-    { id: 'flag', label: 'Flag as suspicious', tone: 'danger' },
+    { id: 'copy', label: 'Copy resource' },
+    { id: 'actor', label: 'Filter by this person' },
   ];
 
-  protected readonly headings = [
-    'Timestamp',
-    'User',
-    'Role',
-    'Action',
-    'Resource',
-    'IP',
-    'Result',
-    'Action',
-  ];
+  protected readonly headings = ['Timestamp', 'Who', 'Type', 'Action', 'Resource', 'IP', 'Result', ''];
+
+  constructor() {
+    void this.audit.load();
+  }
+
+  protected refresh(): void {
+    void this.audit.load().then(() => this.toasts.show('Audit log refreshed', 'info', 'Entries reloaded from identity-service.'));
+  }
 
   protected onSearch(value: string): void {
     this.query.set(value);
@@ -70,6 +85,12 @@ export class AuditLogs {
 
   protected applyCardAction(action: string): void {
     this.query.set('');
+    this.actorFilter.set('Everyone');
+    if (action === 'signins') {
+      this.resultFilter.set('All');
+      this.query.set('signed in');
+      return;
+    }
     this.resultFilter.set(action === 'all' ? 'All' : action);
   }
 
@@ -82,7 +103,7 @@ export class AuditLogs {
     this.csv.download(
       `smartmoney-audit-log-${this.csv.stamp()}.csv`,
       EXPORT_HEADERS,
-      rows.map((log) => [log.time, log.user, log.role, log.action, log.resource, log.ip, log.result]),
+      rows.map((log) => [log.occurredAt, log.user, log.role, log.action, log.resource, log.detail, log.ip, log.result]),
     );
     this.toasts.show(
       'Export ready',
@@ -94,18 +115,16 @@ export class AuditLogs {
   protected onRowAction(action: string, log: AuditLog): void {
     switch (action) {
       case 'copy':
-        void this.copyText(log.resource, 'Resource id copied');
+        void this.copyText(log.resource, 'Resource copied');
         break;
       case 'actor':
         this.resultFilter.set('All');
+        this.actorFilter.set('Everyone');
         this.query.set(log.user);
-        this.toasts.show('Filtered by actor', 'info', `Showing activity for ${log.user}.`);
-        break;
-      case 'flag':
-        this.toasts.show('Flagged for review', 'warning', `${log.action} by ${log.user} was flagged.`);
+        this.toasts.show('Filtered by person', 'info', `Showing activity for ${log.user}.`);
         break;
       default:
-        this.toasts.show('Audit entry', 'info', `${log.action} by ${log.user} at ${log.time}`);
+        this.toasts.show(log.action, 'info', `${log.user} at ${log.time}${log.detail ? '. ' + log.detail : ''}`);
     }
   }
 

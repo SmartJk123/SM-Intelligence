@@ -51,6 +51,11 @@ const PILL_STYLES: Record<string, PillStyle> = {
   Processed: GREEN,
   Success: GREEN,
   Reconciled: GREEN,
+  Sent: GREEN,
+  Delivered: GREEN,
+  'Not linked': NEUTRAL,
+  Customised: VIOLET,
+  'Not sent': GOLD,
 
   WARNING: GOLD,
   Warning: GOLD,

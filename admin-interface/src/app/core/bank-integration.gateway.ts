@@ -221,10 +221,34 @@ export interface PlatformStats {
  * latency or notification counts is worse than one that says the service is
  * unreachable, so a backend problem surfaces as a backend problem.
  */
+/** One transaction a bank reported (GET /api/v1/admin/transactions). */
+export interface AdminTransaction {
+  id: number;
+  bankId: string;
+  reference: string | null;
+  amount: number;
+  currency: string;
+  direction: 'CREDIT' | 'DEBIT' | null;
+  narration: string | null;
+  counterpartyName: string | null;
+  accountMasked: string | null;
+  /** identity-service id of the customer whose linked account this is. */
+  customerId: string | null;
+  accountName: string | null;
+  bookingDate: string | null;
+  receivedAt: string;
+  /** DELIVERED, PENDING, UNLINKED (no customer has this account) or FAILED. */
+  delivery: string;
+  deliveryError: string | null;
+  simulated: boolean;
+}
+
 export interface BankIntegrationGateway {
   testConnection(settings: BankConnectionSettings): Promise<ConnectionTestResult>;
   loadHealth(): Promise<BankHealth[]>;
   loadSettings(bankId: string): Promise<BankConnectionSettings>;
+  /** The last stored connection test, or null when the bank was never tested. */
+  loadLatestTest(bankId: string): Promise<ConnectionTestResult | null>;
   saveSettings(settings: BankConnectionSettings): Promise<BankConnectionSettings>;
   registerCallback(bankId: string): Promise<CallbackRegistration[]>;
   loadCredentials(bankId: string): Promise<CredentialStatus | null>;
@@ -232,6 +256,8 @@ export interface BankIntegrationGateway {
   loadPublicBaseUrl(): Promise<PlatformBaseUrlInfo | null>;
   updatePublicBaseUrl(publicBaseUrl: string): Promise<PlatformBaseUrlInfo>;
   loadStats(): Promise<PlatformStats | null>;
+  /** Every transaction the banks reported, newest first. */
+  loadTransactions(limit: number, includeDemo: boolean): Promise<AdminTransaction[]>;
   /** The demonstration account, or null when the backend is unreachable. */
   loadDemoSummary(): Promise<DemoSummary | null>;
   loadDemoMovements(): Promise<DemoMovement[]>;
