@@ -51,15 +51,78 @@ public class RefreshTokenService {
      * and returns the plaintext token to the client.
      */
     public String createRefreshToken(User user) {
+        return newSession(user, RequestDevice.current()).rawToken();
+    }
+
+    /** A new signed-in session: an access token tied to a refresh token row (its session id). */
+    public record Issued(String accessToken, String refreshToken, UUID sessionId) {
+    }
+
+    public Issued issue(User user) {
+        return issue(user, RequestDevice.current());
+    }
+
+    /** As issue(user), recording the given device (a refresh keeps the device of the session it replaces). */
+    public Issued issue(User user, RequestDevice device) {
+        Session session = newSession(user, device);
+        return new Issued(jwtService.generateToken(user, session.id()), session.rawToken(), session.id());
+    }
+
+    private record Session(String rawToken, UUID id) {
+    }
+
+    /** Stores the session with the browser and address of the request that signed in. */
+    private Session newSession(User user, RequestDevice device) {
         byte[] secret = new byte[32];
         random.nextBytes(secret);
         String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
-
         OffsetDateTime expiresAt = OffsetDateTime.now().plusDays(refreshExpirationDays);
         RefreshToken entity = new RefreshToken(user.getId(), hash(rawToken), expiresAt);
-        refreshTokenRepository.save(entity);
+        entity.setUserAgent(device.userAgent());
+        entity.setIpAddress(device.ipAddress());
+        RefreshToken saved = refreshTokenRepository.save(entity);
+        return new Session(rawToken, saved.getId());
+    }
 
-        return rawToken;
+    /** The user's sessions that are still usable, newest first. */
+    @Transactional(readOnly = true)
+    public java.util.List<RefreshToken> activeSessions(UUID userId) {
+        OffsetDateTime now = OffsetDateTime.now();
+        return refreshTokenRepository.findByUserIdAndRevokedAtIsNull(userId).stream()
+                .filter(token -> token.isUsable(now))
+                .sorted(java.util.Comparator.comparing(RefreshToken::getCreatedAt).reversed())
+                .toList();
+    }
+
+    /** Ends one of the user's sessions. False when it is not theirs or already ended. */
+    public boolean revokeSession(UUID userId, UUID sessionId) {
+        return refreshTokenRepository.findById(sessionId)
+                .filter(token -> token.getUserId().equals(userId) && token.getRevokedAt() == null)
+                .map(token -> {
+                    token.setRevokedAt(OffsetDateTime.now());
+                    refreshTokenRepository.save(token);
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    /** Ends every session of the user except keep (the one making the request), when given. */
+    public void revokeAllExcept(UUID userId, UUID keep) {
+        OffsetDateTime now = OffsetDateTime.now();
+        refreshTokenRepository.findByUserIdAndRevokedAtIsNull(userId).stream()
+                .filter(token -> !token.getId().equals(keep))
+                .forEach(token -> {
+                    token.setRevokedAt(now);
+                    refreshTokenRepository.save(token);
+                });
+    }
+
+    /** False when the session behind a token was revoked or has expired. */
+    @Transactional(readOnly = true)
+    public boolean isSessionActive(UUID sessionId) {
+        return refreshTokenRepository.findById(sessionId)
+                .map(token -> token.getRevokedAt() == null)
+                .orElse(false);
     }
 
     /**
@@ -93,8 +156,12 @@ public class RefreshTokenService {
         refreshTokenRepository.save(token);
 
         // Generate new access token and new rotated refresh token
-        String newAccessToken = jwtService.generateToken(user);
-        String newRefreshToken = createRefreshToken(user);
+        RequestDevice current = RequestDevice.current();
+        Issued issued = issue(user, new RequestDevice(
+                current.userAgent() != null ? current.userAgent() : token.getUserAgent(),
+                current.ipAddress() != null ? current.ipAddress() : token.getIpAddress()));
+        String newAccessToken = issued.accessToken();
+        String newRefreshToken = issued.refreshToken();
 
         return new AuthResponse(
                 newAccessToken,

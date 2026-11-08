@@ -1,5 +1,8 @@
 package com.smi.identity_service.service;
 
+import com.smi.identity_service.activity.ActivityLog;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import com.smi.identity_service.domain.Organization;
 import com.smi.identity_service.domain.OrganizationMember;
 import com.smi.identity_service.domain.User;
@@ -48,6 +51,20 @@ public class OrganizationInviteService {
         this.passwordResets = passwordResets;
     }
 
+    private ActivityLog activity;
+
+    /** Optional so the unit tests can build the service with mocks only. */
+    @Autowired(required = false)
+    public void setActivityLog(ActivityLog activity) {
+        this.activity = activity;
+    }
+
+    private void audit(String action, String targetType, String targetId, String label, String detail) {
+        if (activity != null) {
+            activity.audit(activity.currentActor(), action, targetType, targetId, label, detail, ActivityLog.SUCCESS);
+        }
+    }
+
     public OrganizationResponse createOrganizationWithOwner(CreateOrganizationRequest request) {
         boolean hasOwnerName = request.getOwnerName() != null && !request.getOwnerName().isBlank();
         boolean hasOwnerEmail = request.getOwnerEmail() != null && !request.getOwnerEmail().isBlank();
@@ -58,6 +75,9 @@ public class OrganizationInviteService {
 
         Organization organization = organizationService.createOrganizationRow(
                 request.getOrganizationName(), request.getBusinessType());
+
+        audit("ORGANISATION_CREATED", "ORGANISATION", organization.getId().toString(), organization.getName(),
+                hasOwnerEmail ? "Owner: " + request.getOwnerEmail() : "No owner yet");
 
         if (!hasOwnerEmail) {
             // Saved on its own. No account is created and no email is sent, so emailSent is
@@ -104,6 +124,8 @@ public class OrganizationInviteService {
         }
 
         OrganizationMember member = organizationService.addMember(organizationId, user, request.getRole(), null);
+        audit("MEMBER_INVITED", "USER", user.getId().toString(), user.getEmailAddress(),
+                request.getRole() + " of " + organization.getName() + (emailSent ? ", email sent" : ", email not sent"));
         return OrganizationMemberResponse.fromMember(member, emailSent);
     }
 

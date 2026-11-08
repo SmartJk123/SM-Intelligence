@@ -72,6 +72,46 @@ Admins can also send any user a password reset email from Users, then "Send pass
 If email is down, `backend/identity-service/set-password.ps1 -Email <address>` sets a local
 account's password directly (needs PHP and psql).
 
+### Admin activity: audit log, notifications, outbox and templates
+
+identity-service records an audit trail (`audit_events`), notifications for the admin bell
+(`admin_notifications`), a copy of every email it sends (`email_outbox`) and administrators' edits to
+the email templates (`email_templates`), all created by Flyway migration `V8__admin_activity.sql`.
+
+- Audited: sign up, sign in, failed and blocked sign ins, sign out, password reset requested and
+  completed, customer added, suspended, restored and edited, organisation created, member invited,
+  email template edited or reset. Each entry names who (customer, staff or system) and the IP.
+- Notified: new sign up, a customer's first sign in, an administrator signing in, a suspended account
+  trying to sign in, and the health monitor's alerts and recoveries.
+- Emailed: a welcome email after every sign up, and a temporary password plus a set-password link when
+  an admin adds a customer (`POST /api/v1/admin/users`). The outbox stores links and temporary
+  passwords as `[hidden]`.
+- Admin API (PLATFORM_ADMIN only, routed by api-gateway): `GET /api/v1/admin/audit-events`,
+  `GET /api/v1/admin/notifications`, `POST .../notifications/{id}/read`, `POST .../notifications/read-all`,
+  `GET /api/v1/admin/email-outbox`, `GET /api/v1/admin/email-templates`, `PUT .../email-templates/{key}`,
+  `POST .../email-templates/{key}/reset`.
+
+### Staff roles, settings and sessions
+
+identity-service migration `V9__staff_settings_sessions.sql` adds staff roles, saved admin settings and the
+device behind each session.
+
+- Staff: `GET /api/v1/admin/staff/me` (the caller's permissions), `GET|POST /api/v1/admin/staff`,
+  `PATCH|DELETE /api/v1/admin/staff/{id}`, `GET|POST /api/v1/admin/staff-roles`,
+  `PUT|DELETE /api/v1/admin/staff-roles/{id}`. ADMIN_EMAILS administrators (and admins without a role)
+  have full access. A role's permissions are admin page areas (`StaffPermissions`); identity-service
+  refuses its own admin endpoints outside them (`StaffAccessInterceptor`). bank-integration-service only
+  checks for an admin token, so a role does not limit the bank screens' API.
+- Settings: `GET /api/v1/admin/settings`, `GET|PUT /api/v1/admin/settings/{general|security|notifications|system}`.
+  Applied: failed sign-in lockout, staff email domains, maintenance mode (customers only), audit retention
+  (nightly), which admin notifications are emailed and to whom, and whether outage emails go out.
+- Sessions: each sign in is a refresh-token row with its User-Agent and address; the access token carries
+  its id (`sid`). `GET /api/auth/sessions`, `DELETE /api/auth/sessions/{id}`. Sign out ends only that
+  device; a password change signs out every other device. A revoked session's token stops working at once
+  in identity-service.
+- bank-integration-service `GET /api/v1/admin/transactions` lists bank-reported transactions with the
+  linked customer and whether each reached their dashboard.
+
 ### Forgot password emails
 
 The web sign-in page links to `/forgot-password`. identity-service then emails a one-time link to `/reset-password?token=...` that expires after 60 minutes. Only a SHA-256 hash of each token is stored (`password_reset_tokens`, migration V4). The request always answers the same way, so it never reveals whether an address has an account.

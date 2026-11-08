@@ -38,6 +38,13 @@ public class RefreshToken {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
+    /** The browser or app that signed in, as its User-Agent header said. */
+    @Column(name = "user_agent", length = 1000)
+    private String userAgent;
+
+    @Column(name = "ip_address")
+    private String ipAddress;
+
     protected RefreshToken() {
     }
 
@@ -74,6 +81,22 @@ public class RefreshToken {
 
     public void setRevokedAt(OffsetDateTime revokedAt) {
         this.revokedAt = revokedAt;
+    }
+
+    public String getUserAgent() {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent) {
+        this.userAgent = userAgent;
+    }
+
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
+    public void setIpAddress(String ipAddress) {
+        this.ipAddress = ipAddress;
     }
 
     public OffsetDateTime getCreatedAt() {

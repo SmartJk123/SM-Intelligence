@@ -53,12 +53,20 @@ public class BankIntegrationHealthService {
                 .map(WebhookEventEntity::getReceivedAt)
                 .orElse(null);
 
-        Instant lastTest = tests.latestFor(bankId).map(BankConnectionTest::testedAt).orElse(null);
-        Integer latency = tests.latestFor(bankId).map(test -> (int) test.latencyMs()).orElse(null);
+        BankConnectionTest latestTest = tests.latestFor(bankId).orElse(null);
+        Instant lastTest = latestTest == null ? null : latestTest.testedAt();
+        Integer latency = latestTest == null ? null : (int) latestTest.latencyMs();
 
         TokenSnapshot token = connector instanceof TokenStateProvider provider
                 ? provider.tokenSnapshot()
                 : TokenSnapshot.unknown();
+        // A token is only held in memory, so after a restart it reads as unknown even
+        // though the stored test proves the credentials work. Report the test instead,
+        // so the screen after signing in again matches the screen after the test.
+        if (token.status() == TokenStatus.UNKNOWN && latestTest != null
+                && stepStatus(latestTest, StepKey.TOKEN) == StepStatus.OK) {
+            token = new TokenSnapshot(TokenStatus.VALID, null, latestTest.testedAt());
+        }
 
         long failures = webhookEvents.countByBankIdAndProcessingStatusAndReceivedAtAfterAndSimulatedFalse(
                 bankId, "FAILED", Instant.now().minus(Duration.ofHours(24)));
@@ -73,7 +81,7 @@ public class BankIntegrationHealthService {
                 bankId,
                 settings.environment(),
                 apiStatus(bankId, connector),
-                webhookStatus(lastWebhook),
+                webhookStatus(lastWebhook, latestTest),
                 token.status(),
                 token.expiresInMinutes(),
                 token.refreshedAt(),
@@ -96,6 +104,14 @@ public class BankIntegrationHealthService {
                 .orElse(IntegrationStatus.PENDING);
     }
 
+    private static StepStatus stepStatus(BankConnectionTest test, StepKey key) {
+        return test.steps().stream()
+                .filter(step -> step.key() == key)
+                .map(ConnectionStep::status)
+                .findFirst()
+                .orElse(null);
+    }
+
     private IntegrationStatus statusFromSteps(List<ConnectionStep> steps) {
         boolean tokenFailed = steps.stream()
                 .anyMatch(step -> step.key() == StepKey.TOKEN && step.status() == StepStatus.FAIL);
@@ -110,9 +126,18 @@ public class BankIntegrationHealthService {
         return accountWarned ? IntegrationStatus.WARNING : IntegrationStatus.HEALTHY;
     }
 
-    private IntegrationStatus webhookStatus(Instant lastWebhook) {
+    private IntegrationStatus webhookStatus(Instant lastWebhook, BankConnectionTest latestTest) {
         if (lastWebhook == null) {
-            return IntegrationStatus.PENDING;
+            // Nothing received yet: the stored test's registration step is the best evidence,
+            // which is also what the screen showed right after that test.
+            StepStatus registration = latestTest == null ? null : stepStatus(latestTest, StepKey.WEBHOOK_REGISTRATION);
+            if (registration == StepStatus.OK) {
+                return IntegrationStatus.HEALTHY;
+            }
+            if (registration == StepStatus.WARN) {
+                return IntegrationStatus.WARNING;
+            }
+            return registration == StepStatus.FAIL ? IntegrationStatus.ERROR : IntegrationStatus.PENDING;
         }
         Duration age = Duration.between(lastWebhook, Instant.now());
         if (age.compareTo(HEALTHY_WINDOW) <= 0) {
