@@ -1,5 +1,7 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -353,27 +355,32 @@ async function sendWorkspace(send, call, callBudgets, callInvestments, session, 
 
 // Loopback development adapter. JWTs stay here; the browser receives an HttpOnly session cookie.
 export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
+  // Backends may use plain HTTP only on loopback, or on hosts named explicitly in
+  // ALLOW_HTTP_BACKEND_HOSTS (comma separated), such as a test VM without a
+  // certificate. Credentials then travel unencrypted to that host.
+  const plainHttpHosts = new Set(['localhost', '127.0.0.1', '[::1]',
+    ...(process.env.ALLOW_HTTP_BACKEND_HOSTS || '').split(',').map((host) => host.trim()).filter(Boolean)]);
   const backend = new URL(options.identityUrl || process.env.IDENTITY_SERVICE_URL || process.env.IDENTITY_API_URL || 'http://localhost:8080');
   const invoiceBackend = new URL(options.invoiceUrl || process.env.INVOICE_SERVICE_URL || process.env.INVOICE_API_URL || backend);
   const accountsBackend = new URL(options.accountsUrl || process.env.ACCOUNTS_SERVICE_URL || process.env.ACCOUNTS_API_URL || backend);
-  if (accountsBackend.protocol !== 'https:' && !(accountsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(accountsBackend.hostname)))
+  if (accountsBackend.protocol !== 'https:' && !(accountsBackend.protocol === 'http:' && plainHttpHosts.has(accountsBackend.hostname)))
     throw new Error('Accounts API requires HTTPS, except on loopback.');
   // Where a newly created account is registered so a matching bank notification
   // (by bank + account number) reaches this customer's dashboard. Best-effort:
   // the account is already saved by the time this is called, so a failure here
   // is logged and swallowed rather than failing the account creation itself.
   const bankIntegrationBackend = new URL(options.bankIntegrationUrl || process.env.BANK_INTEGRATION_SERVICE_URL || process.env.BANK_INTEGRATION_API_URL || 'http://localhost:8090');
-  if (bankIntegrationBackend.protocol !== 'https:' && !(bankIntegrationBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(bankIntegrationBackend.hostname)))
+  if (bankIntegrationBackend.protocol !== 'https:' && !(bankIntegrationBackend.protocol === 'http:' && plainHttpHosts.has(bankIntegrationBackend.hostname)))
     throw new Error('Bank integration API requires HTTPS, except on loopback.');
   const budgetsBackend = new URL(options.budgetsUrl || process.env.BUDGETS_SERVICE_URL || process.env.BUDGETS_API_URL || 'http://localhost:8085');
   const investmentsBackend = new URL(options.investmentsUrl || process.env.INVESTMENTS_SERVICE_URL || process.env.INVESTMENTS_API_URL || 'http://localhost:8086');
-  if (investmentsBackend.protocol !== 'https:' && !(investmentsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(investmentsBackend.hostname)))
+  if (investmentsBackend.protocol !== 'https:' && !(investmentsBackend.protocol === 'http:' && plainHttpHosts.has(investmentsBackend.hostname)))
     throw new Error('Investments API requires HTTPS, except on loopback.');
-  if (budgetsBackend.protocol !== 'https:' && !(budgetsBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(budgetsBackend.hostname)))
+  if (budgetsBackend.protocol !== 'https:' && !(budgetsBackend.protocol === 'http:' && plainHttpHosts.has(budgetsBackend.hostname)))
     throw new Error('Budgets API requires HTTPS, except on loopback.');
-  if (invoiceBackend.protocol !== 'https:' && !(invoiceBackend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(invoiceBackend.hostname)))
+  if (invoiceBackend.protocol !== 'https:' && !(invoiceBackend.protocol === 'http:' && plainHttpHosts.has(invoiceBackend.hostname)))
     throw new Error('Invoice API requires HTTPS, except on loopback.');
-  if (backend.protocol !== 'https:' && !(backend.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(backend.hostname)))
+  if (backend.protocol !== 'https:' && !(backend.protocol === 'http:' && plainHttpHosts.has(backend.hostname)))
     throw new Error('Identity API requires HTTPS, except on loopback.');
   const requestBackend = options.fetchAuth || fetch;
   const sessions = new Map();
@@ -390,12 +397,41 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   const call = (route, init) => requestBackend(new URL(route, backend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
   const callBudgets = (route, init) => requestBackend(new URL(route, budgetsBackend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
   const callInvestments = (route, init) => requestBackend(new URL(route, investmentsBackend), { ...init, redirect: 'error', signal: AbortSignal.timeout(15000) });
-  // Workspace preferences per user (see sendWorkspace). In memory only.
+  // Workspace preferences per user (see sendWorkspace): alert settings, which
+  // notifications were read, and the change history. Kept in a JSON file so they
+  // survive a restart (WORKSPACE_PREFS_FILE, default tools/.workspace-prefs.json;
+  // git ignores it). Tests pass prefsFile: null to keep them in memory.
+  const prefsFile = options.prefsFile === undefined
+    ? (process.env.WORKSPACE_PREFS_FILE || fileURLToPath(new URL('./.workspace-prefs.json', import.meta.url)))
+    : options.prefsFile;
   const workspacePrefs = new Map();
+  if (prefsFile) {
+    try {
+      for (const [userId, saved] of Object.entries(JSON.parse(readFileSync(prefsFile, 'utf8'))))
+        workspacePrefs.set(userId, { ...saved, read: new Set(saved.read ?? []), audit: saved.audit ?? [] });
+    } catch { /* no file yet, or unreadable: start empty */ }
+  }
+  const savePrefs = () => {
+    if (!prefsFile) return;
+    const plain = Object.fromEntries([...workspacePrefs].map(([id, p]) => [id, { ...p, read: [...p.read], audit: p.audit.slice(-200) }]));
+    try { writeFileSync(prefsFile, JSON.stringify(plain)); } catch { /* best effort */ }
+  };
   const prefsFor = (userId) => {
     if (!workspacePrefs.has(userId)) workspacePrefs.set(userId, {
       lowBalanceMinor: 0, budgetAlerts: true, balanceAlerts: true, maturityAlerts: true, read: new Set(), audit: [] });
     return workspacePrefs.get(userId);
+  };
+  // Sign-ins waiting for an authenticator code: challenge id -> identity's MFA token.
+  const mfaChallenges = new Map();
+  // Identity records the customer's own browser and address for each session.
+  const deviceHeaders = (req) => ({
+    'User-Agent': String(req.headers['user-agent'] ?? 'unknown').slice(0, 1000),
+    'X-Forwarded-For': [req.headers['x-forwarded-for'], req.socket?.remoteAddress].filter(Boolean).join(', '),
+  });
+  const readJson = async (req) => {
+    let raw = ''; let size = 0;
+    for await (const chunk of req) { size += chunk.length; if (size > 16384) throw Object.assign(new Error('too large'), { status: 413 }); raw += chunk; }
+    try { return raw ? JSON.parse(raw) : {}; } catch { throw Object.assign(new Error('bad json'), { status: 400 }); }
   };
   const publicUser = profile => ({ id: profile.id, name: profile.name, email: profile.emailAddress,
     kind: profile.accountType === 'ORGANIZATION' ? 'organization' : 'individual', setupCompleted: false });
@@ -418,6 +454,8 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
     const route = url.pathname;
     try {
       if (route === '/api/auth/logout' && req.method === 'POST') {
+        // Ends the session at identity-service too, so it leaves the customer's list of signed-in devices.
+        if (session) await call('/api/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + session.token } }).catch(() => null);
         sessions.delete(sessionId); clear(); return send(200, { signedOut: true });
       }
       if (route === '/api/auth/session' && req.method === 'GET') {
@@ -441,12 +479,24 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         const payload = { emailAddress, password: body.password };
         if (registering) Object.assign(payload, { name: body.name.trim(), phoneNumber: typeof body.phone === 'string' ? body.phone.trim() || null : null,
           accountType: body.kind === 'organization' ? 'ORGANIZATION' : 'INDIVIDUAL' });
-        const response = await call(route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!response.ok) return send([400, 401, 409, 429].includes(response.status) ? response.status : 503, { error: 'Authentication request failed' });
+        const response = await call(route, { method: 'POST', headers: { 'Content-Type': 'application/json', ...deviceHeaders(req) }, body: JSON.stringify(payload) });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          if (response.status === 503 && detail.code === 'MAINTENANCE') return send(503, { error: 'maintenance', message: detail.message });
+          if (response.status === 429) return send(429, { error: 'locked', message: detail.message });
+          if (response.status === 403 && detail.code === 'ACCOUNT_SUSPENDED') return send(403, { error: 'suspended' });
+          return send([400, 401, 409].includes(response.status) ? response.status : 503, { error: 'Authentication request failed' });
+        }
         // Registration has committed at this point. If the response/session cannot be established,
         // let the UI offer sign-in without submitting the registration again.
         try {
           const result = await response.json();
+          if (!registering && result.mfaRequired && typeof result.mfaToken === 'string') {
+            // Password accepted; the authenticator code comes next (POST /api/auth/mfa).
+            const challenge = randomUUID();
+            mfaChallenges.set(challenge, { mfaToken: result.mfaToken, email: emailAddress, expiresAt: Date.now() + 5 * 60 * 1000 });
+            return send(200, { mfaRequired: true, challenge });
+          }
           const claims = JSON.parse(Buffer.from(result.token.split('.')[1], 'base64url').toString('utf8'));
           if (claims.sub !== result.userId || !Number.isFinite(claims.exp) || claims.exp * 1000 <= Date.now()) throw new Error('Invalid session');
           const verified = await call('/api/auth/me', { headers: { Authorization: 'Bearer ' + result.token } });
@@ -461,6 +511,29 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         } catch {
           return registering ? send(201, { registered: true }) : send(502, { error: 'Invalid session from identity service' });
         }
+      }
+      if (route === '/api/auth/mfa' && req.method === 'POST') {
+        const body = await readJson(req);
+        for (const [id, value] of mfaChallenges) if (value.expiresAt <= Date.now()) mfaChallenges.delete(id);
+        const pending = typeof body?.challenge === 'string' ? mfaChallenges.get(body.challenge) : null;
+        if (!pending) return send(401, { error: 'expired' });
+        const code = typeof body?.code === 'string' ? body.code.replace(/\s/g, '') : '';
+        if (!code) return send(400, { error: 'Enter the code from your authenticator app' });
+        const response = await call('/api/auth/mfa/verify', { method: 'POST', headers: { 'Content-Type': 'application/json', ...deviceHeaders(req) },
+          body: JSON.stringify({ mfaToken: pending.mfaToken, code }) });
+        if (response.status === 401 || response.status === 400) return send(401, { error: 'wrong-code' });
+        if (!response.ok) return send(503, { error: 'Identity service unavailable' });
+        mfaChallenges.delete(body.challenge);
+        const result = await response.json();
+        const profileRes = await call('/api/auth/me', { headers: { Authorization: 'Bearer ' + result.token } });
+        const profile = profileRes.ok ? await profileRes.json() : null;
+        if (!validProfile(profile) || profile.emailAddress.toLowerCase() !== pending.email) return send(502, { error: 'Invalid session from identity service' });
+        const claims = JSON.parse(Buffer.from(result.token.split('.')[1], 'base64url').toString('utf8'));
+        sessions.delete(sessionId);
+        const id = randomUUID();
+        sessions.set(id, { token: result.token, userId: profile.id, expiresAt: claims.exp * 1000, lastActive: Date.now() });
+        res.setHeader('Set-Cookie', cookie(id));
+        return send(200, { user: publicUser(profile) });
       }
       if (['/api/auth/forgot-password', '/api/auth/reset-password'].includes(route) && req.method === 'POST') {
         let raw = ''; let size = 0;
@@ -485,6 +558,56 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         return send(503, { error: 'Identity service unavailable' });
       }
       if (!session) return send(401, { error: 'Sign in required' });
+      if (route.startsWith('/api/account/')) {
+        const auth = { Authorization: 'Bearer ' + session.token };
+        const ended = (status) => { if (status === 401) { sessions.delete(sessionId); clear(); } };
+        if (route === '/api/account/security' && req.method === 'GET') {
+          const [me, list] = await Promise.all([call('/api/auth/me', { headers: auth }), call('/api/auth/sessions', { headers: auth })]);
+          if (!me.ok || !list.ok) { ended(me.status); return send(me.status === 401 ? 401 : 503, { error: 'Identity service unavailable' }); }
+          const profile = await me.json();
+          return send(200, { mfaEnabled: profile.mfaEnabled === true, emailVerified: profile.isEmailVerified === true, sessions: await list.json() });
+        }
+        if (route === '/api/account/password' && req.method === 'POST') {
+          const body = await readJson(req);
+          if (typeof body?.currentPassword !== 'string' || typeof body?.newPassword !== 'string') return send(400, { error: 'Enter your current and new password' });
+          if (body.newPassword.length < 8) return send(400, { error: 'The new password needs at least 8 characters' });
+          const response = await call('/api/auth/change-password', { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentPassword: body.currentPassword, newPassword: body.newPassword }) });
+          if (response.ok) { prefsFor(session.userId).audit.push({ at: new Date().toISOString(), action: 'Changed password' }); savePrefs(); return send(200, { changed: true }); }
+          const detail = await response.json().catch(() => ({}));
+          if (response.status === 401) return send(400, { error: detail.message === 'Current password is incorrect' || /current/i.test(detail.message ?? '') ? 'Your current password is not correct' : 'Your current password is not correct' });
+          if (response.status === 400) return send(400, { error: detail.message || 'Choose a different new password' });
+          return send(503, { error: 'Identity service unavailable' });
+        }
+        if (route === '/api/account/mfa/setup' && req.method === 'POST') {
+          const response = await call('/api/auth/mfa/setup', { method: 'POST', headers: auth });
+          if (!response.ok) { ended(response.status); return send(response.status === 400 ? 400 : 503, { error: (await response.json().catch(() => ({}))).message || 'Two-factor setup is unavailable' }); }
+          const setup = await response.json();
+          let qrDataUrl = null;
+          try { qrDataUrl = await (await import('qrcode')).toDataURL(setup.otpauthUri, { margin: 1, width: 220 }); } catch { /* qrcode not installed: the key and link still work */ }
+          return send(200, { secret: setup.secret, otpauthUri: setup.otpauthUri, backupCodes: setup.backupCodes, qrDataUrl });
+        }
+        if (['/api/account/mfa/enable', '/api/account/mfa/disable'].includes(route) && req.method === 'POST') {
+          const body = await readJson(req);
+          const enabling = route.endsWith('/enable');
+          const payload = enabling ? { code: String(body?.code ?? '').replace(/\s/g, '') } : { code: String(body?.code ?? '').replace(/\s/g, ''), password: String(body?.password ?? '') };
+          const response = await call('/api/auth' + route.slice('/api/account'.length), { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (response.ok) {
+            prefsFor(session.userId).audit.push({ at: new Date().toISOString(), action: enabling ? 'Turned on two-factor authentication' : 'Turned off two-factor authentication' });
+            savePrefs();
+            return send(200, { mfaEnabled: enabling });
+          }
+          if ([400, 401].includes(response.status)) return send(400, { error: enabling ? 'That code is not correct. Check the time on your phone and try again.' : 'Your password or code is not correct' });
+          return send(503, { error: 'Identity service unavailable' });
+        }
+        const revoke = /^\/api\/account\/sessions\/([0-9a-f-]{36})$/i.exec(route);
+        if (revoke && req.method === 'DELETE') {
+          const response = await call('/api/auth/sessions/' + revoke[1], { method: 'DELETE', headers: auth });
+          if (response.status === 204) return send(200, { revoked: true });
+          return send(response.status === 404 ? 404 : 503, { error: 'That session could not be signed out' });
+        }
+        return send(404, { error: 'Not found' });
+      }
       if (route === '/api/dashboard' && req.method === 'GET') {
         return await sendDashboard(send, call, session, url.searchParams);
       }
@@ -501,7 +624,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         let body;
         try { body = JSON.parse(raw); } catch { return send(400, { error: 'Invalid JSON' }); }
         const prefs = prefsFor(session.userId);
-        const logged = (action) => { prefs.audit.push({ at: new Date().toISOString(), action }); };
+        const logged = (action) => { prefs.audit.push({ at: new Date().toISOString(), action }); savePrefs(); };
         const collection = workspaceSave[1];
         if (collection === 'investments') {
           const id = typeof body?.id === 'string' && /^[0-9a-f-]{36}$/i.test(body.id) ? body.id : null;
@@ -541,6 +664,13 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
           return send(201, await response.json());
         }
         if (collection === 'profile') {
+          // Name and organisation live in identity-service; alert settings are kept here.
+          const name = typeof body?.name === 'string' ? body.name.trim() : '';
+          if (name.length < 2) return send(400, { error: 'Enter your full name' });
+          const identity = await call('/api/auth/me', { method: 'PUT', headers: { Authorization: 'Bearer ' + session.token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, organizationName: typeof body?.organization === 'string' ? body.organization.trim() || null : null }) });
+          if (identity.status === 400) return send(400, { error: (await identity.json().catch(() => ({}))).message || 'Check your profile details' });
+          if (!identity.ok) return send(503, { error: 'Unable to save your profile. Please retry.' });
           const low = Number(body?.lowBalanceMinor);
           if (Number.isFinite(low) && low >= 0) prefs.lowBalanceMinor = low;
           for (const key of ['budgetAlerts', 'balanceAlerts', 'maturityAlerts'])
@@ -550,6 +680,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         }
         if (collection === 'read') {
           for (const id of Array.isArray(body?.ids) ? body.ids : []) if (typeof id === 'string') prefs.read.add(id);
+          savePrefs();
           return send(200, { saved: true });
         }
         if (collection === 'transactions')
@@ -705,7 +836,9 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
       // Financial integration beyond accounts/transactions/invoices is a later team
       // milestone. Never create temporary records.
       return send(501, { error: 'This feature is not connected yet' });
-    } catch {
+    } catch (error) {
+      if (error?.status === 413) return send(413, { error: 'Request too large' });
+      if (error?.status === 400) return send(400, { error: 'Invalid JSON' });
       return send(503, { error: 'Identity service unavailable. Please retry.' });
     }
   });

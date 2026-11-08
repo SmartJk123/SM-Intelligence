@@ -6,7 +6,7 @@ const userId = '12345678-1234-4234-8234-123456789abc';
 const profile = { id: userId, name: 'Team Member', emailAddress: 'member@example.invalid', accountType: 'ORGANIZATION' };
 const jwt = (subject = userId, expires = Date.now() / 1000 + 60) => 'header.' + Buffer.from(JSON.stringify({ sub: subject, exp: expires })).toString('base64url') + '.signature';
 async function fixture(fetchAuth, extra = {}) {
-  const server = startAuthServer(0, 4200, { fetchAuth, identityUrl: 'http://localhost:8080', ...extra });
+  const server = startAuthServer(0, 4200, { fetchAuth, identityUrl: 'http://localhost:8080', prefsFile: null, ...extra });
   await once(server, 'listening');
   const base = 'http://127.0.0.1:' + server.address().port;
   return { server, base, async call(route, body, cookie, origin) {
