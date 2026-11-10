@@ -288,7 +288,7 @@ test('workspace combines the user’s accounts, transactions, budgets and invest
     assert.equal(workspace.budgets[0].allocatedMinor, 500000);
     assert.equal(workspace.budgets[0].threshold, 80);
     assert.deepEqual(workspace.investments[0], { id: 'i1', name: 'CIC Money Market', type: 'Money Market', principalMinor: 1000000,
-      currentValueMinor: 1045050, valuationDate: '2026-10-08', maturityDate: '' });
+      currentValueMinor: 1045050, valuationDate: '2026-10-08', maturityDate: '', interestRate: null, startDate: '' });
     assert.equal(workspace.profile.email, profile.emailAddress);
 
     const saved = await fx.call('/api/workspace/investments', { name: 'T-bill', type: 'Treasury Bill', principalMinor: 2000000,
@@ -296,13 +296,48 @@ test('workspace combines the user’s accounts, transactions, budgets and invest
     assert.equal(saved.status, 201);
     const post = sent.find((c) => c.path === '/api/investments' && c.method === 'POST');
     assert.deepEqual(JSON.parse(post.body), { ownerId: userId, name: 'T-bill', type: 'Treasury Bill', principal: 20000,
-      currentValue: null, valuationDate: '2026-10-08', maturityDate: null });
+      currentValue: null, valuationDate: '2026-10-08', maturityDate: null, interestRate: null });
 
     const base = 'http://127.0.0.1:' + fx.server.address().port;
     const removed = await fetch(base + '/api/workspace/investments/' + userId, { method: 'DELETE', headers: { Cookie: cookie } });
     assert.equal(removed.status, 204);
     assert.ok(sent.some((c) => c.method === 'DELETE' && c.path === '/api/investments/' + userId + '?ownerId=' + userId));
     assert.equal((await fx.call('/api/workspace/transactions', { amountMinor: 1 }, cookie)).status, 400);
+  } finally { await fx.close(); }
+});
+
+test('an expense allocated to a budget counts towards it, and clearing it takes it back out', async () => {
+  const token = jwt();
+  const txId = '6f1c2a9e-1b2c-4d3e-8f90-123456789abc';
+  const tx = { id: txId, accountId: 'a1', transactionType: 'DEBIT', status: 'POSTED', amount: 1500,
+    description: 'POS 4471 NAIVAS', counterparty: 'Naivas', transactionDate: new Date().toISOString() };
+  const fx = await fixture(async (url) => {
+    if (url.pathname.endsWith('/login')) return Response.json({ token, userId });
+    if (url.pathname === '/api/auth/me') return Response.json(profile);
+    if (url.pathname === '/api/accounts') return Response.json([{ id: 'a1', institution: 'KCB', accountType: 'DEPOSIT', availableBalance: 1 }]);
+    if (url.pathname === '/api/transactions') return Response.json([tx]);
+    if (url.pathname === '/api/transactions/activity') return Response.json([{ ...tx, direction: 'DEBIT', bank: 'KCB' }]);
+    if (url.pathname === '/api/budgets') return Response.json([{ id: 'b1', category: 'Groceries', monthlyLimit: 10000, alertThresholdPercentage: 85 }]);
+    if (url.pathname.startsWith('/api/investments')) return Response.json([]);
+    return Response.json({}, { status: 404 });
+  });
+  try {
+    const cookie = (await fx.call('/api/auth/login', input)).cookie.split(';')[0];
+    let budgets = (await fx.call('/api/budgets', null, cookie)).body;
+    assert.equal(budgets.budgets[0].spentMinor, 0);
+    assert.deepEqual(budgets.expenses, [{ id: txId, date: tx.transactionDate.slice(0, 10), description: 'Naivas', amountMinor: 150000, allocatedTo: null }]);
+
+    const allocated = await fx.call('/api/workspace/allocations', { transactionId: txId, category: 'Groceries' }, cookie);
+    assert.equal(allocated.status, 200);
+    budgets = (await fx.call('/api/budgets', null, cookie)).body;
+    assert.equal(budgets.budgets[0].spentMinor, 150000);
+    assert.equal(budgets.budgets[0].percentUsed, 15);
+    assert.equal(budgets.expenses[0].allocatedTo, 'Groceries');
+    assert.equal((await fx.call('/api/workspace', null, cookie)).body.transactions[0].category, 'Groceries');
+
+    await fx.call('/api/workspace/allocations', { transactionId: txId, category: '' }, cookie);
+    assert.equal((await fx.call('/api/budgets', null, cookie)).body.budgets[0].spentMinor, 0);
+    assert.equal((await fx.call('/api/workspace/allocations', { transactionId: 'not-an-id', category: 'Rent' }, cookie)).status, 400);
   } finally { await fx.close(); }
 });
 

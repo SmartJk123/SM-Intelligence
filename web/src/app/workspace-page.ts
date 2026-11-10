@@ -12,6 +12,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { WorkspaceApi, WorkspaceData, Budget, Investment, Entry } from './workspace-api';
 import { BankLogo } from './bank-logo';
+import { forecast, InvestmentForecast } from './investment-forecast';
 import { AccountApi } from './account-api';
 import { workspaceLinks } from './workspace-shell';
 
@@ -342,6 +343,40 @@ export class WorkspacePage implements OnInit, OnDestroy {
   }
   get principal() {
     return (this.data()?.investments ?? []).reduce((s, i) => s + i.principalMinor, 0);
+  }
+  /** Simple-interest forecast (value x rate x time to maturity); null without an interest rate. */
+  forecastOf(i: Investment): InvestmentForecast | null {
+    return forecast(i);
+  }
+  /** Projected value at maturity across investments that have a rate; null when none has one. */
+  get forecastTotal() {
+    const all = (this.data()?.investments ?? []).map((i) => forecast(i)).filter((f) => f !== null);
+    return all.length ? all.reduce((s, f) => s + f.projectedMinor, 0) : null;
+  }
+
+  /** The money-out row whose "Allocate" picker is open in the ledger. */
+  allocatingId = '';
+  allocationError = '';
+  /** Choices for allocating an expense: the customer's budgets, then their investments. */
+  get allocationTargets() {
+    const d = this.data();
+    return {
+      budgets: [...new Set((d?.budgets ?? []).map((b) => b.category))].sort(),
+      investments: (d?.investments ?? []).map((i) => 'Investment: ' + i.name),
+    };
+  }
+  async allocate(t: Entry, category: string) {
+    this.allocationError = '';
+    try {
+      await firstValueFrom(
+        this.http.post('/api/workspace/allocations', { transactionId: t.id, category }).pipe(timeout(15000)),
+      );
+      this.allocatingId = '';
+      await this.load(true);
+      this.message.set(category ? 'Allocated to ' + category + '.' : 'Allocation cleared.');
+    } catch (e: any) {
+      this.allocationError = e?.error?.error ?? 'That allocation could not be saved. Please retry.';
+    }
   }
   get alerts() {
     const d = this.data();
@@ -676,12 +711,14 @@ export class WorkspacePage implements OnInit, OnDestroy {
         { ...amount('currentValue', 'Current value (KES)'), required: false },
         f('valuationDate', 'Valuation date', 'date'),
         f('maturityDate', 'Maturity date', 'date', { required: false }),
+        f('interestRate', 'Interest rate (% a year)', 'number', { required: false, min: 0, max: 100, step: '0.01' }),
       ];
       this.form = row
         ? {
             ...row,
             principal: row.principalMinor / 100,
             currentValue: row.currentValueMinor === null ? '' : row.currentValueMinor / 100,
+            interestRate: row.interestRate === null ? '' : row.interestRate,
           }
         : {
             name: '',
@@ -690,6 +727,7 @@ export class WorkspacePage implements OnInit, OnDestroy {
             currentValue: '',
             valuationDate: this.today,
             maturityDate: '',
+            interestRate: '',
           };
     }
     if (kind === 'profile') {

@@ -11,6 +11,31 @@ const toMinor = (amount) => Math.round(Number(amount) * 100);
 // for a self-transfer), which reads as a bug rather than a name. Swap that
 // case for the bank's name instead of showing digits where a sender name is
 // expected.
+/** The customer's investments for the forecast; an empty list when investments-service is unavailable. */
+async function investmentsFor(callInvestments, session) {
+  if (!callInvestments) return [];
+  try {
+    const response = await callInvestments('/api/investments?ownerId=' + encodeURIComponent(session.userId));
+    if (!response.ok) return [];
+    return (await response.json()).map((i) => ({
+      id: i.id,
+      name: i.name,
+      type: i.type,
+      principalMinor: toMinor(i.principal),
+      currentValueMinor: i.currentValue === null || i.currentValue === undefined ? null : toMinor(i.currentValue),
+      valuationDate: i.valuationDate ?? '',
+      maturityDate: i.maturityDate ?? '',
+      interestRate: i.interestRate === null || i.interestRate === undefined ? null : Number(i.interestRate),
+      startDate: i.startDate ?? '',
+    }));
+  } catch { return []; }
+}
+
+/** The budget category of a transaction: the customer's allocation, else the bank's narrative. */
+function categoryOf(tx, prefs) {
+  return prefs?.allocations?.[tx.id] || tx.description || 'Uncategorized';
+}
+
 function describedNarrative(narrative, institution) {
   const text = (narrative ?? '').trim();
   if (!text) return institution ? institution + ' transaction' : 'Transaction';
@@ -24,7 +49,7 @@ function describedNarrative(narrative, institution) {
  * identity. Never invents figures: a downstream failure is reported as a
  * failure, and a user with no accounts yet simply sees zeros.
  */
-async function sendDashboard(send, call, session, searchParams) {
+async function sendDashboard(send, call, session, searchParams, prefs) {
   const days = Math.min(365, Math.max(1, parseInt(searchParams.get('days') ?? '30', 10) || 30));
   const bank = searchParams.get('bank') ?? '';
   const to = new Date();
@@ -138,6 +163,20 @@ async function sendDashboard(send, call, session, searchParams) {
     cashFlow,
     transactions,
     transactionCount: inPeriod.length,
+    // Every posted deposit-account movement in the period, newest first (Cash Flow lists money in and money out).
+    movements: inPeriod
+      .filter(isCashMovement)
+      .sort((a, b) => new Date(b.transactionDate) - new Date(a.transactionDate))
+      .slice(0, 500)
+      .map((tx) => ({
+        id: tx.id,
+        date: String(tx.transactionDate ?? '').slice(0, 10),
+        description: tx.counterparty || describedNarrative(tx.description, accounts.find((a) => a.id === tx.accountId)?.institution),
+        bank: accounts.find((a) => a.id === tx.accountId)?.institution ?? '',
+        direction: tx.transactionType,
+        amountMinor: toMinor(tx.amount),
+        allocatedTo: prefs?.allocations?.[tx.id] ?? null,
+      })),
   });
 }
 
@@ -147,7 +186,7 @@ async function sendDashboard(send, call, session, searchParams) {
  * list; trends need every posted debit across the whole window to total
  * correctly.
  */
-async function sendAnalytics(send, call, session, searchParams) {
+async function sendAnalytics(send, call, session, searchParams, prefs, callInvestments) {
   const months = Math.min(24, Math.max(1, parseInt(searchParams.get('months') ?? '6', 10) || 6));
   const to = new Date();
   const from = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth() - (months - 1), 1));
@@ -192,7 +231,7 @@ async function sendAnalytics(send, call, session, searchParams) {
     const key = monthKey(new Date(tx.transactionDate));
     const minor = toMinor(tx.amount);
     totalsByMonth.set(key, (totalsByMonth.get(key) ?? 0) + minor);
-    const category = tx.description || 'Uncategorized';
+    const category = categoryOf(tx, prefs);
     categoryTotals.set(category, (categoryTotals.get(category) ?? 0) + minor);
     if (!categoryByMonth.has(category)) categoryByMonth.set(category, new Map(monthKeys.map((k) => [k, 0])));
     const perMonth = categoryByMonth.get(category);
@@ -212,6 +251,7 @@ async function sendAnalytics(send, call, session, searchParams) {
       monthly: monthKeys.map((key) => perMonth.get(key) ?? 0),
     })),
     transactionCount: inPeriod.filter(isPostedDebit).length,
+    investments: await investmentsFor(callInvestments, session),
   });
 }
 
@@ -221,7 +261,7 @@ async function sendAnalytics(send, call, session, searchParams) {
  * same posted-debit totals the dashboard and analytics use, so "spent" always
  * means the same thing everywhere in the app.
  */
-async function sendBudgets(send, call, callBudgets, session) {
+async function sendBudgets(send, call, callBudgets, session, prefs) {
   const budgetsResponse = await callBudgets('/api/budgets?userId=' + encodeURIComponent(session.userId));
   if (!budgetsResponse.ok) return send(503, { error: 'Budgets service unavailable' });
   const budgets = await budgetsResponse.json();
@@ -247,13 +287,26 @@ async function sendBudgets(send, call, callBudgets, session) {
     const booked = new Date(new Date(tx.transactionDate).getTime() + EAT_OFFSET_MS);
     return booked >= monthStart;
   });
+  // An expense counts towards the budget the customer allocated it to; one they
+  // have not allocated falls back to the bank's narrative, as before.
   const spentByCategory = new Map();
   for (const tx of thisMonth) {
-    const category = tx.description || 'Uncategorized';
+    const category = categoryOf(tx, prefs);
     spentByCategory.set(category, (spentByCategory.get(category) ?? 0) + toMinor(tx.amount));
   }
+  const institutionOf = new Map(accounts.map((a) => [a.id, a.institution]));
 
   return send(200, {
+    expenses: thisMonth
+      .slice()
+      .sort((a, b) => new Date(b.transactionDate) - new Date(a.transactionDate))
+      .map((tx) => ({
+        id: tx.id,
+        date: String(tx.transactionDate ?? '').slice(0, 10),
+        description: tx.counterparty || describedNarrative(tx.description, institutionOf.get(tx.accountId)),
+        amountMinor: toMinor(tx.amount),
+        allocatedTo: prefs.allocations[tx.id] ?? null,
+      })),
     budgets: budgets.map((b) => {
       const spentMinor = spentByCategory.get(b.category) ?? 0;
       const limitMinor = toMinor(b.monthlyLimit);
@@ -315,7 +368,8 @@ async function sendWorkspace(send, call, callBudgets, callInvestments, session, 
       accountId: t.accountId,
       date: String(t.transactionDate ?? t.receivedAt ?? '').slice(0, 10),
       description: t.counterparty || describedNarrative(t.description, t.bank),
-      category: t.description || 'Uncategorized',
+      category: categoryOf(t, prefs),
+      allocatedTo: prefs.allocations[t.id] ?? null,
       direction: t.direction,
       amountMinor: toMinor(t.amount),
       status: t.status ?? 'POSTED',
@@ -337,6 +391,8 @@ async function sendWorkspace(send, call, callBudgets, callInvestments, session, 
       currentValueMinor: i.currentValue === null || i.currentValue === undefined ? null : toMinor(i.currentValue),
       valuationDate: i.valuationDate ?? '',
       maturityDate: i.maturityDate ?? '',
+      interestRate: i.interestRate === null || i.interestRate === undefined ? null : Number(i.interestRate),
+      startDate: i.startDate ?? '',
     })),
     profile: {
       name: profile.name,
@@ -408,7 +464,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   if (prefsFile) {
     try {
       for (const [userId, saved] of Object.entries(JSON.parse(readFileSync(prefsFile, 'utf8'))))
-        workspacePrefs.set(userId, { ...saved, read: new Set(saved.read ?? []), audit: saved.audit ?? [] });
+        workspacePrefs.set(userId, { ...saved, read: new Set(saved.read ?? []), audit: saved.audit ?? [], allocations: saved.allocations ?? {} });
     } catch { /* no file yet, or unreadable: start empty */ }
   }
   const savePrefs = () => {
@@ -418,7 +474,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
   };
   const prefsFor = (userId) => {
     if (!workspacePrefs.has(userId)) workspacePrefs.set(userId, {
-      lowBalanceMinor: 0, budgetAlerts: true, balanceAlerts: true, maturityAlerts: true, read: new Set(), audit: [] });
+      lowBalanceMinor: 0, budgetAlerts: true, balanceAlerts: true, maturityAlerts: true, read: new Set(), audit: [], allocations: {} });
     return workspacePrefs.get(userId);
   };
   // Sign-ins waiting for an authenticator code: challenge id -> identity's MFA token.
@@ -609,10 +665,10 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         return send(404, { error: 'Not found' });
       }
       if (route === '/api/dashboard' && req.method === 'GET') {
-        return await sendDashboard(send, call, session, url.searchParams);
+        return await sendDashboard(send, call, session, url.searchParams, prefsFor(session.userId));
       }
       if (route === '/api/analytics' && req.method === 'GET') {
-        return await sendAnalytics(send, call, session, url.searchParams);
+        return await sendAnalytics(send, call, session, url.searchParams, prefsFor(session.userId), callInvestments);
       }
       if (route === '/api/workspace' && req.method === 'GET') {
         return await sendWorkspace(send, call, callBudgets, callInvestments, session, prefsFor(session.userId));
@@ -636,14 +692,21 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
             currentValue: body?.currentValueMinor === null || body?.currentValueMinor === undefined ? null : Number(body.currentValueMinor) / 100,
             valuationDate: body?.valuationDate || null,
             maturityDate: body?.maturityDate || null,
+            interestRate: body?.interestRate === '' || body?.interestRate === null || body?.interestRate === undefined ? null : Number(body.interestRate),
           };
+          if (payload.interestRate !== null && !(Number.isFinite(payload.interestRate) && payload.interestRate >= 0 && payload.interestRate <= 100))
+            return send(400, { error: 'Enter an interest rate between 0 and 100 percent.' });
           const response = await callInvestments('/api/investments' + (id ? '/' + id : ''), {
             method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
           if (response.status === 400) return send(400, { error: (await response.json().catch(() => ({}))).message || 'Check the investment details.' });
           if (response.status === 404) return send(404, { error: 'Investment not found' });
           if (!response.ok) return send(503, { error: 'Unable to save the investment. Please retry.' });
           logged((id ? 'Updated' : 'Added') + ' investment ' + payload.name);
-          return send(id ? 200 : 201, await response.json());
+          const saved = await response.json();
+          // An investments-service from before the interest rate field drops it without an error.
+          if (payload.interestRate !== null && saved?.interestRate === undefined)
+            return send(502, { error: 'The investment was saved, but its interest rate was not: investments-service is out of date. Restart it and save again.' });
+          return send(id ? 200 : 201, saved);
         }
         if (collection === 'budgets') {
           if (typeof body?.category !== 'string' || !body.category.trim()) return send(400, { error: 'Enter a category' });
@@ -683,6 +746,17 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
           savePrefs();
           return send(200, { saved: true });
         }
+        if (collection === 'allocations') {
+          // Allocates one expense to a budget category (or clears it with an empty category).
+          const transactionId = typeof body?.transactionId === 'string' && /^[0-9a-f-]{36}$/i.test(body.transactionId) ? body.transactionId : null;
+          if (!transactionId) return send(400, { error: 'Choose an expense to allocate' });
+          const category = typeof body?.category === 'string' ? body.category.trim() : '';
+          if (category.length > 60) return send(400, { error: 'Keep the category under 60 characters' });
+          if (category) prefs.allocations[transactionId] = category;
+          else delete prefs.allocations[transactionId];
+          logged(category ? 'Allocated an expense to ' + category : 'Cleared an expense allocation');
+          return send(200, { transactionId, category: category || null });
+        }
         if (collection === 'transactions')
           return send(400, { error: 'Transactions come from your linked banks and cannot be added by hand.' });
         return send(404, { error: 'Unknown workspace collection' });
@@ -709,7 +783,7 @@ export function startAuthServer(port = 4301, webPort = 4200, options = {}) {
         return send(404, { error: 'This record cannot be deleted here' });
       }
       if (route === '/api/budgets' && req.method === 'GET') {
-        return await sendBudgets(send, call, callBudgets, session);
+        return await sendBudgets(send, call, callBudgets, session, prefsFor(session.userId));
       }
       if (route === '/api/budgets' && req.method === 'POST') {
         let raw = ''; let size = 0;

@@ -51,7 +51,8 @@ export const routes: Routes = [
         loadComponent: () => import('./dashboard').then((m) => m.Dashboard),
       },
       { path: 'overview', redirectTo: 'dashboard', pathMatch: 'full' },
-      { path: 'invoices', title: 'Invoices | SM-Intelligence', loadComponent: () => import('./invoices').then(m => m.Invoices) },
+      // Invoices is hidden until the page is reliable. Uncomment to bring it back (and its link in workspace-shell.ts).
+      // { path: 'invoices', title: 'Invoices | SM-Intelligence', loadComponent: () => import('./invoices').then(m => m.Invoices) },
       // The pages below share WorkspacePage, which reads route data.page.
       ...[
         { page: 'accounts', title: 'Accounts' },
