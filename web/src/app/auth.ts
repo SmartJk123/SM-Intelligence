@@ -35,6 +35,21 @@ import { AccountApi, AccountKind } from './account-api';
         @if (created()) {
           <p role="status">Your account was created, but automatic sign-in could not complete. Please sign in to continue.</p>
           <a class="button" routerLink="/login">Continue to sign in</a>
+        } @else if (mfaChallenge()) {
+          <form (submit)="$event.preventDefault(); submitMfa()" novalidate>
+            <p>Two-factor authentication is on for this account. Enter the 6-digit code from your authenticator
+              app, or one of your recovery codes.</p>
+            <label for="mfa-code">Verification code</label
+            ><input id="mfa-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12"
+              [value]="mfaCode()" (input)="mfaCode.set($any($event.target).value)" autofocus />
+            @if (error()) {
+              <p role="alert" class="alert">{{ error() }}</p>
+            }
+            <button class="button full" type="submit" [disabled]="pending()">
+              {{ pending() ? 'Please wait…' : 'Verify and sign in →' }}
+            </button>
+            <button class="button secondary full" type="button" (click)="cancelMfa()">Use a different account</button>
+          </form>
         } @else {
         <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
           @if (register) {
@@ -49,7 +64,7 @@ import { AccountApi, AccountKind } from './account-api';
                   type="radio"
                   formControlName="kind"
                   value="organization"
-                />Company<small>Company or team</small></label
+                />Organisation<small>Business, team or group</small></label
               >
             </fieldset>
             <label for="name">Full name</label
@@ -176,6 +191,9 @@ export class Auth {
   readonly showPassword = signal(false);
   readonly pending = signal(false);
   readonly error = signal('');
+  /** Set after a correct password when the account has two-factor authentication on. */
+  readonly mfaChallenge = signal('');
+  readonly mfaCode = signal('');
   invalid(name: keyof typeof this.form.controls) {
     const c = this.form.controls[name];
     return c.touched && c.invalid;
@@ -220,19 +238,69 @@ export class Auth {
           }
         }
       }
-      else await this.api.login({ email: value.email.trim(), password: value.password });
+      else {
+        const challenge = await this.api.login({ email: value.email.trim(), password: value.password });
+        if (challenge) {
+          this.form.controls.password.reset();
+          this.mfaChallenge.set(challenge);
+          return;
+        }
+      }
       this.form.controls.password.reset();
       this.form.controls.confirm.reset();
       await this.api.refreshAccounts();
       await this.router.navigate([this.api.setupCompleted() ? '/dashboard' : '/setup']);
     } catch (e) {
-      this.error.set(
-        'Unable to ' +
-          (this.register ? 'create your account' : 'sign in') +
-          '. Check your details and try again. If the problem continues, the account service may be unavailable.',
-      );
+      this.error.set(signInError(e, this.register));
     } finally {
       this.pending.set(false);
     }
   }
+
+  async submitMfa() {
+    if (this.pending()) return;
+    const code = this.mfaCode().replace(/\s/g, '');
+    if (!code) {
+      this.error.set('Enter the code from your authenticator app.');
+      return;
+    }
+    this.pending.set(true);
+    this.error.set('');
+    try {
+      await this.api.verifyMfa(this.mfaChallenge(), code);
+      this.mfaChallenge.set('');
+      this.mfaCode.set('');
+      await this.api.refreshAccounts();
+      await this.router.navigate([this.api.setupCompleted() ? '/dashboard' : '/setup']);
+    } catch (e: any) {
+      if (e?.error?.error === 'expired') {
+        this.cancelMfa();
+        this.error.set('That sign-in took too long. Enter your password again.');
+      } else {
+        this.error.set(e?.error?.error === 'wrong-code'
+          ? 'That code is not correct. Check the time on your phone and try again.'
+          : 'Unable to verify the code right now. Please try again.');
+      }
+    } finally {
+      this.pending.set(false);
+    }
+  }
+
+  cancelMfa() {
+    this.mfaChallenge.set('');
+    this.mfaCode.set('');
+    this.error.set('');
+  }
+}
+
+/** A sign-in or sign-up failure, in words the customer can act on. */
+function signInError(e: any, registering: boolean): string {
+  const status = e?.status;
+  if (status === 503 && e?.error?.error === 'maintenance') return e.error.message || 'SmartMoney is down for maintenance. Please try again later.';
+  if (status === 429) return e?.error?.message || 'Too many failed attempts. Please wait a few minutes or reset your password.';
+  if (status === 403 && e?.error?.error === 'suspended') return 'This account has been suspended. Contact support to restore access.';
+  if (status === 401 && !registering) return 'Incorrect email address or password.';
+  if (status === 409 && registering) return 'An account with this email already exists. Sign in instead.';
+  return 'Unable to ' + (registering ? 'create your account' : 'sign in') +
+    '. Check your details and try again. If the problem continues, the account service may be unavailable.';
 }

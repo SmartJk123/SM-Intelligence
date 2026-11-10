@@ -90,6 +90,14 @@ public class BankIntegrationController {
         return settingsService.settingsFor(bankId);
     }
 
+    /** The last stored connection test, so the portal shows it again after a new sign in. 204 when never tested. */
+    @GetMapping("/{bankId}/test")
+    public ResponseEntity<BankConnectionTest> latestTest(@PathVariable String bankId) {
+        return tests.latestFor(bankId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     /**
      * Which credentials the backend has loaded, without ever returning a secret.
      * The portal issues the OAuth client key and secret; the ApiKey field of the

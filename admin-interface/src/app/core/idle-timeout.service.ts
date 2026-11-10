@@ -9,8 +9,8 @@ export const IDLE_WARNING_MS = 60 * 1000;
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove'] as const;
 
 /**
- * Signs an inactive administrator out. The admin token lives in this browser
- * (localStorage) for up to a day, so an unattended portal would otherwise stay
+ * Signs an inactive administrator out. The admin token stays valid in this tab
+ * (sessionStorage) for up to a day, so an unattended portal would otherwise stay
  * open on every customer's data. AdminLayout starts this while signed in.
  */
 @Injectable({ providedIn: 'root' })
@@ -22,6 +22,8 @@ export class IdleTimeoutService {
   /** Seconds left before sign-out while the warning is showing, otherwise null. */
   readonly secondsLeft = signal<number | null>(null);
 
+  /** Settings, Security can change the limit; IDLE_LIMIT_MS until it has loaded. */
+  private limitMs = IDLE_LIMIT_MS;
   private lastActivity = Date.now();
   private ticker: ReturnType<typeof setInterval> | null = null;
   private readonly onActivity = () => {
@@ -46,6 +48,13 @@ export class IdleTimeoutService {
     this.secondsLeft.set(null);
   }
 
+  /** Sets the idle limit in minutes (Settings, Security, Admin idle sign-out). */
+  configure(minutes: number): void {
+    if (Number.isFinite(minutes) && minutes >= 1) {
+      this.limitMs = Math.round(minutes) * 60 * 1000;
+    }
+  }
+
   stayActive(): void {
     this.lastActivity = Date.now();
     this.secondsLeft.set(null);
@@ -53,12 +62,12 @@ export class IdleTimeoutService {
 
   private tick(): void {
     const idle = Date.now() - this.lastActivity;
-    if (idle >= IDLE_LIMIT_MS) {
+    if (idle >= this.limitMs) {
       this.stop();
       this.auth.logout();
       void this.router.navigate(['/admin/login'], { queryParams: { reason: 'idle' } });
-    } else if (idle >= IDLE_LIMIT_MS - IDLE_WARNING_MS) {
-      this.secondsLeft.set(Math.ceil((IDLE_LIMIT_MS - idle) / 1000));
+    } else if (idle >= this.limitMs - Math.min(IDLE_WARNING_MS, this.limitMs / 2)) {
+      this.secondsLeft.set(Math.ceil((this.limitMs - idle) / 1000));
     } else {
       this.secondsLeft.set(null);
     }

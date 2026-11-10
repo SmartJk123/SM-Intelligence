@@ -368,3 +368,45 @@ router-outlet { display: none; }
 .delay-200 { animation-delay: .20s; }
 .delay-250 { animation-delay: .25s; }
 .delay-300 { animation-delay: .30s; }
+
+/* Settings form controls, shared by every settings section. */
+.settings-control {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+.settings-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.settings-control:disabled {
+  opacity: 0.65;
+}
+.settings-save {
+  margin-top: 1.25rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary);
+}
+.settings-save:disabled,
+.settings-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.settings-secondary {
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}

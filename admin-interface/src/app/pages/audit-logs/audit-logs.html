@@ -1,39 +1,13 @@
 <div class="flex-1 overflow-auto p-4 lg:p-6 space-y-5">
+  @if (audit.loadError(); as error) {
+    <p class="text-[12.5px] px-4 py-3 rounded-2xl" style="background: var(--red-soft); color: var(--red-ink)" role="alert">{{ error }}</p>
+  }
+
   <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
-    <app-kpi-card
-      label="Total events"
-      [value]="total"
-      sub="recorded activity"
-      color="blue"
-      delay="delay-50"
-      action="all"
-      (selected)="applyCardAction($event)"
-    />
-    <app-kpi-card
-      label="Successful"
-      [value]="successCount"
-      sub="completed actions"
-      color="green"
-      delay="delay-100"
-      action="Success"
-      (selected)="applyCardAction($event)"
-    />
-    <app-kpi-card
-      label="Failed"
-      [value]="failedCount"
-      sub="need investigation"
-      color="red"
-      delay="delay-150"
-      action="Failed"
-      (selected)="applyCardAction($event)"
-    />
-    <app-kpi-card
-      label="Administrators"
-      [value]="actorCount"
-      sub="distinct actors"
-      color="gold"
-      delay="delay-200"
-    />
+    <app-kpi-card label="Total events" [value]="total()" sub="newest 500 entries" color="blue" delay="delay-50" action="all" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Successful" [value]="successCount()" sub="completed actions" color="green" delay="delay-100" action="Success" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Failed" [value]="failedCount()" sub="failed or blocked sign ins" color="red" delay="delay-150" action="Failed" (selected)="applyCardAction($event)" />
+    <app-kpi-card label="Sign ins today" [value]="signInsToday()" sub="customers and staff" color="gold" delay="delay-200" action="signins" (selected)="applyCardAction($event)" />
   </div>
 
   <app-surface-card class="overflow-hidden" animDelay="delay-200">
@@ -44,40 +18,53 @@
           type="text"
           [value]="query()"
           (input)="onSearch($any($event.target).value)"
-          placeholder="Search user, action, resource or IP"
+          placeholder="Search person, action, resource or IP"
           class="w-full pl-9 pr-3 py-2 text-[12.5px] rounded-full border focus:outline-none"
           style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
         />
       </label>
 
       <div class="segment-track">
-        @for (option of resultFilters; track option) {
-          <button
-            type="button"
-            class="segment"
-            [attr.data-active]="resultFilter() === option"
-            (click)="resultFilter.set(option)"
-          >
+        @for (option of actorFilters; track option) {
+          <button type="button" class="segment" [attr.data-active]="actorFilter() === option" (click)="actorFilter.set(option)">
             {{ option }}
           </button>
         }
       </div>
 
-      <button
-        type="button"
-        (click)="exportCsv()"
-        class="ml-auto flex items-center gap-1.5 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
-        style="background: var(--primary); color: #fff"
-      >
-        <span class="icon icon-sm">download</span> Export CSV
-      </button>
+      <div class="segment-track">
+        @for (option of resultFilters; track option) {
+          <button type="button" class="segment" [attr.data-active]="resultFilter() === option" (click)="resultFilter.set(option)">
+            {{ option }}
+          </button>
+        }
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          (click)="refresh()"
+          class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80"
+          style="border-color: var(--border); color: var(--text-2)"
+        >
+          <span class="icon icon-sm">refresh</span> Refresh
+        </button>
+        <button
+          type="button"
+          (click)="exportCsv()"
+          class="flex items-center gap-1.5 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90"
+          style="background: var(--primary); color: #fff"
+        >
+          <span class="icon icon-sm">download</span> Export CSV
+        </button>
+      </div>
     </div>
 
     <div class="overflow-x-auto">
-      <table class="w-full min-w-[860px]">
+      <table class="w-full min-w-[900px]">
         <thead>
           <tr style="background: var(--surface-2)">
-            @for (heading of headings; track heading) {
+            @for (heading of headings; track $index) {
               <th
                 class="text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] px-5 py-3 first:rounded-l-xl last:rounded-r-xl"
                 style="color: var(--text-3)"
@@ -93,10 +80,16 @@
               <td class="px-5 py-3.5">
                 <span
                   class="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg"
-                  style="background: var(--primary-soft); color: var(--primary-ink)"
+                  [style.background]="log.role === 'Staff' ? 'var(--violet-soft)' : log.role === 'System' ? 'var(--surface-3)' : 'var(--primary-soft)'"
+                  [style.color]="log.role === 'Staff' ? 'var(--violet-ink)' : log.role === 'System' ? 'var(--text-2)' : 'var(--primary-ink)'"
                 >{{ log.role }}</span>
               </td>
-              <td class="px-5 py-3.5 text-[13px] font-medium" style="color: var(--text-1)">{{ log.action }}</td>
+              <td class="px-5 py-3.5">
+                <p class="text-[13px] font-medium" style="color: var(--text-1)">{{ log.action }}</p>
+                @if (log.detail) {
+                  <p class="text-[11.5px] mt-0.5" style="color: var(--text-3)">{{ log.detail }}</p>
+                }
+              </td>
               <td class="px-5 py-3.5 text-[12.5px] font-mono" style="color: var(--primary-ink)">{{ log.resource }}</td>
               <td class="px-5 py-3.5 text-[12.5px] font-mono" style="color: var(--text-3)">{{ log.ip }}</td>
               <td class="px-5 py-3.5"><app-badge [status]="log.result" /></td>
@@ -107,8 +100,15 @@
           } @empty {
             <tr>
               <td colspan="8" class="px-5 py-14 text-center">
-                <p class="text-[14px] font-semibold" style="color: var(--text-1)">No audit entries match</p>
-                <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Clear the search or change the result filter.</p>
+                @if (!audit.loaded()) {
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">Loading the audit log…</p>
+                } @else if (total() === 0) {
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">No audit entries yet</p>
+                  <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Sign ups, sign ins and admin changes are recorded here as they happen.</p>
+                } @else {
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">No audit entries match</p>
+                  <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Clear the search or change the filters.</p>
+                }
               </td>
             </tr>
           }

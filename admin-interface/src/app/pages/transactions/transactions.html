@@ -1,4 +1,114 @@
 <div class="flex-1 overflow-auto p-4 lg:p-6 space-y-5">
+  <div class="flex flex-wrap items-center gap-3">
+    <div class="segment-track" role="tablist" aria-label="Transactions">
+      <button type="button" role="tab" class="segment" [attr.data-active]="tab() === 'live'" [attr.aria-selected]="tab() === 'live'" (click)="tab.set('live')">Bank transactions</button>
+      <button type="button" role="tab" class="segment" [attr.data-active]="tab() === 'demo'" [attr.aria-selected]="tab() === 'demo'" (click)="tab.set('demo')">Demo account</button>
+    </div>
+    @if (tab() === 'live') {
+      <span class="ml-auto flex items-center gap-2 text-[12px]" style="color: var(--text-3)">
+        <span class="w-2 h-2 rounded-full" [style.background]="liveError() ? 'var(--red)' : 'var(--green)'"></span>
+        {{ liveError() ? 'Not connected' : 'Live' }} · updated {{ updatedLabel() }} · refreshes every 15 seconds
+      </span>
+    }
+  </div>
+
+  @if (tab() === 'live') {
+    @if (liveError(); as error) {
+      <p class="text-[12.5px] px-4 py-3 rounded-2xl" style="background: var(--red-soft); color: var(--red-ink)" role="alert">{{ error }}</p>
+    }
+    <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <app-kpi-card label="Transactions today" [value]="liveCountToday()" sub="reported by the banks" color="blue" delay="delay-50" />
+      <app-kpi-card label="Money in today" [value]="money(liveInToday())" sub="credits, KES" color="green" delay="delay-100" />
+      <app-kpi-card label="Money out today" [value]="money(liveOutToday())" sub="debits, KES" color="red" delay="delay-150" />
+      <app-kpi-card label="Not on a dashboard" [value]="undelivered()" sub="unlinked or failed" color="gold" delay="delay-200" />
+    </div>
+
+    <app-surface-card class="overflow-hidden" animDelay="delay-200">
+      <div class="flex flex-wrap items-center gap-3 px-5 py-4 border-b" style="border-color: var(--border)">
+        <label class="relative flex-1 min-w-[220px] max-w-sm">
+          <span class="icon icon-sm absolute left-3.5 top-1/2 -translate-y-1/2" style="color: var(--text-3)">search</span>
+          <input type="text" [value]="liveQuery()" (input)="liveQuery.set($any($event.target).value)"
+            placeholder="Search reference, customer, sender or account"
+            class="w-full pl-9 pr-3 py-2 text-[12.5px] rounded-full border focus:outline-none"
+            style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)" />
+        </label>
+        <select (change)="liveBank.set($any($event.target).value)" aria-label="Bank"
+          class="px-3 py-2 text-[12.5px] rounded-full border focus:outline-none"
+          style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)">
+          <option value="" [selected]="!liveBank()">All banks</option>
+          @for (bank of banks; track bank) {
+            <option [value]="bank" [selected]="liveBank() === bank">{{ bank.toUpperCase() }}</option>
+          }
+        </select>
+        <div class="segment-track">
+          @for (filter of directionFilters; track filter) {
+            <button type="button" class="segment" [attr.data-active]="liveDirection() === filter" (click)="liveDirection.set(filter)">{{ filter }}</button>
+          }
+        </div>
+        <div class="segment-track">
+          @for (filter of deliveryFilters; track filter) {
+            <button type="button" class="segment" [attr.data-active]="liveDelivery() === filter" (click)="liveDelivery.set(filter)">{{ filter }}</button>
+          }
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <button type="button" (click)="loadLive()" class="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-full border transition-all hover:opacity-80" style="border-color: var(--border); color: var(--text-2)">
+            <span class="icon icon-sm">refresh</span> Refresh
+          </button>
+          <button type="button" (click)="exportLive()" class="flex items-center gap-1.5 text-[12.5px] font-semibold px-4 py-2 rounded-full transition-all hover:opacity-90" style="background: var(--primary); color: #fff">
+            <span class="icon icon-sm">download</span> Export CSV
+          </button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[960px]">
+          <thead>
+            <tr style="background: var(--surface-2)">
+              @for (heading of ['Received', 'Bank', 'Reference', 'Customer', 'Sender / receiver', 'Amount', 'Delivery']; track heading) {
+                <th class="text-left text-[11.5px] font-semibold uppercase tracking-[0.08em] px-5 py-3" style="color: var(--text-3)">{{ heading }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (tx of liveRows(); track tx.id) {
+              <tr class="border-b last:border-0 transition-all" style="border-color: var(--border)"
+                [style.background]="isNew(tx) ? 'var(--green-soft)' : 'transparent'">
+                <td class="px-5 py-3 text-[12.5px] whitespace-nowrap" style="color: var(--text-3)">{{ when(tx.receivedAt) }}</td>
+                <td class="px-5 py-3 text-[12.5px] font-semibold" style="color: var(--text-1)">{{ tx.bankId.toUpperCase() }}</td>
+                <td class="px-5 py-3">
+                  <p class="text-[12.5px] font-mono" style="color: var(--primary-ink)">{{ tx.reference || '—' }}</p>
+                  @if (tx.narration) { <p class="text-[11.5px]" style="color: var(--text-3)">{{ tx.narration }}</p> }
+                </td>
+                <td class="px-5 py-3">
+                  <p class="text-[12.5px]" style="color: var(--text-1)">{{ customer(tx) || 'No customer' }}</p>
+                  <p class="text-[11.5px] font-mono" style="color: var(--text-3)">{{ tx.accountMasked || '' }}</p>
+                </td>
+                <td class="px-5 py-3 text-[12.5px]" style="color: var(--text-2)">{{ tx.counterpartyName || '—' }}</td>
+                <td class="px-5 py-3 text-[13px] font-semibold tabular whitespace-nowrap"
+                  [style.color]="tx.direction === 'DEBIT' ? 'var(--red-ink)' : 'var(--green-ink)'">
+                  {{ tx.direction === 'DEBIT' ? '−' : '+' }}{{ tx.currency }} {{ money(tx.amount) }}
+                </td>
+                <td class="px-5 py-3" [attr.title]="tx.deliveryError || null"><app-badge [status]="deliveryLabel(tx)" /></td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="px-5 py-14 text-center">
+                  @if (!liveLoaded()) {
+                    <p class="text-[14px] font-semibold" style="color: var(--text-1)">Loading transactions…</p>
+                  } @else if (live().length === 0) {
+                    <p class="text-[14px] font-semibold" style="color: var(--text-1)">No bank transactions yet</p>
+                    <p class="text-[12.5px] mt-1" style="color: var(--text-3)">They appear here within seconds of a bank reporting a payment.</p>
+                  } @else {
+                    <p class="text-[14px] font-semibold" style="color: var(--text-1)">No transactions match</p>
+                    <p class="text-[12.5px] mt-1" style="color: var(--text-3)">Clear the search or change the filters.</p>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </app-surface-card>
+  } @else {
   <div
     class="rounded-2xl px-5 py-4 flex flex-wrap items-center gap-3"
     style="background: var(--surface-2); border: 1px solid var(--border)"
@@ -144,4 +254,5 @@
       </table>
     </div>
   </app-surface-card>
+  }
 </div>

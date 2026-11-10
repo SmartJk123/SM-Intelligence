@@ -1,4 +1,17 @@
 <div class="flex-1 overflow-auto p-4 lg:p-6 space-y-5">
+  <div
+    class="rounded-2xl border px-4 py-3 flex flex-wrap items-center gap-3"
+    style="border-color: var(--border); background: var(--surface-2)"
+  >
+    <span class="pill" style="background: var(--gold-soft); color: var(--gold-ink)">
+      <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background: var(--gold)"></span>
+      Not connected
+    </span>
+    <p class="text-[12.5px] flex-1 min-w-[220px]" style="color: var(--text-2)">
+      Reconciliation has no backend yet, so the queue is empty and nothing is matched or saved.
+    </p>
+  </div>
+
   <div class="grid grid-cols-2 xl:grid-cols-5 gap-4">
     @for (item of summary(); track item.label; let index = $index) {
       <app-kpi-card
@@ -68,10 +81,17 @@
           } @empty {
             <tr>
               <td colspan="6" class="px-5 py-14 text-center">
-                <p class="text-[14px] font-semibold" style="color: var(--text-1)">Nothing in this queue</p>
-                <p class="text-[12.5px] mt-1" style="color: var(--text-3)">
-                  Every record for this status has been dealt with.
-                </p>
+                @if (records().length === 0) {
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">Nothing in this queue</p>
+                  <p class="text-[12.5px] mt-1" style="color: var(--text-3)">
+                    Records appear here once reconciliation is connected.
+                  </p>
+                } @else {
+                  <p class="text-[14px] font-semibold" style="color: var(--text-1)">Nothing in this queue</p>
+                  <p class="text-[12.5px] mt-1" style="color: var(--text-3)">
+                    Every record for this status has been dealt with.
+                  </p>
+                }
               </td>
             </tr>
           }

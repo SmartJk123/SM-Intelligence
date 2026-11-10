@@ -1,144 +1,266 @@
 <div class="flex-1 overflow-auto p-4 lg:p-6 space-y-4">
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-    <app-kpi-card
-      label="All"
-      [value]="total()"
-      color="blue"
-      delay="delay-50"
-      action="all"
-      (selected)="applyCardAction($event)"
-    />
-    <app-kpi-card
-      label="Unread"
-      [value]="unread()"
-      sub="Click to filter"
-      color="green"
-      delay="delay-100"
-      action="unread"
-      (selected)="applyCardAction($event)"
-    />
-    <app-kpi-card
-      label="Critical"
-      [value]="critical()"
-      sub="Click to filter"
-      color="red"
-      delay="delay-150"
-      action="critical"
-      (selected)="applyCardAction($event)"
-    />
-    <app-kpi-card
-      label="Warnings"
-      [value]="warnings()"
-      sub="Click to filter"
-      color="gold"
-      delay="delay-200"
-      action="warning"
-      (selected)="applyCardAction($event)"
-    />
-  </div>
-
-  <app-surface-card class="overflow-hidden" animDelay="delay-200">
-    <!-- Filter bar -->
-    <div
-      class="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-3 border-b"
-      style="border-color: var(--border)"
-    >
-      <div class="flex gap-1">
-        @for (option of readFilters; track option) {
-          <button
-            type="button"
-            (click)="readFilter.set(option)"
-            class="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all"
-            [style.background]="readFilter() === option ? 'var(--primary)' : 'var(--surface-2)'"
-            [style.color]="readFilter() === option ? '#fff' : 'var(--text-2)'"
-          >
-            {{ option }}
-          </button>
-        }
-      </div>
-
-      <div class="flex flex-wrap gap-1">
-        @for (severity of severityFilters; track severity) {
-          <button
-            type="button"
-            (click)="severityFilter.set(severity)"
-            class="px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-all border"
-            [style.background]="severityFilter() === severity ? 'var(--surface)' : 'transparent'"
-            [style.color]="severityFilter() === severity ? 'var(--text-1)' : 'var(--text-3)'"
-            [style.borderColor]="severityFilter() === severity ? 'var(--border)' : 'transparent'"
-          >
-            {{ severity }}
-          </button>
-        }
-      </div>
-
+  <div class="segment-track" role="tablist" aria-label="Notifications sections">
+    @for (item of tabs; track item.id) {
       <button
         type="button"
-        (click)="markAllRead()"
-        [disabled]="unread() === 0"
-        class="ml-auto text-[12px] font-semibold disabled:opacity-40"
-        style="color: var(--primary)"
+        role="tab"
+        class="segment flex items-center gap-1.5"
+        [attr.aria-selected]="tab() === item.id"
+        [attr.data-active]="tab() === item.id"
+        (click)="selectTab(item.id)"
       >
-        Mark all as read
+        <span class="icon icon-sm">{{ item.icon }}</span>
+        {{ item.label }}
+        @if (item.id === 'notifications' && unread() > 0) {
+          <span class="text-[10.5px] font-bold rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center"
+            style="background: var(--accent); color: #fff">{{ unread() }}</span>
+        }
       </button>
-    </div>
+    }
+  </div>
 
-    <!-- List -->
-    <div>
-      @for (notification of shown(); track notification.id) {
-        <button
-          type="button"
-          (click)="open(notification)"
-          class="w-full text-left flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 px-3 sm:px-4 py-4 border-b last:border-0 transition-all hover:opacity-80"
-          style="border-color: var(--border)"
-          [style.background]="notification.read ? 'transparent' : 'var(--primary-soft)'"
-        >
-          <div class="flex items-start gap-3 flex-1 min-w-0">
-            <div
-              class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
-              [style.background]="severityColors[notification.severity]"
-            ></div>
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-center gap-2 mb-1">
-                <app-badge [status]="notification.severity" />
-                <span class="text-[11px] uppercase tracking-wider" style="color: var(--text-3)">
-                  {{ notification.cat }}
-                </span>
-                @if (!notification.read) {
-                  <span
-                    class="text-[11px] font-semibold px-1.5 py-0.5 rounded"
-                    style="background: var(--primary); color: #fff"
-                  >New</span>
-                }
+  @switch (tab()) {
+    @case ('notifications') {
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <app-kpi-card label="All" [value]="total()" color="blue" delay="delay-50" action="all" (selected)="applyCardAction($event)" />
+        <app-kpi-card label="Unread" [value]="unread()" sub="Click to filter" color="green" delay="delay-100" action="unread" (selected)="applyCardAction($event)" />
+        <app-kpi-card label="Critical" [value]="critical()" sub="Click to filter" color="red" delay="delay-150" action="critical" (selected)="applyCardAction($event)" />
+        <app-kpi-card label="Warnings" [value]="warnings()" sub="Click to filter" color="gold" delay="delay-200" action="warning" (selected)="applyCardAction($event)" />
+      </div>
+
+      @if (notifications.loadError(); as error) {
+        <p class="text-[12.5px] px-4 py-3 rounded-2xl" style="background: var(--red-soft); color: var(--red-ink)" role="alert">{{ error }}</p>
+      }
+
+      <app-surface-card class="overflow-hidden" animDelay="delay-200">
+        <div class="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-3 border-b" style="border-color: var(--border)">
+          <div class="flex gap-1">
+            @for (option of readFilters; track option) {
+              <button
+                type="button"
+                (click)="readFilter.set(option)"
+                class="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all"
+                [style.background]="readFilter() === option ? 'var(--primary)' : 'var(--surface-2)'"
+                [style.color]="readFilter() === option ? '#fff' : 'var(--text-2)'"
+              >{{ option }}</button>
+            }
+          </div>
+
+          <div class="flex flex-wrap gap-1">
+            @for (severity of severityFilters; track severity) {
+              <button
+                type="button"
+                (click)="severityFilter.set(severity)"
+                class="px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-all border"
+                [style.background]="severityFilter() === severity ? 'var(--surface)' : 'transparent'"
+                [style.color]="severityFilter() === severity ? 'var(--text-1)' : 'var(--text-3)'"
+                [style.borderColor]="severityFilter() === severity ? 'var(--border)' : 'transparent'"
+              >{{ severity }}</button>
+            }
+          </div>
+
+          <button
+            type="button"
+            (click)="markAllRead()"
+            [disabled]="unread() === 0"
+            class="ml-auto text-[12px] font-semibold disabled:opacity-40"
+            style="color: var(--primary)"
+          >Mark all as read</button>
+        </div>
+
+        <div>
+          @for (notification of shown(); track notification.id) {
+            <button
+              type="button"
+              (click)="open(notification)"
+              class="w-full text-left flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 px-3 sm:px-4 py-4 border-b last:border-0 transition-all hover:opacity-80"
+              style="border-color: var(--border)"
+              [style.background]="notification.read ? 'transparent' : 'var(--primary-soft)'"
+            >
+              <div class="flex items-start gap-3 flex-1 min-w-0">
+                <div class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" [style.background]="severityColors[notification.severity]"></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <app-badge [status]="notification.severity" />
+                    <span class="text-[11px] uppercase tracking-wider" style="color: var(--text-3)">{{ notification.cat }}</span>
+                    @if (!notification.read) {
+                      <span class="text-[11px] font-semibold px-1.5 py-0.5 rounded" style="background: var(--primary); color: #fff">New</span>
+                    }
+                  </div>
+                  <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ notification.title }}</p>
+                  <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--text-2)">{{ notification.desc }}</p>
+                </div>
               </div>
-              <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ notification.title }}</p>
-              <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--text-2)">
-                {{ notification.desc }}
+              <div class="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1 flex-shrink-0 pl-6 sm:pl-0">
+                <span class="text-[12px] whitespace-nowrap" style="color: var(--text-3)">{{ notification.time }}</span>
+                <span class="text-[12px] font-semibold whitespace-nowrap" style="color: var(--primary)">{{ destination(notification.cat) }}</span>
+              </div>
+            </button>
+          } @empty {
+            <div class="px-4 py-12 text-center">
+              <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center text-lg" style="background: var(--surface-2); color: var(--text-3)">
+                <span class="icon icon-lg">notifications</span>
+              </div>
+              @if (total() === 0) {
+                <p class="text-sm font-semibold" style="color: var(--text-1)">No notifications yet</p>
+                <p class="text-[12px] mt-1" style="color: var(--text-3)">New sign ups, sign ins and system warnings appear here as they happen.</p>
+              } @else {
+                <p class="text-sm font-semibold" style="color: var(--text-1)">No notifications to show</p>
+                <p class="text-[12px] mt-1" style="color: var(--text-3)">Adjust the filters above to see more notifications.</p>
+              }
+            </div>
+          }
+        </div>
+      </app-surface-card>
+    }
+
+    @case ('outbox') {
+      <div class="grid grid-cols-3 gap-3">
+        <app-kpi-card label="Emails" [value]="outbox().length" sub="most recent 200" color="blue" delay="delay-50" />
+        <app-kpi-card label="Sent" [value]="sentCount()" sub="accepted by the mail server" color="green" delay="delay-100" />
+        <app-kpi-card label="Not sent" [value]="notSentCount()" sub="failed or SMTP not set up" color="gold" delay="delay-150" />
+      </div>
+
+      @if (outboxError(); as error) {
+        <p class="text-[12.5px] px-4 py-3 rounded-2xl" style="background: var(--red-soft); color: var(--red-ink)" role="alert">{{ error }}</p>
+      }
+
+      <app-surface-card class="overflow-hidden" animDelay="delay-200">
+        <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b" style="border-color: var(--border)">
+          <label class="relative flex-1 min-w-[220px] max-w-sm">
+            <span class="icon icon-sm absolute left-3.5 top-1/2 -translate-y-1/2" style="color: var(--text-3)">search</span>
+            <input
+              type="text"
+              [value]="outboxQuery()"
+              (input)="outboxQuery.set($any($event.target).value)"
+              placeholder="Search recipient or subject"
+              class="w-full pl-9 pr-3 py-2 text-[12.5px] rounded-full border focus:outline-none"
+              style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+            />
+          </label>
+          <p class="text-[12px]" style="color: var(--text-3)">Links and temporary passwords are stored as [hidden].</p>
+          <button type="button" (click)="loadOutbox()" class="ml-auto flex items-center gap-1.5 text-[12.5px] font-semibold" style="color: var(--primary)">
+            <span class="icon icon-sm">refresh</span> Refresh
+          </button>
+        </div>
+
+        @for (email of shownOutbox(); track email.id) {
+          <div class="border-b last:border-0" style="border-color: var(--border)">
+            <button type="button" (click)="toggleEmail(email.id)" class="w-full text-left flex flex-wrap items-center gap-3 px-4 py-3 hover:opacity-80">
+              <app-badge [status]="emailStatus(email)" />
+              <div class="flex-1 min-w-[200px]">
+                <p class="text-[13px] font-semibold" style="color: var(--text-1)">{{ email.subject }}</p>
+                <p class="text-[12px] font-mono" style="color: var(--text-3)">{{ email.recipient }}</p>
+              </div>
+              <span class="text-[11px] uppercase tracking-wider" style="color: var(--text-3)">{{ email.templateKey ?? 'system' }}</span>
+              <span class="text-[12px] whitespace-nowrap" style="color: var(--text-3)">{{ emailTime(email) }}</span>
+              <span class="icon icon-sm" style="color: var(--text-3)">{{ openEmailId() === email.id ? 'expand_less' : 'expand_more' }}</span>
+            </button>
+            @if (openEmailId() === email.id) {
+              <div class="px-4 pb-4">
+                @if (email.error) {
+                  <p class="text-[12px] mb-2 px-3 py-2 rounded-lg" style="background: var(--gold-soft); color: var(--gold-ink)">{{ email.error }}</p>
+                }
+                <pre class="text-[12px] whitespace-pre-wrap p-3 rounded-xl border font-mono" style="background: var(--surface-2); border-color: var(--border); color: var(--text-2)">{{ email.body }}</pre>
+              </div>
+            }
+          </div>
+        } @empty {
+          <div class="px-4 py-12 text-center">
+            @if (!outboxLoaded()) {
+              <p class="text-sm font-semibold" style="color: var(--text-1)">Loading the outbox…</p>
+            } @else {
+              <p class="text-sm font-semibold" style="color: var(--text-1)">No emails yet</p>
+              <p class="text-[12px] mt-1" style="color: var(--text-3)">Welcome emails, invites and password resets appear here once they are sent.</p>
+            }
+          </div>
+        }
+      </app-surface-card>
+    }
+
+    @case ('templates') {
+      @if (templatesError(); as error) {
+        <p class="text-[12.5px] px-4 py-3 rounded-2xl" style="background: var(--red-soft); color: var(--red-ink)" role="alert">{{ error }}</p>
+      }
+
+      <div class="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-4">
+        <app-surface-card class="overflow-hidden self-start" animDelay="delay-50">
+          @for (template of templates(); track template.key) {
+            <button
+              type="button"
+              (click)="selectTemplate(template.key)"
+              class="w-full text-left px-4 py-3 border-b last:border-0 transition-all"
+              style="border-color: var(--border)"
+              [style.background]="selectedKey() === template.key ? 'var(--primary-soft)' : 'transparent'"
+            >
+              <span class="flex items-center gap-2">
+                <span class="text-[13px] font-semibold flex-1" style="color: var(--text-1)">{{ template.name }}</span>
+                @if (template.customised) { <app-badge status="Customised" /> }
+              </span>
+              <span class="block text-[11.5px] mt-0.5" style="color: var(--text-3)">{{ template.description }}</span>
+            </button>
+          } @empty {
+            <p class="px-4 py-6 text-[12.5px]" style="color: var(--text-3)">Loading templates…</p>
+          }
+        </app-surface-card>
+
+        @if (selectedTemplate(); as template) {
+          <app-surface-card class="p-5 space-y-4" animDelay="delay-100">
+            <div>
+              <h2 class="text-[15px] font-bold font-display" style="color: var(--text-1)">{{ template.name }}</h2>
+              <p class="text-[12.5px] mt-0.5" style="color: var(--text-3)">
+                {{ template.description }}
+                @if (template.customised && template.updatedBy) { Last edited by {{ template.updatedBy }}. }
               </p>
             </div>
-          </div>
-
-          <div
-            class="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1 flex-shrink-0 pl-6 sm:pl-0"
-          >
-            <span class="text-[12px] whitespace-nowrap" style="color: var(--text-3)">{{ notification.time }}</span>
-            <span class="text-[12px] font-semibold whitespace-nowrap" style="color: var(--primary)">
-              {{ destination(notification.cat) }}
-            </span>
-          </div>
-        </button>
-      } @empty {
-        <div class="px-4 py-12 text-center">
-          <div
-            class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center text-lg"
-            style="background: var(--surface-2); color: var(--text-3)"
-          ><span class="icon icon-lg">notifications</span></div>
-          <p class="text-sm font-semibold" style="color: var(--text-1)">No notifications to show</p>
-          <p class="text-[12px] mt-1" style="color: var(--text-3)">
-            Adjust the filters above to see more notifications.
-          </p>
-        </div>
-      }
-    </div>
-  </app-surface-card>
+            <div>
+              <label for="template-subject" class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">Subject</label>
+              <input
+                id="template-subject"
+                [value]="draftSubject()"
+                (input)="draftSubject.set($any($event.target).value)"
+                class="w-full px-3 py-2.5 text-[13px] rounded-xl border focus:outline-none"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+              />
+            </div>
+            <div>
+              <label for="template-body" class="text-[11px] font-semibold mb-1.5 block uppercase tracking-wider" style="color: var(--text-3)">Body</label>
+              <textarea
+                id="template-body"
+                rows="14"
+                [value]="draftBody()"
+                (input)="draftBody.set($any($event.target).value)"
+                class="w-full px-3 py-2.5 text-[12.5px] font-mono rounded-xl border focus:outline-none"
+                style="background: var(--surface-2); border-color: var(--border); color: var(--text-1)"
+              ></textarea>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold mb-1.5 uppercase tracking-wider" style="color: var(--text-3)">Placeholders</p>
+              <div class="flex flex-wrap gap-1.5">
+                @for (placeholder of template.placeholders; track placeholder) {
+                  <code class="text-[11.5px] px-2 py-0.5 rounded-md" style="background: var(--surface-3); color: var(--text-2)">{{ placeholderLabel(placeholder) }}</code>
+                }
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                (click)="resetTemplate()"
+                [disabled]="!template.customised || savingTemplate()"
+                class="px-4 py-2 rounded-full text-[12.5px] font-semibold border disabled:opacity-40"
+                style="border-color: var(--border); color: var(--text-2)"
+              >Restore built-in wording</button>
+              <button
+                type="button"
+                (click)="saveTemplate()"
+                [disabled]="!templateChanged() || savingTemplate()"
+                class="px-4 py-2 rounded-full text-[12.5px] font-semibold text-white disabled:opacity-40"
+                style="background: var(--primary)"
+              >{{ savingTemplate() ? 'Saving…' : 'Save template' }}</button>
+            </div>
+          </app-surface-card>
+        }
+      </div>
+    }
+  }
 </div>

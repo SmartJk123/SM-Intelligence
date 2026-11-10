@@ -6,11 +6,12 @@ contacts a bank is `05 Callback Registration/stanbic-register-callback.bru`.
 
 ## Before the first run
 
-Start the backend and leave that window open.
+Start the backend and leave its windows open: api-gateway on 8080 and the bank
+service behind it (`.\start-local.ps1` at the repository root starts both).
 
 ```powershell
-cd "C:\Users\user\Desktop\ECLECTICS\SM-Intelligence\admin-interface\backend"
-.\run-local.ps1 -Offline
+cd "C:\Users\user\Desktop\ECLECTICS\SM-Intelligence"
+.\backend\bank-integration-service\run-local.ps1
 ```
 
 Then select the `local` environment in Bruno.
@@ -45,24 +46,26 @@ passing. From the desktop application, run the folders in number order.
 
 ## What the environment holds
 
-| Name | `local` | `tunnel` | Secret |
-| --- | --- | --- | --- |
-| `baseUrl` | `http://localhost:8080` | your tunnel host | No |
-| `bankId` | `kcb` | `stanbic` | No |
+Two values, neither secret. `baseUrl` is `http://localhost:8080` in `local` and
+your tunnel host in `tunnel`. `bankId` is `kcb` in `local` and `stanbic` in
+`tunnel`. There is also a `render` environment for the deployed gateway.
 
-That is all. The service has no authentication while `PERMIT_ALL` is true, so
-the collection needs no credentials. Do not add a value to a `.bru` file: these
-files are plain text and are committed. See the folder above for how credentials
-are handled once authentication is switched on.
+The collection holds no credentials, so its admin requests only pass against a
+local bank service started with `PERMIT_ALL=true`. Do not add a value to a `.bru`
+file: these files are plain text and are committed. See the folder above for how
+credentials are handled once authentication is added to the requests.
 
 ## Reading the results
 
-| You see | It means |
-| --- | --- |
-| `tokenReady: false` on a credential request | The service has no usable credentials for that bank. The `apiKeyAdvice` field says what is missing |
-| `publiclyReachable: false` on a notification URL request | The address is localhost, or its hostname no longer resolves. Either way, no bank can deliver a notification |
-| A failed `token` step in a connection test | The bank refused the credentials or the token address is wrong. The step detail carries the bank's own message |
-| `401` on a sample notification | Signature verification is on and no signature was supplied. That is the endpoint failing closed, not a fault |
+- **`tokenReady: false` on a credential request.** The service has no usable
+  credentials for that bank. The `apiKeyAdvice` field says what is missing.
+- **`publiclyReachable: false` on a notification URL request.** The address is
+  localhost, or its hostname no longer resolves. Either way, no bank can deliver a
+  notification.
+- **A failed `token` step in a connection test.** The bank refused the credentials
+  or the token address is wrong. The step detail carries the bank's own message.
+- **`401` on a sample notification.** Signature verification is on and no
+  signature was supplied. That is the endpoint failing closed, not a fault.
 
 `publiclyReachable` is true only when the address is public HTTPS and its host
 resolves, so it reports false for a stopped tunnel as well as for localhost. It

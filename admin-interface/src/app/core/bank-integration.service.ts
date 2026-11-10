@@ -70,6 +70,7 @@ export class BankIntegrationService {
     // of it, so nothing is seeded locally.
     void this.loadHealth();
     void this.loadSettings();
+    void this.loadLatestTests();
     void this.loadStats();
     void this.loadDemo();
     void this.loadWebhookInfos();
@@ -118,6 +119,23 @@ export class BankIntegrationService {
   }
 
   /**
+   * Loads the last stored connection test for every bank, so a test run in an
+   * earlier session still shows its result instead of asking for a new run.
+   */
+  async loadLatestTests(): Promise<void> {
+    for (const bank of BANKS) {
+      try {
+        const result = await this.gateway.loadLatestTest(bank.id);
+        if (result && !this.resultsState()[bank.id]) {
+          this.resultsState.update((current) => ({ ...current, [bank.id]: result }));
+        }
+      } catch {
+        // Backend not reachable, or an older backend without this endpoint.
+      }
+    }
+  }
+
+  /**
    * Loads the notification address for every bank.
    *
    * The address depends on PUBLIC_BASE_URL, which only the server knows, so it
@@ -146,6 +164,11 @@ export class BankIntegrationService {
     } catch {
       this.connectedState.set(false);
     }
+  }
+
+  /** Bank-reported transactions for the Transactions page. Throws when the service is unreachable. */
+  loadTransactions(limit = 500, includeDemo = false) {
+    return this.gateway.loadTransactions(limit, includeDemo);
   }
 
   /** Reloads the demonstration account. Both calls are safe to repeat. */
@@ -201,7 +224,8 @@ export class BankIntegrationService {
   async saveSettings(bankId: string): Promise<BankConnectionSettings> {
     const saved = await this.gateway.saveSettings(this.settingsFor(bankId));
     this.settingsState.update((current) => ({ ...current, [bankId]: saved }));
-    this.clearResult(bankId);
+    // The stored test result stays: it is still the latest evidence for this bank.
+    await this.loadHealth();
     return saved;
   }
 

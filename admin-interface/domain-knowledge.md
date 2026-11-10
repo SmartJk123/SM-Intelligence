@@ -4,17 +4,10 @@ Master domain and system reference for the SmartMoney Intelligence platform. It 
 product is, the financial concepts behind it, how money moves through the system, what each module
 means, how bank integrations work, and what the administrator is responsible for.
 
-## Document control
-
-| Field | Value |
-| --- | --- |
-| Document type | Domain and system reference |
-| Version | 1.0 |
-| Status | Active |
-| Owner | Eclectics, SmartMoney Intelligence |
-| Last updated | 10 September 2026 |
-| Related documents | [Admin interface notes](../admin-interface/README.md), [API contract](../admin-interface/docs/api-contract.md) |
-| Prerequisites | None. This document is the entry point for the domain |
+Domain and system reference, version 1.0, last updated 10 September 2026, owned by Eclectics,
+SmartMoney Intelligence. Status: active. This document is the entry point for the domain, so it needs
+no prior reading. Related reading: the [admin interface notes](README.md) and the
+[API contract](../docs/api-contract.md).
 
 ## 1. What SmartMoney Intelligence is
 
@@ -51,13 +44,16 @@ Businesses hold financial information in many disconnected places: bank accounts
 channels, collection systems, property and rental collections, manual spreadsheets, accounting
 records and transaction notifications.
 
-| Problem | Description | Consequence |
-| --- | --- | --- |
-| Fragmented information | Several accounts and channels must be checked separately | No single view of the business |
-| Difficult reconciliation | Expected records must be compared with actual bank records by hand | Slow, error prone, and incomplete |
-| Poor cash flow visibility | Balances are known but movement is not understood | Recurring costs and pressure points are missed |
-| Poor collection visibility | Expected, received and outstanding amounts are unclear | Follow up is reactive and unreliable |
-| Reactive decisions | Decisions rely on fragmented historical information | Opportunities and risks are identified late |
+- **Fragmented information.** Several accounts and channels must be checked separately, so there is
+  no single view of the business.
+- **Difficult reconciliation.** Expected records must be compared with actual bank records by hand,
+  which is slow, error prone and incomplete.
+- **Poor cash flow visibility.** Balances are known but movement is not understood, so recurring costs
+  and pressure points are missed.
+- **Poor collection visibility.** Expected, received and outstanding amounts are unclear, so follow
+  up is reactive and unreliable.
+- **Reactive decisions.** Decisions rely on fragmented historical information, so opportunities and
+  risks are identified late.
 
 ## 3. Target users
 
@@ -217,10 +213,10 @@ an assumption that all banks behave the same way.
 An API lets SmartMoney request information from a bank. A webhook lets the bank notify SmartMoney
 that an event has happened.
 
-| Concept | Direction | Typical use | Timing |
-| --- | --- | --- | --- |
-| API | SmartMoney requests, bank responds | Transaction history, account details | On demand or scheduled |
-| Webhook | Bank pushes, SmartMoney receives | New transaction, payment notification | Near real time where supported |
+With an **API**, SmartMoney requests and the bank responds. It is used for transaction history and
+account details, on demand or on a schedule. With a **webhook**, the bank pushes and SmartMoney
+receives. It is used for new transactions and payment notifications, in near real time where the
+bank supports it.
 
 ```mermaid
 sequenceDiagram
@@ -279,11 +275,11 @@ A transaction represents a financial movement.
 
 ### 11.1 Transaction types
 
-| Type | Definition | Examples |
-| --- | --- | --- |
-| Income | Money entering the business | Rent received, customer payment, sales revenue |
-| Expense | Money leaving the business | Supplier payment, utility bill, operating expense |
-| Transfer | Movement between the business own accounts | Account A to account B |
+- **Income** is money entering the business, such as rent received, a customer payment or sales
+  revenue.
+- **Expense** is money leaving the business, such as a supplier payment, a utility bill or an
+  operating expense.
+- **Transfer** is movement between the business's own accounts, such as account A to account B.
 
 A transfer must not be treated as revenue or as an expense. That distinction is essential for
 accurate financial analysis.
@@ -294,12 +290,10 @@ Different banks return different formats. Bank A may return `amount`, `transacti
 and `description`. Bank B may return `transactionAmount`, `reference`, `date` and `narration`.
 SmartMoney converts both into a single internal format.
 
-| Bank field example | Internal field |
-| --- | --- |
-| `amount`, `transactionAmount` | `amount` |
-| `transactionRef`, `reference` | `externalReference` |
-| `txnDate`, `date` | `transactionDate` |
-| `description`, `narration` | `description` |
+- `amount` and `transactionAmount` both become `amount`.
+- `transactionRef` and `reference` both become `externalReference`.
+- `txnDate` and `date` both become `transactionDate`.
+- `description` and `narration` both become `description`.
 
 Normalisation allows the rest of the application to work independently of any specific bank API
 format.
@@ -339,14 +333,12 @@ flowchart TD
 
 ### 14.1 Reconciliation states
 
-| State | Meaning |
-| --- | --- |
-| Matched | Expected and actual records agree |
-| Unmatched | A transaction exists with no corresponding expected record |
-| Duplicate | The same transaction appears more than once |
-| Needs review | The system cannot determine the correct result with confidence |
-| Failed | The reconciliation process could not complete |
-| Partially paid | Part of an expected amount has been received |
+- **Matched:** the expected and actual records agree.
+- **Unmatched:** a transaction exists with no corresponding expected record.
+- **Duplicate:** the same transaction appears more than once.
+- **Needs review:** the system cannot determine the correct result with confidence.
+- **Failed:** the reconciliation process could not complete.
+- **Partially paid:** part of an expected amount has been received.
 
 ### 14.2 Matching rules
 
@@ -413,14 +405,12 @@ that a bank will approve financing.
 
 ## 21. Data integrity
 
-| Property | Requirement |
-| --- | --- |
-| Accuracy | Transactions represent the source transaction correctly |
-| Completeness | Required fields are present |
-| Consistency | The same transaction carries consistent information throughout |
-| Uniqueness | Duplicate transactions are detected |
-| Traceability | Changes are recorded |
-| Security | Sensitive information is protected |
+- **Accuracy:** a transaction represents the source transaction correctly.
+- **Completeness:** required fields are present.
+- **Consistency:** the same transaction carries consistent information throughout.
+- **Uniqueness:** duplicate transactions are detected.
+- **Traceability:** changes are recorded.
+- **Security:** sensitive information is protected.
 
 ## 22. Audit trail
 
@@ -443,29 +433,23 @@ identifies issues and provides controls. It does not claim that losses can never
 
 The administrator is the platform operations officer.
 
-| Area | Question the admin answers |
-| --- | --- |
-| Organisations | Who uses SmartMoney |
-| Users | Who has access |
-| Banks | Which integrations are connected |
-| Accounts | Which bank accounts are connected |
-| Transactions | What financial data is flowing through the platform |
-| Reconciliation | Are transactions matching correctly |
-| Integration health | Are APIs and webhooks working |
-| Audit | Who performed which administrative action |
+For each area, the admin answers one question:
+
+- **Organisations:** who uses SmartMoney?
+- **Users:** who has access?
+- **Banks:** which integrations are connected?
+- **Accounts:** which bank accounts are connected?
+- **Transactions:** what financial data is flowing through the platform?
+- **Reconciliation:** are transactions matching correctly?
+- **Integration health:** are APIs and webhooks working?
+- **Audit:** who performed which administrative action?
 
 ## 25. Admin dashboard mental model
 
-The admin dashboard answers six questions, and those questions drive the entire user experience.
-
-| Question | Domain area |
-| --- | --- |
-| Who | Organisations and users |
-| Where | Banks and accounts |
-| What | Transactions |
-| Is it correct | Reconciliation |
-| Is it working | Integration and system health |
-| What needs attention | Alerts and exceptions |
+The admin dashboard answers six questions, and those questions drive the entire user experience:
+who (organisations and users), where (banks and accounts), what (transactions), is it correct
+(reconciliation), is it working (integration and system health), and what needs attention (alerts
+and exceptions).
 
 ## 26. Bank integration health
 
@@ -602,16 +586,17 @@ This is one of the most important architectural decisions for the platform.
 
 ## 34. MVP scope
 
-| Area | Included in the first implementation |
-| --- | --- |
-| Authentication | Admin login, business login, role based access |
-| Organisation management | Create organisation, users, organisation status |
-| Bank integration | KCB, NCBA, Equity, Stanbic with sandbox or mock adapters where credentials are unavailable |
-| Bank accounts | Connect account, account status, last synchronisation |
-| Transactions | Receive, normalise, store, classify, display |
-| Reconciliation | Match, unmatched, duplicate, review |
-| Dashboard | Income, expenses, cash flow, transaction volume, reconciliation status |
-| Admin monitoring | Integration health, errors, audit logs, notifications |
+The first implementation includes:
+
+- **Authentication:** admin login, business login and role based access.
+- **Organisation management:** creating organisations and users, and organisation status.
+- **Bank integration:** KCB, NCBA, Equity and Stanbic, with sandbox or mock adapters where
+  credentials are unavailable.
+- **Bank accounts:** connecting an account, account status and last synchronisation.
+- **Transactions:** receive, normalise, store, classify and display.
+- **Reconciliation:** matched, unmatched, duplicate and review.
+- **Dashboard:** income, expenses, cash flow, transaction volume and reconciliation status.
+- **Admin monitoring:** integration health, errors, audit logs and notifications.
 
 ## 35. Statements to avoid
 
@@ -627,30 +612,28 @@ sandbox and NCBA, Equity and Stanbic through sandbox or mock adapters.
 
 ## 36. Glossary
 
-| Term | Meaning |
-| --- | --- |
-| Organisation | A business using SmartMoney |
-| Bank integration | Connection between SmartMoney and a bank technology platform |
-| Bank account | Financial account connected to SmartMoney |
-| API | Interface used to exchange data between systems |
-| Webhook | Event notification sent from one system to another |
-| Transaction | Financial movement |
-| Income | Money entering a business |
-| Expense | Money leaving a business |
-| Transfer | Movement between accounts |
-| Reconciliation | Comparing financial records to determine whether they match |
-| Matching | Linking an expected record to an actual transaction |
-| Duplicate | Same transaction received more than once |
-| Normalisation | Converting different bank data formats into one internal format |
-| Cash flow | Movement of money into and out of a business |
-| Budget | Planned financial spending or income |
-| Collection | Money expected from customers or tenants |
-| Financial intelligence | Analysis that converts financial data into useful information |
-| Forecast | Estimate of future financial conditions based on available information |
-| Audit log | Record of system and user activity |
-| Multi tenancy | Multiple businesses using one platform with isolated data |
-| Connector | Bank specific integration implementation |
-| Idempotency | Processing the same event repeatedly without creating duplicate records |
+- **Organisation:** a business using SmartMoney.
+- **Bank integration:** the connection between SmartMoney and a bank technology platform.
+- **Bank account:** a financial account connected to SmartMoney.
+- **API:** an interface used to exchange data between systems.
+- **Webhook:** an event notification sent from one system to another.
+- **Transaction:** a financial movement.
+- **Income:** money entering a business.
+- **Expense:** money leaving a business.
+- **Transfer:** movement between accounts.
+- **Reconciliation:** comparing financial records to determine whether they match.
+- **Matching:** linking an expected record to an actual transaction.
+- **Duplicate:** the same transaction received more than once.
+- **Normalisation:** converting different bank data formats into one internal format.
+- **Cash flow:** the movement of money into and out of a business.
+- **Budget:** planned financial spending or income.
+- **Collection:** money expected from customers or tenants.
+- **Financial intelligence:** analysis that converts financial data into useful information.
+- **Forecast:** an estimate of future financial conditions based on available information.
+- **Audit log:** a record of system and user activity.
+- **Multi tenancy:** multiple businesses using one platform with isolated data.
+- **Connector:** a bank specific integration implementation.
+- **Idempotency:** processing the same event repeatedly without creating duplicate records.
 
 ## 37. One minute mental model
 
@@ -677,13 +660,9 @@ flowchart TD
 
 ## 38. References
 
-| Reference | Address |
-| --- | --- |
-| KCB BUNI developer portal | https://buni.kcbgroup.com/getting-started |
-| Stanbic Bank API developer portal | https://sandbox.stanbicbank.co.ke/ |
+- KCB BUNI developer portal: <https://buni.kcbgroup.com/getting-started>
+- Stanbic Bank API developer portal: <https://sandbox.stanbicbank.co.ke/>
 
 ## Revision history
 
-| Version | Date | Summary |
-| --- | --- | --- |
-| 1.0 | 10 September 2026 | Initial domain and system reference |
+- **1.0, 10 September 2026.** Initial domain and system reference.

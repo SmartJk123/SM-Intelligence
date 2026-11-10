@@ -41,9 +41,14 @@ In a second terminal:
 
 The gateway listens on 8080 and forwards /api/auth/**, /api/v1/admin/users/** (identity), /api/accounts/** (accounts-service) and /api/transactions/** (transactions-service). Its configuration uses the Spring Cloud Gateway Server Web MVC property namespace.
 
-`GET /api/v1/admin/users` on identity-service lists every active user (no password hash) — this is what makes a signup on `web/` show up in `admin-interface`'s Organisations/Users pages. It has no authentication yet (see the TODO comment next to it in `SecurityConfig.java`) because admin-interface has no real admin login against this backend yet; it only reads data, but lock it down before this is public.
+`GET /api/v1/admin/users` on identity-service lists every user (no password hash). This is what makes a
+signup on `web/` show up on the admin portal's Users page. Everything under `/api/v1/admin/**` and
+`/api/organizations/**` needs a token with the `PLATFORM_ADMIN` role.
 
-accounts-service and transactions-service have no Spring Security configuration at all today — anyone who can reach them directly (bypassing api-gateway/the web adapter) can read or write any `userId`'s accounts and transactions. This predates any particular feature but matters a lot once real money is involved (see `web/API-CONTRACT.md`'s `/api/dashboard` section) — prioritize closing it before production.
+accounts-service works out the account owner from the caller's own bearer token, or trusts
+`X-Internal-Token` when bank-integration-service acts for a customer. transactions-service does not check
+a token on `/api/transactions` yet; only `/api/transactions/activity` does. Close that before production
+(see [Known limits](#deploying-on-render-one-shared-system)).
 
 Run `npm start` in `web/` and open http://localhost:4200. Registered users are stored in PostgreSQL; sessions in the local adapter end when it restarts.
 
@@ -67,20 +72,59 @@ Admins can also send any user a password reset email from Users, then "Send pass
 If email is down, `backend/identity-service/set-password.ps1 -Email <address>` sets a local
 account's password directly (needs PHP and psql).
 
+### Admin activity: audit log, notifications, outbox and templates
+
+identity-service records an audit trail (`audit_events`), notifications for the admin bell
+(`admin_notifications`), a copy of every email it sends (`email_outbox`) and administrators' edits to
+the email templates (`email_templates`), all created by Flyway migration `V8__admin_activity.sql`.
+
+- Audited: sign up, sign in, failed and blocked sign ins, sign out, password reset requested and
+  completed, customer added, suspended, restored and edited, organisation created, member invited,
+  email template edited or reset. Each entry names who (customer, staff or system) and the IP.
+- Notified: new sign up, a customer's first sign in, an administrator signing in, a suspended account
+  trying to sign in, and the health monitor's alerts and recoveries.
+- Emailed: a welcome email after every sign up, and a temporary password plus a set-password link when
+  an admin adds a customer (`POST /api/v1/admin/users`). The outbox stores links and temporary
+  passwords as `[hidden]`.
+- Admin API (PLATFORM_ADMIN only, routed by api-gateway): `GET /api/v1/admin/audit-events`,
+  `GET /api/v1/admin/notifications`, `POST .../notifications/{id}/read`, `POST .../notifications/read-all`,
+  `GET /api/v1/admin/email-outbox`, `GET /api/v1/admin/email-templates`, `PUT .../email-templates/{key}`,
+  `POST .../email-templates/{key}/reset`.
+
+### Staff roles, settings and sessions
+
+identity-service migration `V9__staff_settings_sessions.sql` adds staff roles, saved admin settings and the
+device behind each session.
+
+- Staff: `GET /api/v1/admin/staff/me` (the caller's permissions), `GET|POST /api/v1/admin/staff`,
+  `PATCH|DELETE /api/v1/admin/staff/{id}`, `GET|POST /api/v1/admin/staff-roles`,
+  `PUT|DELETE /api/v1/admin/staff-roles/{id}`. ADMIN_EMAILS administrators (and admins without a role)
+  have full access. A role's permissions are admin page areas (`StaffPermissions`); identity-service
+  refuses its own admin endpoints outside them (`StaffAccessInterceptor`). bank-integration-service only
+  checks for an admin token, so a role does not limit the bank screens' API.
+- Settings: `GET /api/v1/admin/settings`, `GET|PUT /api/v1/admin/settings/{general|security|notifications|system}`.
+  Applied: failed sign-in lockout, staff email domains, maintenance mode (customers only), audit retention
+  (nightly), which admin notifications are emailed and to whom, and whether outage emails go out.
+- Sessions: each sign in is a refresh-token row with its User-Agent and address; the access token carries
+  its id (`sid`). `GET /api/auth/sessions`, `DELETE /api/auth/sessions/{id}`. Sign out ends only that
+  device; a password change signs out every other device. A revoked session's token stops working at once
+  in identity-service.
+- bank-integration-service `GET /api/v1/admin/transactions` lists bank-reported transactions with the
+  linked customer and whether each reached their dashboard.
+
 ### Forgot password emails
 
 The web sign-in page links to `/forgot-password`. identity-service then emails a one-time link to `/reset-password?token=...` that expires after 60 minutes. Only a SHA-256 hash of each token is stored (`password_reset_tokens`, migration V4). The request always answers the same way, so it never reveals whether an address has an account.
 
-Sending needs SMTP settings in `backend/identity-service/.env.local`. Without SMTP_HOST the service still starts, but it logs a warning and sends nothing.
+Sending needs SMTP settings in `backend/identity-service/.env.local`. Without `SMTP_HOST` the service still
+starts, but it logs a warning and sends nothing.
 
-| Variable | Example |
-| --- | --- |
-| SMTP_HOST | `smtp.gmail.com` |
-| SMTP_PORT | `587` (STARTTLS) or `465` (TLS) |
-| SMTP_USERNAME | the sending mailbox |
-| SMTP_PASSWORD | for Gmail, an app password (requires 2-Step Verification), not the account password |
-| MAIL_FROM | optional; defaults to SMTP_USERNAME |
-| PASSWORD_RESET_URL | optional; defaults to `http://localhost:4200/reset-password` |
+- `SMTP_HOST`: for example `smtp.gmail.com`.
+- `SMTP_PORT`: `587` for STARTTLS or `465` for TLS.
+- `SMTP_USERNAME`: the sending mailbox.
+- `SMTP_PASSWORD`: for Gmail, an app password (needs 2-Step Verification), not the account password.
+- `MAIL_FROM`: optional, defaults to `SMTP_USERNAME`.
+- `PASSWORD_RESET_URL`: optional, defaults to `http://localhost:4200/reset-password`.
 
 Admin accounts use the same identity, so an administrator resets their password the same way from the web app.
 
@@ -130,11 +174,12 @@ The production host cannot run Java, so each bank posts to a PHP receiver on cPa
 (`admin-interface/backend/deploy/cpanel`). The receiver verifies the notification, stores it in MySQL,
 and offers a token protected export that this service imports every minute.
 
-| Bank | Notification URL | Import settings in `.env.local` |
-| --- | --- | --- |
-| NCBA | `https://globalsmartspaces.com/api/v1/webhooks/ncba` (registered with NCBA) | `NCBA_CPANEL_EXPORT_URL`, `NCBA_CPANEL_EXPORT_TOKEN` |
-| KCB | `https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/kcb` | `KCB_CPANEL_EXPORT_URL`, `KCB_CPANEL_EXPORT_TOKEN` |
-| Equity | `https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/equity` | `EQUITY_CPANEL_EXPORT_URL`, `EQUITY_CPANEL_EXPORT_TOKEN` |
+- **NCBA** posts to `https://globalsmartspaces.com/api/v1/webhooks/ncba` (the address registered with NCBA).
+  The import is set by `NCBA_CPANEL_EXPORT_URL` and `NCBA_CPANEL_EXPORT_TOKEN` in `.env.local`.
+- **KCB** posts to `https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/kcb`. The import is set by
+  `KCB_CPANEL_EXPORT_URL` and `KCB_CPANEL_EXPORT_TOKEN`.
+- **Equity** posts to `https://sm-intelligence.globalsmartspaces.com/api/v1/webhooks/equity`. The import is
+  set by `EQUITY_CPANEL_EXPORT_URL` and `EQUITY_CPANEL_EXPORT_TOKEN`.
 
 KCB instant payment notifications carry no credit or debit field. They are sent only after an account
 is credited, so they are recorded as credits. The sender's name and mobile number, and the payment
@@ -147,15 +192,13 @@ and account number (KCB names the account in `creditAccountIdentifier`).
 
 The Equity connector authenticates with Jenga (`POST .../authentication/api/v3/authenticate/merchant`,
 `Api-Key` header, merchant code and consumer secret) to prove the credentials, and receives Instant Payment
-Notifications protected with Basic Auth.
+Notifications protected with Basic Auth. Its settings:
 
-| Variable | Meaning |
-| --- | --- |
-| `EQUITY_ENV` | `SANDBOX` (Jenga UAT, `uat.finserve.africa`) or `PRODUCTION` (`api.finserve.africa`) |
-| `EQUITY_MERCHANT_CODE`, `EQUITY_API_KEY`, `EQUITY_CONSUMER_SECRET` | from Jenga HQ |
-| `EQUITY_IPN_USERNAME`, `EQUITY_IPN_PASSWORD` | the Basic Auth pair registered with the IPN callback |
-| `EQUITY_ACCOUNT_NUMBER` | the Equity account payments belong to when a notification names none |
-| `EQUITY_TOKEN_URL` | optional override of the token endpoint |
+- `EQUITY_ENV`: `SANDBOX` (Jenga UAT, `uat.finserve.africa`) or `PRODUCTION` (`api.finserve.africa`).
+- `EQUITY_MERCHANT_CODE`, `EQUITY_API_KEY` and `EQUITY_CONSUMER_SECRET`: from Jenga HQ.
+- `EQUITY_IPN_USERNAME` and `EQUITY_IPN_PASSWORD`: the Basic Auth pair registered with the IPN callback.
+- `EQUITY_ACCOUNT_NUMBER`: the Equity account a payment belongs to when the notification names none.
+- `EQUITY_TOKEN_URL`: optional override of the token endpoint.
 
 Failed payments (`transaction.status` FAILED) are recorded with their reason but never credited.
 
@@ -166,11 +209,10 @@ Failed payments (`transaction.status` FAILED) are recorded with their reason but
 today's notifications, failures in the last 24 hours, last notification and last test times) are shown
 only with an admin token. Anyone else sees the overall status, and the bank breakdown answers 404.
 
-| Status | Meaning |
-| --- | --- |
-| `UP` | the last connection test passed, or notifications are arriving |
-| `DEGRADED` | the last connection test failed, or no notification for 7 days. The service answers 200, so monitors alert rather than restart it |
-| `UNKNOWN` | not tested and nothing received yet |
+A bank is `UP` when its last connection test passed or notifications are arriving, and `UNKNOWN` when it
+has not been tested and nothing has arrived yet. It is `DEGRADED` when the last connection test failed or
+no notification has arrived for 7 days. Only a production bank can make the whole service `DEGRADED`, and
+the service still answers 200, so monitors alert rather than restart it.
 
 The indicators never call a bank, so a health probe cannot use up a bank's rate limit. Refresh them with
 the admin's "Test connection".
@@ -192,7 +234,8 @@ The one exception: a signed-in customer may `POST /api/v1/admin/account-links` f
 accounts-service already holds for them at that bank and number (the web app does this after
 onboarding). Any other customer request is refused.
 
-`PERMIT_ALL=true` opens everything, for tests and isolated debugging only. It is off by default.
+`PERMIT_ALL=true` opens everything, for tests and isolated debugging only. It is off by default, and the
+service refuses to start with it on the `postgres` profile, which is what Render runs.
 
 ### One account number per user
 
@@ -203,16 +246,18 @@ entered by the customer (stored as a fingerprint) or linked by an admin (stored 
 ## One money flow for every app
 
 Every app reads the same money through the gateway (`http://localhost:8080` locally), so a payment that shows
-on the admin portal also shows on the web dashboard and in the mobile app.
+on the admin portal also shows on the web dashboard and in the mobile app. Each call sends the bearer token
+from sign-in.
 
-| Call (Bearer token from sign-in) | What it gives |
-| --- | --- |
-| `GET /api/accounts` | The user's accounts and balances |
-| `GET /api/transactions/activity` | All money in and out across the user's accounts, newest first, with bank, account, sender, amount and dates |
-| `GET /api/transactions/activity?since=<receivedAt>` | Only what arrived after that moment. Poll this for notifications (the web app polls every few seconds) |
-| `GET /api/transactions?accountId=<id>` | One account's transactions |
-| `POST /api/v1/admin/account-links` | Link a saved account so its bank's payments reach the user (the bank service accepts a customer only for their own account) |
-| `DELETE /api/v1/admin/account-links/by-account/<id>` | Unlink before removing an account |
+- `GET /api/accounts` returns the user's accounts and balances.
+- `GET /api/transactions/activity` returns all money in and out across the user's accounts, newest first,
+  with bank, account, sender, amount and dates.
+- `GET /api/transactions/activity?since=<receivedAt>` returns only what arrived after that moment. Poll it
+  for notifications; the web app polls every few seconds.
+- `GET /api/transactions?accountId=<id>` returns one account's transactions.
+- `POST /api/v1/admin/account-links` links a saved account so its bank's payments reach the user. The bank
+  service accepts a customer only for their own account.
+- `DELETE /api/v1/admin/account-links/by-account/<id>` unlinks an account before it is removed.
 
 `/api/transactions/activity` asks accounts-service for the user's accounts with the user's own token, so it
 can only ever return that user's money. A movement's `direction` is `CREDIT` (money in) or `DEBIT` (money out),
@@ -232,17 +277,26 @@ every other service is a private service that only the gateway and the other ser
 use the gateway's URL, so signing in as the same user shows the same accounts and transactions on the web
 app, the admin portal and the mobile app.
 
-| Piece | How it is set up |
-| --- | --- |
-| Database | The team's **Supabase** PostgreSQL (`smi-database` group). Use the **session pooler, port 5432**; the transaction pooler (6543) breaks Hibernate's and Flyway's prepared statements. Each service keeps its own schema (`DB_SCHEMA`: identity, accounts, transactions, budgets), created on first start; bank-integration-service keeps `public`, where its existing data is |
-| Service addresses | Each service's private `host:port` from Render (`*_SERVICE_HOSTPORT`); locally the old `*_SERVICE_URL` defaults still apply |
-| Shared secrets | `JWT_SECRET` and `INTERNAL_SERVICE_TOKEN` are generated once in the `smi-shared` environment group, so the services that must agree always do |
-| Other secrets | Marked `sync: false`: enter them in the Render dashboard (bank keys, export tokens, SMTP, `ADMIN_EMAILS`, `GEMINI_API_KEY`) |
-| Bank data | bank-integration-service runs with `SPRING_PROFILES_ACTIVE=postgres`, so nothing is lost on redeploy |
-| Live bank payments | Still arrive on cPanel; the bank service on Render imports them from the cPanel export feeds |
+How it is set up:
+
+- **Database.** The team's Supabase PostgreSQL (`smi-database` group). Use the session pooler on port
+  5432; the transaction pooler (6543) breaks Hibernate's and Flyway's prepared statements. Each service
+  keeps its own schema (`DB_SCHEMA`: identity, accounts, transactions, budgets), created on first start.
+  bank-integration-service keeps `public`, where its existing data is.
+- **Service addresses.** Each service gets its private `host:port` from Render (`*_SERVICE_HOSTPORT`).
+  Locally the old `*_SERVICE_URL` defaults still apply.
+- **Shared secrets.** `JWT_SECRET` and `INTERNAL_SERVICE_TOKEN` are generated once in the `smi-shared`
+  environment group, so the services that must agree always do.
+- **Other secrets** are marked `sync: false`. Enter them in the Render dashboard: bank keys, export
+  tokens, SMTP, `ADMIN_EMAILS` and `GEMINI_API_KEY`.
+- **Bank data.** bank-integration-service runs with `SPRING_PROFILES_ACTIVE=postgres`, so nothing is lost
+  on redeploy.
+- **Live bank payments** still arrive on cPanel. The bank service on Render imports them from the cPanel
+  export feeds.
 
 **Deploying:**
-1. Render dashboard → New → Blueprint → this repository. Render reads `render.yaml`. The existing web service
+
+1. In the Render dashboard choose New, then Blueprint, then this repository. Render reads `render.yaml`. The existing web service
    `bank-integration-service` (https://bank-integration-service.onrender.com) is adopted by name. Remove any
    `DB_URL` set on it by hand (it would override the blueprint and keep port 6543). Private services need a paid
    Render instance type.
