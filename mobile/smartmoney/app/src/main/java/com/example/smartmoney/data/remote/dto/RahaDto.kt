@@ -17,6 +17,18 @@ data class RahaInvestmentDto(
 data class RahaChatRequest(
     @SerialName("message") val message: String,
     @SerialName("conversationId") val conversationId: String? = null,
+    @SerialName("clientInvestments") val clientInvestments: List<RahaInvestmentDto> = emptyList(),
+    @SerialName("screenRoute") val screenRoute: String? = null,
+    @SerialName("screenTitle") val screenTitle: String? = null,
+    @SerialName("pageData") val pageData: Map<String, String> = emptyMap()
+)
+
+@Serializable
+data class RahaPageBriefingRequest(
+    @SerialName("screenRoute") val screenRoute: String,
+    @SerialName("screenTitle") val screenTitle: String,
+    @SerialName("conversationId") val conversationId: String? = null,
+    @SerialName("pageData") val pageData: Map<String, String> = emptyMap(),
     @SerialName("clientInvestments") val clientInvestments: List<RahaInvestmentDto> = emptyList()
 )
 

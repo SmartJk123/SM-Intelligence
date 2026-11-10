@@ -10,6 +10,7 @@ import com.smi.assistant_service.model.AccountSummary;
 import com.smi.assistant_service.model.BudgetSummary;
 import com.smi.assistant_service.model.FinancialContext;
 import com.smi.assistant_service.model.InvestmentSummary;
+import com.smi.assistant_service.model.ScreenContext;
 import com.smi.assistant_service.model.TransactionSummary;
 import com.smi.assistant_service.service.ConversationMemoryService;
 import org.slf4j.Logger;
@@ -69,6 +70,15 @@ public class GeminiLlmClient implements LlmClient {
     @Override
     public boolean isConfigured() {
         return !apiKey.isBlank();
+    }
+
+    @Override
+    public RahaChatResponse generatePageBriefing(String conversationId, FinancialContext context) {
+        ScreenContext screen = context.getScreenContext();
+        String title = screen != null && screen.getTitle() != null ? screen.getTitle() : (screen != null ? screen.getRoute() : "Overview");
+        String prompt = "I just opened the assistant while looking at the " + title + " screen. " +
+                "Provide a brief, engaging overview of this screen and its contents, highlight relevant numbers, and offer 3 practical follow-up questions.";
+        return processChat(prompt, conversationId, context);
     }
 
     @Override
@@ -289,6 +299,19 @@ public class GeminiLlmClient implements LlmClient {
                         .append(currencyFormat.format(tx.getAmount())).append("\n");
             }
             sb.append("\n");
+        }
+
+        // Current Screen Context
+        ScreenContext screen = context.getScreenContext();
+        if (screen != null) {
+            sb.append("Current Mobile App Screen:\n");
+            sb.append("- Screen Title: ").append(screen.getTitle() != null ? screen.getTitle() : screen.getRoute()).append("\n");
+            sb.append("- Screen Route: ").append(screen.getRoute()).append("\n");
+            if (screen.getData() != null && !screen.getData().isEmpty()) {
+                sb.append("- Screen Content Details:\n");
+                screen.getData().forEach((k, v) -> sb.append("    * ").append(k).append(": ").append(v).append("\n"));
+            }
+            sb.append("- Screen Guidance: The user is actively viewing this screen. Tailor your response, advice, and quickReplies to the contents of this screen.\n\n");
         }
 
         // 5. Output format requirement

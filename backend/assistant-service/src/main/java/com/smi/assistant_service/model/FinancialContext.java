@@ -14,6 +14,7 @@ public class FinancialContext {
     private List<BudgetSummary> budgets = new ArrayList<>();
     private List<TransactionSummary> recentTransactions = new ArrayList<>();
     private List<InvestmentSummary> investments = new ArrayList<>();
+    private ScreenContext screenContext;
 
     public FinancialContext() {
     }
@@ -80,5 +81,13 @@ public class FinancialContext {
 
     public void setInvestments(List<InvestmentSummary> investments) {
         this.investments = investments != null ? investments : new ArrayList<>();
+    }
+
+    public ScreenContext getScreenContext() {
+        return screenContext;
+    }
+
+    public void setScreenContext(ScreenContext screenContext) {
+        this.screenContext = screenContext;
     }
 }

@@ -9,6 +9,7 @@ import com.smi.assistant_service.dto.RahaChatResponse;
 import com.smi.assistant_service.model.AccountSummary;
 import com.smi.assistant_service.model.BudgetSummary;
 import com.smi.assistant_service.model.FinancialContext;
+import com.smi.assistant_service.model.ScreenContext;
 import com.smi.assistant_service.model.TransactionSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,15 @@ public class DeepSeekLlmClient implements LlmClient {
     @Override
     public boolean isConfigured() {
         return !apiKey.isBlank();
+    }
+
+    @Override
+    public RahaChatResponse generatePageBriefing(String conversationId, FinancialContext context) {
+        ScreenContext screen = context.getScreenContext();
+        String title = screen != null && screen.getTitle() != null ? screen.getTitle() : (screen != null ? screen.getRoute() : "Overview");
+        String prompt = "I just opened the assistant while looking at the " + title + " screen. " +
+                "Provide a brief, engaging overview of this screen and its contents, highlight relevant numbers, and offer 3 practical follow-up questions.";
+        return processChat(prompt, conversationId, context);
     }
 
     @Override
@@ -194,6 +204,17 @@ public class DeepSeekLlmClient implements LlmClient {
             for (TransactionSummary tx : context.getRecentTransactions()) {
                 sb.append("  * ").append(tx.getDescription()).append(" - KES ").append(tx.getAmount()).append("\n");
             }
+        }
+
+        ScreenContext screen = context.getScreenContext();
+        if (screen != null) {
+            sb.append("\nCurrent Mobile Screen:\n");
+            sb.append("- Title: ").append(screen.getTitle() != null ? screen.getTitle() : screen.getRoute()).append("\n");
+            sb.append("- Route: ").append(screen.getRoute()).append("\n");
+            if (screen.getData() != null && !screen.getData().isEmpty()) {
+                sb.append("- Data: ").append(screen.getData()).append("\n");
+            }
+            sb.append("- Tailor your response and recommendations to this active screen.\n");
         }
 
         sb.append("\nOutput format requirement:\n");

@@ -2,6 +2,7 @@ package com.smi.assistant_service.controller;
 
 import com.smi.assistant_service.dto.RahaChatRequest;
 import com.smi.assistant_service.dto.RahaChatResponse;
+import com.smi.assistant_service.dto.RahaPageBriefingRequest;
 import com.smi.assistant_service.service.AssistantService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -32,6 +34,25 @@ public class AssistantController {
             @Valid @RequestBody RahaChatRequest request) {
         RahaChatResponse response = assistantService.chat(request, authorization);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/briefing")
+    public ResponseEntity<RahaChatResponse> getPageBriefing(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @Valid @RequestBody RahaPageBriefingRequest request) {
+        RahaChatResponse response = assistantService.getPageBriefing(request, authorization);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/nudge")
+    public ResponseEntity<Map<String, String>> getNudge(
+            @RequestParam(value = "screenRoute", defaultValue = "dashboard") String screenRoute,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        String nudge = assistantService.getPromptNudge(screenRoute, authorization);
+        return ResponseEntity.ok(Map.of(
+                "screenRoute", screenRoute,
+                "nudge", nudge
+        ));
     }
 
     @DeleteMapping("/conversations/{id}")

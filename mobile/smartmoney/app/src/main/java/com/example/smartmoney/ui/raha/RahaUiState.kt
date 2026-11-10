@@ -14,5 +14,9 @@ data class RahaUiState(
     ),
     val hasUnreadAlert: Boolean = false,
     val alertMessage: String? = null,
-    val conversationId: String? = null
+    val conversationId: String? = null,
+    val currentScreenRoute: String? = null,
+    val currentScreenTitle: String? = null,
+    val promptNudge: String? = null,
+    val isPromptNudgeVisible: Boolean = false
 )

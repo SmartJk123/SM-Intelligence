@@ -154,6 +154,7 @@ fun RahaBottomSheet(
                 // Header
                 RahaHeader(
                     isDark = isDark,
+                    screenTitle = uiState.currentScreenTitle,
                     onClearChat = onClearChat,
                     onClose = onDismiss
                 )
@@ -235,6 +236,7 @@ fun RahaBottomSheet(
 @Composable
 private fun RahaHeader(
     isDark: Boolean,
+    screenTitle: String?,
     onClearChat: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -283,9 +285,28 @@ private fun RahaHeader(
                         .size(8.dp)
                         .background(Color(0xFF4CAF50), CircleShape)
                 )
+
+                if (!screenTitle.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = SmartMoneyColors.AzurePrimary.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, SmartMoneyColors.AzurePrimary.copy(alpha = 0.35f))
+                    ) {
+                        Text(
+                            text = screenTitle,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) SmartMoneyColors.PowderBlue else SmartMoneyColors.AzurePrimary,
+                                fontSize = 11.sp
+                            ),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
             Text(
-                text = "Financial Assistant",
+                text = if (!screenTitle.isNullOrBlank()) "Active screen briefing & analysis" else "Financial Assistant",
                 style = MaterialTheme.typography.bodySmall.copy(
                     color = if (isDark) SmartMoneyColors.DarkTextSecondary.copy(alpha = 0.7f) else SmartMoneyColors.TextMuted,
                     fontSize = 12.sp
