@@ -14,6 +14,17 @@ interface CashFlowData {
   period: { from: string; to: string; days: number };
   summary: { moneyInMinor: number; moneyOutMinor: number; netCashFlowMinor: number };
   cashFlow: { from: string; to: string; moneyInMinor: number; moneyOutMinor: number }[];
+  movements?: Movement[];
+}
+
+interface Movement {
+  id: string;
+  date: string;
+  description: string;
+  bank: string;
+  direction: 'CREDIT' | 'DEBIT';
+  amountMinor: number;
+  allocatedTo: string | null;
 }
 
 @Component({
@@ -106,6 +117,61 @@ interface CashFlowData {
               </div>
             }
           </article>
+          <article class="dashboard-panel">
+            <div class="panel-heading">
+              <div>
+                <h2 class="money-in">↗ Money in</h2>
+                <p>{{ moneyIn().length }} payments · {{ d.summary.moneyInMinor / 100 | currency: 'KES' : 'code' }}</p>
+              </div>
+            </div>
+            @if (!moneyIn().length) {
+              <p class="muted">No money came in during this period.</p>
+            } @else {
+              <div class="dashboard-table-wrap" tabindex="0" aria-label="Money in">
+                <table>
+                  <thead><tr><th>Date</th><th>From</th><th style="text-align: right">Amount (KES)</th></tr></thead>
+                  <tbody>
+                    @for (m of moneyIn(); track m.id) {
+                      <tr>
+                        <td>{{ m.date | date: 'd MMM' : 'UTC' }}</td>
+                        <td>{{ m.description }}<br /><small class="muted">{{ m.bank }}</small></td>
+                        <td class="positive" style="text-align: right">+{{ m.amountMinor / 100 | currency: 'KES' : '' : '1.2-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </article>
+          <article class="dashboard-panel">
+            <div class="panel-heading">
+              <div>
+                <h2 class="money-out">↘ Money out</h2>
+                <p>{{ moneyOut().length }} payments · {{ d.summary.moneyOutMinor / 100 | currency: 'KES' : 'code' }}</p>
+              </div>
+            </div>
+            @if (!moneyOut().length) {
+              <p class="muted">No money went out during this period.</p>
+            } @else {
+              <div class="dashboard-table-wrap" tabindex="0" aria-label="Money out">
+                <table>
+                  <thead><tr><th>Date</th><th>Paid to</th><th style="text-align: right">Amount (KES)</th></tr></thead>
+                  <tbody>
+                    @for (m of moneyOut(); track m.id) {
+                      <tr>
+                        <td>{{ m.date | date: 'd MMM' : 'UTC' }}</td>
+                        <td>
+                          {{ m.description }}<br />
+                          <small class="muted">{{ m.bank }}{{ m.allocatedTo ? ' · ' + m.allocatedTo : '' }}</small>
+                        </td>
+                        <td style="text-align: right">−{{ m.amountMinor / 100 | currency: 'KES' : '' : '1.2-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </article>
         </div>
       }
     </section>
@@ -168,6 +234,9 @@ export class CashFlow {
       this.loading.set(false);
     }
   }
+
+  readonly moneyIn = computed(() => (this.data()?.movements ?? []).filter((m) => m.direction === 'CREDIT'));
+  readonly moneyOut = computed(() => (this.data()?.movements ?? []).filter((m) => m.direction === 'DEBIT'));
 
   readonly chartPoints = computed(() =>
     (this.data()?.cashFlow ?? []).map((p) => ({ from: p.from, to: p.to, in: p.moneyInMinor, out: p.moneyOutMinor })),

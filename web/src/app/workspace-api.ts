@@ -23,6 +23,8 @@ export interface Entry {
   direction: 'CREDIT' | 'DEBIT';
   amountMinor: number;
   status: string;
+  /** The budget or investment the customer allocated this expense to. */
+  allocatedTo?: string | null;
 }
 export interface Budget {
   id: string;
@@ -41,6 +43,9 @@ export interface Investment {
   currentValueMinor: number | null;
   valuationDate: string;
   maturityDate: string;
+  /** Annual interest rate in percent; null when not entered. */
+  interestRate: number | null;
+  startDate: string;
 }
 export interface Profile {
   name: string;

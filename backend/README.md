@@ -91,6 +91,12 @@ the email templates (`email_templates`), all created by Flyway migration `V8__ad
   `GET /api/v1/admin/email-outbox`, `GET /api/v1/admin/email-templates`, `PUT .../email-templates/{key}`,
   `POST .../email-templates/{key}/reset`.
 
+### Investment interest rate
+
+investments-service migration `V2__investment_interest_rate.sql` adds `annual_interest_rate` (percent, 0 to 100, nullable).
+Requests take an optional `interestRate`; leaving it out (older clients such as the current mobile app) keeps the
+saved rate. Responses add `interestRate` and `startDate`, which the web app uses for its maturity forecast.
+
 ### Staff roles, settings and sessions
 
 identity-service migration `V9__staff_settings_sessions.sql` adds staff roles, saved admin settings and the

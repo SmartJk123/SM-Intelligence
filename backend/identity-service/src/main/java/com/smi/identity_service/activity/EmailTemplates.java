@@ -71,7 +71,7 @@ public class EmailTemplates {
                 Temporary password: {{temporaryPassword}}
 
                 Please change this password straight away. You can choose your own password with this link
-                (it works once and expires in 7 days):
+                (it works once and expires in 2 days):
 
                 {{setupLink}}
 
@@ -101,7 +101,7 @@ public class EmailTemplates {
 
                 An account has been created for you as the owner of "{{organisation}}" on SmartMoney.
 
-                Choose your password with this link (it works once and expires in 7 days):
+                Choose your password with this link (it works once and expires in 2 days):
 
                 {{setupLink}}
 
@@ -117,7 +117,7 @@ public class EmailTemplates {
 
                 An account has been created for you as {{role}} on "{{organisation}}" on SmartMoney.
 
-                Choose your password with this link (it works once and expires in 7 days):
+                Choose your password with this link (it works once and expires in 2 days):
 
                 {{setupLink}}
 
@@ -149,7 +149,7 @@ public class EmailTemplates {
                 Temporary password: {{temporaryPassword}}
 
                 Please choose your own password straight away with this link
-                (it works once and expires in 7 days):
+                (it works once and expires in 2 days):
 
                 {{setupLink}}
                 """,

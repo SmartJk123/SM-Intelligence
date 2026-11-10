@@ -5,6 +5,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
 import { LiveUpdates } from './live-updates';
+import { forecast, ForecastInput, InvestmentForecast } from './investment-forecast';
 
 interface AnalyticsData {
   currency: 'KES';
@@ -13,6 +14,7 @@ interface AnalyticsData {
   categories: { category: string; value: number }[];
   categoryTrend: { category: string; monthly: number[] }[];
   transactionCount: number;
+  investments?: (ForecastInput & { id: string; name: string; type: string })[];
 }
 
 @Component({
@@ -87,6 +89,67 @@ interface AnalyticsData {
                 </div>
               }
             </article>
+          </div>
+        }
+        <article class="dashboard-panel" style="margin-top: 20px">
+          <div class="panel-heading">
+            <div>
+              <h2>Investment interest forecast</h2>
+              <p>Simple interest: current value × interest rate (% a year) × time to maturity. Estimates, not guaranteed returns.</p>
+            </div>
+          </div>
+          @if (!forecasts().rows.length) {
+            <p class="muted">
+              @if (d.investments?.length) { Add an interest rate to your investments to see their forecast. }
+              @else { No investments recorded yet. Add one on the Investments page with its interest rate. }
+            </p>
+          } @else {
+            <div class="dashboard-metrics">
+              <article><p>Value today</p><strong>{{ forecasts().baseMinor / 100 | currency: 'KES' : 'code' }}</strong></article>
+              <article><p>Forecast interest</p><strong class="positive">+{{ forecasts().interestMinor / 100 | currency: 'KES' : 'code' }}</strong></article>
+              <article><p>Forecast at maturity</p><strong>{{ forecasts().projectedMinor / 100 | currency: 'KES' : 'code' }}</strong></article>
+            </div>
+            <div class="viz-plot" aria-label="Forecast value by year">
+              <div class="viz-axis">
+                <span>{{ maxYearly() / 100 | currency: 'KES' : '' : '1.0-0' }}</span>
+                <span>{{ maxYearly() / 200 | currency: 'KES' : '' : '1.0-0' }}</span>
+                <span>0</span>
+              </div>
+              <div class="viz-columns">
+                @for (y of forecasts().byYear; track y.year) {
+                  <div class="viz-column" [attr.title]="y.year + ': ' + (y.valueMinor / 100 | currency: 'KES' : 'code')">
+                    <span class="viz-bars"><span class="viz-in" [style.height.%]="(y.valueMinor / maxYearly()) * 100"></span></span>
+                    <small>{{ y.year }}</small>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="dashboard-table-wrap" tabindex="0" aria-label="Forecast by investment">
+              <table>
+                <thead>
+                  <tr><th>Investment</th><th>Rate</th><th>Term</th><th>Time to maturity</th><th style="text-align: right">Value today</th><th style="text-align: right">Forecast</th></tr>
+                </thead>
+                <tbody>
+                  @for (row of forecasts().rows; track row.id) {
+                    <tr>
+                      <td>{{ row.name }}<br /><small class="muted">{{ row.type }}</small></td>
+                      <td>{{ row.f.rate }}%</td>
+                      <td>{{ row.f.termLabel ?? 'No maturity date' }}@if (row.f.termLength) {<br /><small class="muted">{{ row.f.termLength }}</small>}</td>
+                      <td>{{ row.f.remaining ?? '1 year shown' }}</td>
+                      <td style="text-align: right">{{ row.f.baseMinor / 100 | currency: 'KES' : '' : '1.0-0' }}</td>
+                      <td style="text-align: right">
+                        {{ row.f.projectedMinor / 100 | currency: 'KES' : '' : '1.0-0' }}<br />
+                        <small class="positive">+{{ row.f.interestMinor / 100 | currency: 'KES' : '' : '1.0-0' }}</small>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </article>
+        @if (d.transactionCount) {
+          <div class="dashboard-hybrid" style="margin-top: 20px">
             <article class="dashboard-panel" style="grid-column: 1 / -1">
               <div class="panel-heading">
                 <div>
@@ -115,6 +178,29 @@ export class Analysis {
     Math.max(1, ...(this.data()?.monthlySpending.map((m) => m.spendingMinor) ?? [0])),
   );
 
+  /** Each investment's forecast, the totals, and the combined projected value per year. */
+  readonly forecasts = computed(() => {
+    const rows = (this.data()?.investments ?? [])
+      .map((i) => ({ id: i.id, name: i.name, type: i.type, f: forecast(i) }))
+      .filter((r): r is { id: string; name: string; type: string; f: InvestmentForecast } => r.f !== null);
+    const years = new Map<number, number>();
+    for (const r of rows) {
+      const last = r.f.yearly.at(-1)!;
+      // Each holding keeps its maturity value in later years, so the total never dips.
+      for (const y of r.f.yearly) years.set(y.year, (years.get(y.year) ?? 0) + y.valueMinor);
+      const end = Math.max(...rows.map((x) => x.f.yearly.at(-1)!.year));
+      for (let y = last.year + 1; y <= end; y++) years.set(y, (years.get(y) ?? 0) + last.valueMinor);
+    }
+    return {
+      rows,
+      baseMinor: rows.reduce((s, r) => s + r.f.baseMinor, 0),
+      interestMinor: rows.reduce((s, r) => s + r.f.interestMinor, 0),
+      projectedMinor: rows.reduce((s, r) => s + r.f.projectedMinor, 0),
+      byYear: [...years.entries()].sort((a, b) => a[0] - b[0]).slice(0, 30).map(([year, valueMinor]) => ({ year, valueMinor })),
+    };
+  });
+  readonly maxYearly = computed(() => Math.max(1, ...this.forecasts().byYear.map((y) => y.valueMinor)));
+
   constructor() {
     void this.load();
     effect(() => {
@@ -138,6 +224,13 @@ export class Analysis {
       );
       if (d?.currency !== 'KES' || !Array.isArray(d.monthlySpending) || !Array.isArray(d.categories))
         throw new Error('Invalid response');
+      if (!Array.isArray(d.investments)) {
+        // An older web server does not send investments with analytics: read them from the workspace.
+        const w = await firstValueFrom(
+          this.http.get<{ investments?: AnalyticsData['investments'] }>('/api/workspace').pipe(timeout(15000)),
+        ).catch(() => null);
+        d.investments = w?.investments ?? [];
+      }
       this.data.set(d);
       this.selectedMonth.set(Math.max(0, d.monthlySpending.length - 1));
     } catch (error) {

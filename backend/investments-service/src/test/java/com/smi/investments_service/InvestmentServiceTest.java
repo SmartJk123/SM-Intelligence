@@ -24,7 +24,7 @@ class InvestmentServiceTest {
     private static InvestmentRequest request(UUID owner, String type, String principal, String value,
                                              LocalDate valued, LocalDate matures) {
         return new InvestmentRequest(owner, "Sacco fund", type, new BigDecimal(principal),
-                value == null ? null : new BigDecimal(value), valued, matures, null);
+                value == null ? null : new BigDecimal(value), valued, matures, null, null);
     }
 
     @Test
@@ -92,6 +92,25 @@ class InvestmentServiceTest {
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
         assertThatThrownBy(() -> service.create(request(owner, "Other", "-5", null, LocalDate.now(), null)))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+    @Test
+    void keepsTheInterestRateAndStartDateAndRefusesARateOutsideZeroToHundred() {
+        UUID owner = UUID.randomUUID();
+        LocalDate start = LocalDate.of(2026, 1, 15);
+        InvestmentRequest withRate = new InvestmentRequest(owner, "Fixed deposit", "Fixed Deposit", new BigDecimal("100000"),
+                new BigDecimal("100000"), start, LocalDate.of(2036, 1, 15), null, new BigDecimal("12.5"));
+        InvestmentResponse created = service.create(withRate);
+        assertThat(created.interestRate()).isEqualByComparingTo("12.5");
+        assertThat(created.startDate()).isEqualTo(start);
+
+        // An update without a rate (an older client) keeps the saved one.
+        InvestmentResponse updated = service.update(created.id(), new InvestmentRequest(owner, "Fixed deposit", "Fixed Deposit",
+                new BigDecimal("100000"), new BigDecimal("101000"), start.plusMonths(1), LocalDate.of(2036, 1, 15), null, null));
+        assertThat(updated.interestRate()).isEqualByComparingTo("12.5");
+
+        assertThatThrownBy(() -> service.create(new InvestmentRequest(owner, "Bad", "Other", BigDecimal.ONE, null, start, null, null,
+                new BigDecimal("101"))))
                 .isInstanceOf(ResponseStatusException.class);
     }
 }
