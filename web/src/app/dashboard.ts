@@ -253,7 +253,7 @@ interface DashboardData {
           @if (!d.transactions.length) {
             <div class="dashboard-empty">
               <h3>{{ data() ? 'No transactions yet' : 'No transaction data available' }}</h3>
-              <p>Your activity will appear here once transaction records are available. <a routerLink="/invoices">View invoice records</a></p>
+              <p>Your activity will appear here once transaction records are available.</p>
             </div>
           } @else {
             <div class="dashboard-table-wrap" tabindex="0" aria-label="Recent transactions">

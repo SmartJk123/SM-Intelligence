@@ -239,7 +239,11 @@ Sections render conditionally from WorkspacePage.page.
           >
         </div>
         <article class="ws-card">
-          <p>{{ rows.length }} matching records</p>
+          <p>{{ rows.length }} matching records. Use <strong>Allocate</strong> on money out to say what it was for (a budget or an investment).</p>
+          @if (allocationError) { <p class="ws-alert" role="alert">{{ allocationError }}</p> }
+          @if (!allocationTargets.budgets.length && !allocationTargets.investments.length) {
+            <p class="ws-muted">Add a budget or an investment first, then allocate expenses to it.</p>
+          }
           <div class="ws-table-wrap" tabindex="0" aria-label="Transaction ledger">
             <table>
               <thead>
@@ -249,6 +253,7 @@ Sections render conditionally from WorkspacePage.page.
                   <th>Account</th>
                   <th>Status</th>
                   <th>Amount (KES)</th>
+                  <th>Spent on</th>
                 </tr>
               </thead>
               <tbody>
@@ -267,10 +272,39 @@ Sections render conditionally from WorkspacePage.page.
                       {{ t.direction === 'CREDIT' ? '+' : '−'
                       }}{{ t.amountMinor / 100 | currency: 'KES' : '' }}
                     </td>
+                    <td class="ws-allocate">
+                      @if (t.direction === 'DEBIT') {
+                        @if (allocatingId === t.id) {
+                          <select
+                            [attr.aria-label]="'What ' + t.description + ' was for'"
+                            [value]="t.allocatedTo ?? ''"
+                            (change)="allocate(t, $any($event.target).value)"
+                          >
+                            <option value="">Not allocated</option>
+                            @if (allocationTargets.budgets.length) {
+                              <optgroup label="Budgets">
+                                @for (c of allocationTargets.budgets; track c) { <option [value]="c">{{ c }}</option> }
+                              </optgroup>
+                            }
+                            @if (allocationTargets.investments.length) {
+                              <optgroup label="Investments">
+                                @for (c of allocationTargets.investments; track c) { <option [value]="c">{{ c }}</option> }
+                              </optgroup>
+                            }
+                          </select>
+                          <button class="ws-link" type="button" (click)="allocatingId = ''">Cancel</button>
+                        } @else {
+                          @if (t.allocatedTo) { <span class="ws-tag">{{ t.allocatedTo }}</span> }
+                          <button class="ws-link" type="button" (click)="allocatingId = t.id; allocationError = ''">
+                            {{ t.allocatedTo ? 'Change' : 'Allocate' }}
+                          </button>
+                        }
+                      }
+                    </td>
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="5">
+                    <td colspan="6">
                       No matching transactions. Try a wider date range, another account or clear the search.
                     </td>
                   </tr>
@@ -407,6 +441,12 @@ Sections render conditionally from WorkspacePage.page.
                 : ((portfolio - principal) / 100 | currency: 'KES' : 'code')
             }}</strong>
           </article>
+          <article>
+            <p>Forecast at maturity</p>
+            <strong>{{
+              forecastTotal === null ? 'Add interest rates' : (forecastTotal / 100 | currency: 'KES' : 'code')
+            }}</strong>
+          </article>
         </div>
         <div class="ws-section-title">
           <h2>Investment records</h2>
@@ -426,6 +466,26 @@ Sections render conditionally from WorkspacePage.page.
               <p>
                 Valued {{ i.valuationDate }}<br />Maturity: {{ i.maturityDate || 'Not specified' }}
               </p>
+              @if (forecastOf(i); as f) {
+                <div class="ws-forecast">
+                  <p>Interest rate: <strong>{{ f.rate }}% a year</strong></p>
+                  @if (f.termLabel) {
+                    <p>Term: <strong>{{ f.termLabel }}</strong> ({{ f.termLength }})</p>
+                    <p>Time to maturity: <strong>{{ f.remaining }}</strong></p>
+                    <p>
+                      Forecast at maturity: <strong>{{ f.projectedMinor / 100 | currency: 'KES' : 'code' }}</strong>
+                      <small>(+{{ f.interestMinor / 100 | currency: 'KES' : 'code' }} interest)</small>
+                    </p>
+                  } @else {
+                    <p>
+                      In one year: <strong>{{ f.projectedMinor / 100 | currency: 'KES' : 'code' }}</strong>
+                      <small>(+{{ f.interestMinor / 100 | currency: 'KES' : 'code' }}). Add a maturity date for the full forecast.</small>
+                    </p>
+                  }
+                </div>
+              } @else {
+                <p class="ws-muted">Add an interest rate to see the maturity forecast.</p>
+              }
               <div class="ws-actions">
                 <button class="ws-link" (click)="open('investments', i)">Edit record</button
                 ><button
@@ -443,8 +503,8 @@ Sections render conditionally from WorkspacePage.page.
           }
         </div>
         <p class="ws-muted">
-          Recorded valuations are separate from available cash. This page does not execute
-          investments or calculate guaranteed returns.
+          Recorded valuations are separate from available cash. Forecasts use simple interest
+          (value × rate × time to maturity) and are estimates, not guaranteed returns.
         </p>
       }
       @case ('analysis') {
