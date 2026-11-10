@@ -1,0 +1,31 @@
+meta {
+  name: Record Audit Log
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{auditBaseUrl}}/api/audit
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "sourceService": "accounts-service",
+    "tableName": "accounts",
+    "recordId": "00000000-0000-0000-0000-000000000001",
+    "action": "UPDATE",
+    "oldData": "{\"balance\": 200000.00, \"currency\": \"KES\"}",
+    "newData": "{\"balance\": 250000.00, \"currency\": \"KES\"}",
+    "changedBy": "00000000-0000-0000-0000-000000000002"
+  }
+}
+
+vars:post-response {
+  auditLogId: res.body.id
+}
