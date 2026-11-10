@@ -1624,3 +1624,11 @@ html[data-theme='dark'] .workspace-shell .dashboard-metrics article { padding:18
 .ws-session small {
   color: var(--ws-muted);
 }
+
+/* Transactions: "Allocate" an expense to a budget or investment. */
+.ws-allocate { white-space: nowrap; }
+.ws-allocate select { padding: 4px 8px; border-radius: 8px; border: 1px solid var(--ws-border, #dce6f1); max-width: 200px; }
+.ws-allocate .ws-tag { margin-right: 6px; }
+/* Investments: maturity forecast block on each card. */
+.ws-forecast { border-top: 1px solid var(--ws-border, #dce6f1); margin-top: 10px; padding-top: 10px; }
+.ws-forecast p { margin: 4px 0; }
