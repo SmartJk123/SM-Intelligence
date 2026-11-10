@@ -106,14 +106,14 @@ export class FinanceChart {
         aria-label="Category share of posted debits. Select a labeled category for exact values."
       >
         <div>
-          <small>{{ selected() || 'Total posted debits' }}</small
+          <small>{{ selected() || 'Total spent' }}</small
           ><strong>{{ value() / 100 | currency: 'KES' : 'code' }}</strong
-          ><span>{{ selected() ? percent(value()) + '% of total' : 'All categories' }}</span>
+          ><span>{{ selected() ? share(value()) + ' of total' : points().length + ' categories' }}</span>
         </div>
       </div>
       <div class="category-legend">
         <button (click)="selected.set('')" [attr.aria-pressed]="!selected()">
-          All categories <strong>100%</strong>
+          <span>All categories</span><strong>{{ total() / 100 | currency: 'KES' : 'code' : '1.0-0' }} · 100%</strong>
         </button>
         @for (p of points(); track p.category; let i = $index) {
           <button
@@ -121,14 +121,14 @@ export class FinanceChart {
             [attr.aria-pressed]="selected() === p.category"
           >
             <i [style.background]="colors[i % colors.length]"></i><span>{{ p.category }}</span
-            ><strong>{{ percent(p.value) }}%</strong>
+            ><strong>{{ p.value / 100 | currency: 'KES' : 'code' : '1.0-2' }} · {{ share(p.value) }}</strong>
           </button>
         }
       </div>
     </div>
     <p class="viz-hint" aria-live="polite">
-      {{ selected() || 'All categories' }}: {{ value() / 100 | currency: 'KES' : 'code' }} in posted
-      debits.
+      {{ selected() || 'All categories' }}: {{ value() / 100 | currency: 'KES' : 'code' }} spent
+      ({{ selected() ? share(value()) : '100%' }}). Select a category for its amount.
     </p>
   `,
 })
@@ -145,6 +145,13 @@ export class CategoryChart {
   }
   percent(v: number) {
     return this.total() ? Math.round((v / this.total()) * 100) : 0;
+  }
+  /** Share of the total as text; small shares keep a decimal so they never read as 0%. */
+  share(v: number) {
+    if (!this.total() || v <= 0) return '0%';
+    const pct = (v / this.total()) * 100;
+    if (pct < 0.1) return '<0.1%';
+    return (pct >= 10 ? Math.round(pct) : Math.round(pct * 10) / 10) + '%';
   }
   gradient() {
     let start = 0;

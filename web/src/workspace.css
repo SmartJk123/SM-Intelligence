@@ -1632,3 +1632,8 @@ html[data-theme='dark'] .workspace-shell .dashboard-metrics article { padding:18
 /* Investments: maturity forecast block on each card. */
 .ws-forecast { border-top: 1px solid var(--ws-border, #dce6f1); margin-top: 10px; padding-top: 10px; }
 .ws-forecast p { margin: 4px 0; }
+
+/* Analytics: inline interest rate entry for an investment without one. */
+.forecast-rate { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding: 12px 0; border-bottom: 1px solid var(--ws-border, #dce6f1); }
+.forecast-rate label { display: grid; gap: 4px; font-size: 12px; }
+.forecast-rate input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--ws-border, #dce6f1); width: 140px; }

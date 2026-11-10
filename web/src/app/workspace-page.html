@@ -277,18 +277,17 @@ Sections render conditionally from WorkspacePage.page.
                         @if (allocatingId === t.id) {
                           <select
                             [attr.aria-label]="'What ' + t.description + ' was for'"
-                            [value]="t.allocatedTo ?? ''"
                             (change)="allocate(t, $any($event.target).value)"
                           >
-                            <option value="">Not allocated</option>
+                            <option value="" [selected]="!t.allocatedTo">Not allocated</option>
                             @if (allocationTargets.budgets.length) {
                               <optgroup label="Budgets">
-                                @for (c of allocationTargets.budgets; track c) { <option [value]="c">{{ c }}</option> }
+                                @for (c of allocationTargets.budgets; track c) { <option [value]="c" [selected]="t.allocatedTo === c">{{ c }}</option> }
                               </optgroup>
                             }
                             @if (allocationTargets.investments.length) {
                               <optgroup label="Investments">
-                                @for (c of allocationTargets.investments; track c) { <option [value]="c">{{ c }}</option> }
+                                @for (c of allocationTargets.investments; track c) { <option [value]="c" [selected]="t.allocatedTo === c">{{ c }}</option> }
                               </optgroup>
                             }
                           </select>
@@ -469,6 +468,10 @@ Sections render conditionally from WorkspacePage.page.
               @if (forecastOf(i); as f) {
                 <div class="ws-forecast">
                   <p>Interest rate: <strong>{{ f.rate }}% a year</strong></p>
+                  <p>
+                    Worth today: <strong>{{ f.valueTodayMinor / 100 | currency: 'KES' : 'code' }}</strong>
+                    <small>(+{{ f.earnedSoFarMinor / 100 | currency: 'KES' : 'code' }} over {{ f.heldFor }})</small>
+                  </p>
                   @if (f.termLabel) {
                     <p>Term: <strong>{{ f.termLabel }}</strong> ({{ f.termLength }})</p>
                     <p>Time to maturity: <strong>{{ f.remaining }}</strong></p>

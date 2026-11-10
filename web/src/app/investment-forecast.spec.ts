@@ -31,4 +31,14 @@ describe('Investment forecast', () => {
     expect(past.remaining).toBe('Matured');
     expect(describeMonths(18)).toBe('1 year 6 months');
   });
+
+  it('estimates the worth today from the start date at the annual rate', () => {
+    // KES 100,000 from 1 Jan 2026 at 12% a year, checked on 1 Jul 2026: about half a year of interest.
+    const f = forecast({ principalMinor: 10_000_000, currentValueMinor: 10_000_000, valuationDate: '2026-01-01',
+      maturityDate: '2027-12-30', interestRate: 12, startDate: '2026-01-01' }, new Date('2026-07-01T00:00:00Z'))!;
+    expect(Math.abs(f.valueTodayMinor - 10_595_000)).toBeLessThan(5_000);
+    expect(f.earnedSoFarMinor).toBe(f.valueTodayMinor - 10_000_000);
+    expect(f.heldFor).toBe('6 months');
+    expect(f.termLabel).toBe('2026–2027');
+  });
 });
