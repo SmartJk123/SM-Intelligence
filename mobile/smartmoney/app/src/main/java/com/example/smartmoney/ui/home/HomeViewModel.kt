@@ -1,7 +1,5 @@
 package com.example.smartmoney.ui.home
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -191,21 +189,6 @@ class HomeViewModel(
         _selectedMonth.value = month
     }
 
-    /**
-     * Shifts the selected analytics month one month into the past.
-     */
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun previousMonth() {
-        _selectedMonth.value = _selectedMonth.value.minusMonths(1)
-    }
-
-    /**
-     * Shifts the selected analytics month one month into the future.
-     */
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun nextMonth() {
-        _selectedMonth.value = _selectedMonth.value.plusMonths(1)
-    }
 
     /**
      * Synchronizes transactions and accounts from remote backend services off the Main thread.
@@ -275,6 +258,19 @@ class HomeViewModel(
      */
     fun clearGlow() {
         _glowEvent.value = null
+    }
+
+    /** Shows the month before the one on screen. */
+    fun previousMonth() {
+        _selectedMonth.value = _selectedMonth.value.minusMonths(1)
+    }
+
+    /** Shows the month after the one on screen, never beyond the current month. */
+    fun nextMonth() {
+        val next = _selectedMonth.value.plusMonths(1)
+        if (!next.isAfter(YearMonth.now())) {
+            _selectedMonth.value = next
+        }
     }
 
     class Factory(

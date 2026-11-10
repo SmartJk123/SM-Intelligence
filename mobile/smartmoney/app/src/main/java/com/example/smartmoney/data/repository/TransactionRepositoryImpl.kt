@@ -151,11 +151,18 @@ class TransactionRepositoryImpl(
                                 description = kcbTx.narration ?: "$bankUpper ${kcbTx.direction} - ${kcbTx.reference}",
                                 providerTransactionId = kcbTx.reference,
                                 createdAt = kcbTx.createdAt ?: nowIso,
-                                updatedAt = kcbTx.createdAt ?: nowIso
+                                updatedAt = kcbTx.createdAt ?: nowIso,
+                                source = "REMOTE",
+                                syncStatus = "SYNCED"
                             )
                         }
                     }
                     if (kcbEntities.isNotEmpty()) {
+                        for (entity in kcbEntities) {
+                            if (!entity.providerTransactionId.isNullOrBlank()) {
+                                localDao.removeSupersededDuplicates(entity.providerTransactionId, entity.id)
+                            }
+                        }
                         localDao.upsertTransactions(kcbEntities)
                     }
 
@@ -240,8 +247,13 @@ class TransactionRepositoryImpl(
                     }
                     val entities = domainTransactions
                         .filter { it.accountId in targetAccountIds }
-                        .map { TransactionEntity.fromDomain(it, userId = targetUserId) }
+                        .map { TransactionEntity.fromDomain(it, userId = targetUserId).copy(source = "REMOTE", syncStatus = "SYNCED") }
                     if (entities.isNotEmpty()) {
+                        for (entity in entities) {
+                            if (!entity.providerTransactionId.isNullOrBlank()) {
+                                localDao.removeSupersededDuplicates(entity.providerTransactionId, entity.id)
+                            }
+                        }
                         localDao.upsertTransactions(entities)
 
                         // Ingest in-app notifications for live remote movements (e.g. NCBA live webhooks)
@@ -347,11 +359,20 @@ class TransactionRepositoryImpl(
                             ?: "${item.bank ?: "Bank"} ${item.direction.lowercase(Locale.ROOT)}",
                         providerTransactionId = item.id,
                         createdAt = item.receivedAt ?: booked,
-                        updatedAt = item.receivedAt ?: booked
+                        updatedAt = item.receivedAt ?: booked,
+                        source = "REMOTE",
+                        syncStatus = "SYNCED"
                     )
                 }
             }
-            localDao.upsertTransactions(entities)
+            if (entities.isNotEmpty()) {
+                for (entity in entities) {
+                    if (!entity.providerTransactionId.isNullOrBlank()) {
+                        localDao.removeSupersededDuplicates(entity.providerTransactionId, entity.id)
+                    }
+                }
+                localDao.upsertTransactions(entities)
+            }
 
             // In-app notifications (bell). IGNORE on conflict, so repeats are never duplicated.
             if (notificationDao != null) {

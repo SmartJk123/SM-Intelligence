@@ -164,4 +164,40 @@ object NotificationHelper {
 
         postSystemNotification(context, title, message)
     }
+
+    suspend fun recordBankIngestionAlert(
+        context: Context,
+        notificationDao: NotificationDao?,
+        bankName: String,
+        amount: BigDecimal,
+        direction: String,
+        reference: String,
+        description: String? = null
+    ) {
+        val isCredit = direction.equals("CREDIT", ignoreCase = true)
+        val formattedAmount = DecimalFormat("#,##0.00").format(amount)
+        val title = if (isCredit) "$bankName Inflow Received" else "$bankName Outflow Recorded"
+        val descPart = if (!description.isNullOrBlank()) "$description • " else ""
+        val message = "${descPart}KES $formattedAmount (Ref: $reference)"
+
+        val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
+        val cleanBank = bankName.lowercase(Locale.ROOT).replace(" ", "_")
+        val notifId = "notif_${cleanBank}_$reference"
+
+        if (notificationDao != null) {
+            val entity = NotificationEntity(
+                id = notifId,
+                title = title,
+                message = message,
+                amount = amount,
+                type = if (isCredit) "CREDIT" else "DEBIT",
+                timestamp = timestamp,
+                reference = reference,
+                isRead = false
+            )
+            notificationDao.insertNotification(entity)
+        }
+
+        postSystemNotification(context, title, message)
+    }
 }

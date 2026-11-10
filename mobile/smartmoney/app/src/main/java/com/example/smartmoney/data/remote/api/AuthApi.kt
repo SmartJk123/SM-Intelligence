@@ -33,6 +33,15 @@ data class RegisterRequest(
 )
 
 /**
+ * Request payload for refreshing an authentication token.
+ */
+@Serializable
+data class RefreshTokenRequest(
+    @SerialName("refreshToken")
+    val refreshToken: String
+)
+
+/**
  * Request payload for user login authentication.
  */
 @Serializable
@@ -77,6 +86,9 @@ data class AuthResponse(
 
     @SerialName("accessToken")
     val accessToken: String? = null,
+
+    @SerialName("refreshToken")
+    val refreshToken: String? = null,
 
     @SerialName("tokenType")
     val tokenType: String? = null,
@@ -135,4 +147,13 @@ interface AuthApi {
      */
     @retrofit2.http.GET("api/auth/me")
     suspend fun getCurrentUser(): Response<UserProfileResponse>
+
+    /**
+     * Refreshes an expired or expiring authentication token.
+     * Backend endpoint: POST /api/auth/refresh
+     */
+    @POST("api/auth/refresh")
+    suspend fun refreshToken(
+        @Body request: RefreshTokenRequest
+    ): Response<AuthResponse>
 }

@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.biometric)
     ksp(libs.androidx.room.compiler)
 
     // Supabase & Networking

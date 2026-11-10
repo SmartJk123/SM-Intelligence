@@ -112,10 +112,11 @@ class AuthRemoteDataSource(
     ): Result<AuthResponse> = login(email, password)
 
     /**
-     * Validates the active session against GET /api/auth/me on app launch.
+     * Validates the active session against GET /api/auth/me on cold start.
      */
     suspend fun validateRemoteSession(): Result<Unit> {
-        if (authToken.isNullOrBlank()) {
+        val currentToken = authToken ?: userPreferencesRepository?.getAuthToken()
+        if (currentToken.isNullOrBlank()) {
             signOut()
             return Result.failure(Exception("No active session token"))
         }
@@ -126,18 +127,52 @@ class AuthRemoteDataSource(
                 currentUserName = user.name ?: currentUserName
                 currentUserEmail = user.emailAddress ?: currentUserEmail
                 currentUserPhoneNumber = user.phoneNumber ?: currentUserPhoneNumber
-                userPreferencesRepository?.saveAuthSession(authToken, currentUserId, currentUserName, currentUserEmail, currentUserPhoneNumber)
+                userPreferencesRepository?.saveAuthSession(
+                    token = currentToken,
+                    userId = currentUserId,
+                    name = currentUserName,
+                    email = currentUserEmail,
+                    phoneNumber = currentUserPhoneNumber,
+                    refreshToken = userPreferencesRepository?.getRefreshToken()
+                )
                 Result.success(Unit)
-            } else if (response.code() == 401 || response.code() == 403) {
-                signOut()
-                Result.failure(Exception("Session token has expired"))
+            } else if (response.code() == 401) {
+                val refreshResult = refreshSession()
+                if (refreshResult.isSuccess) {
+                    Result.success(Unit)
+                } else {
+                    signOut()
+                    Result.failure(Exception("Session token has expired"))
+                }
             } else {
-                // Keep local session if server returns transient error
+                // Keep local session if server returns transient error or non-401 code
                 Result.success(Unit)
             }
         } catch (e: Exception) {
             // Keep local offline session if server is temporarily unreachable
             Result.success(Unit)
+        }
+    }
+
+    /**
+     * Refreshes the session using the stored refresh token if available.
+     */
+    suspend fun refreshSession(): Result<Unit> {
+        val refreshToken = userPreferencesRepository?.getRefreshToken()
+        if (refreshToken.isNullOrBlank()) {
+            return Result.failure(Exception("No refresh token available"))
+        }
+        return try {
+            val response = authApi.refreshToken(com.example.smartmoney.data.remote.api.RefreshTokenRequest(refreshToken))
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                updateSession(body, currentUserEmail ?: "", currentUserName)
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Refresh token was rejected by server"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
@@ -186,7 +221,14 @@ class AuthRemoteDataSource(
 
         userPreferencesRepository?.let { prefs ->
             CoroutineScope(Dispatchers.IO).launch {
-                prefs.saveAuthSession(authToken, currentUserId, currentUserName, currentUserEmail, currentUserPhoneNumber)
+                prefs.saveAuthSession(
+                    token = authToken,
+                    userId = currentUserId,
+                    name = currentUserName,
+                    email = currentUserEmail,
+                    phoneNumber = currentUserPhoneNumber,
+                    refreshToken = body.refreshToken ?: prefs.getRefreshToken()
+                )
             }
         }
     }

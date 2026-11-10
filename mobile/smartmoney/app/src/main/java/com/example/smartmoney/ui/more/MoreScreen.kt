@@ -63,9 +63,11 @@ fun MoreScreen(
     userId: String? = null,
     isDarkMode: Boolean = false,
     onToggleDarkMode: (Boolean) -> Unit = {},
+    appLockManager: com.example.smartmoney.core.security.AppLockManager? = null,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
+    val effectiveLockManager = appLockManager ?: (context.applicationContext as? com.example.smartmoney.SmartMoneyApplication)?.container?.appLockManager
     val isDark = LocalDarkTheme.current
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -281,6 +283,21 @@ fun MoreScreen(
                     onCheckedChange = onToggleDarkMode
                 )
             }
+        }
+
+        if (effectiveLockManager != null) {
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "Security & Privacy",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            com.example.smartmoney.ui.security.BiometricSecuritySettingsCard(appLockManager = effectiveLockManager)
         }
 
         Spacer(modifier = Modifier.height(20.dp))

@@ -27,7 +27,10 @@ data class TransactionDto(
         description = description,
         providerTransactionId = providerTransactionId,
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        status = "COMPLETED",
+        source = "REMOTE",
+        syncStatus = "SYNCED"
     )
 
     companion object {

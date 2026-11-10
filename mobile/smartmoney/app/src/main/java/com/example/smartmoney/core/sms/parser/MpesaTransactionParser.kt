@@ -227,6 +227,7 @@ class MpesaTransactionParser {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
+
     private fun parseDateTime(text: String): LocalDateTime? {
         val match = DATE_TIME_REGEX.find(text) ?: return null
         val value = match.value.trim().replace(WHITE_SPACE_REGEX, " ").uppercase(Locale.ENGLISH)

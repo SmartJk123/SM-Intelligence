@@ -15,6 +15,8 @@ import kotlinx.coroutines.tasks.await
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import com.example.smartmoney.core.ocr.BitmapOcrOptimizer
+import com.example.smartmoney.core.ocr.InvoiceSpatialExtractor
 import com.example.smartmoney.data.remote.RetrofitClient
 import java.math.BigDecimal
 
@@ -57,33 +59,23 @@ class InvoiceViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.Default) {
             _isScanning.value = true
             try {
-                val image = InputImage.fromBitmap(bitmap, 0)
+                // Downscale to bounded OCR dimensions off the main thread to eliminate GC churn and accelerate inference
+                val optimizedBitmap = BitmapOcrOptimizer.prepareForOcr(bitmap)
+                val image = InputImage.fromBitmap(optimizedBitmap, 0)
+
                 // Use coroutines to await the result from the Play Services Task API off the main thread
                 val visionText = recognizer.process(image).await()
-                val fullText = visionText.text
-                _extractedText.value = fullText
-                
-                // Very basic regex to find a date
-                val dateRegex = """\d{2,4}[-/]\d{1,2}[-/]\d{1,4}""".toRegex()
-                val matchDate = dateRegex.find(fullText)
-                if (matchDate != null && _invoiceDate.value.isEmpty()) {
-                    _invoiceDate.value = matchDate.value
-                }
-                
-                // Very basic regex to find total amount (look for Total followed by a number)
-                val amountRegex = """(?i)Total[^\d]*?([\d,\.]+)""".toRegex()
-                val matchAmount = amountRegex.find(fullText)
-                if (matchAmount != null && matchAmount.groupValues.size > 1 && _amount.value.isEmpty()) {
-                    val a = matchAmount.groupValues[1].replace(",", "")
-                    if (a.toDoubleOrNull() != null) {
-                        _amount.value = a
-                    }
-                }
 
-                // If vendor is empty, just take the first line
-                if (fullText.isNotBlank() && _vendor.value.isEmpty()) {
-                    _vendor.value = fullText.lines().firstOrNull { it.isNotBlank() } ?: ""
-                }
+                // Extract structured fields via 2D spatial geometry analysis
+                val extracted = InvoiceSpatialExtractor.extract(visionText)
+                _extractedText.value = extracted.rawText
+
+                extracted.vendor?.takeIf { it.isNotBlank() }?.let { _vendor.value = it }
+                extracted.invoiceNumber?.takeIf { it.isNotBlank() }?.let { _invoiceNumber.value = it }
+                extracted.amount?.takeIf { it.isNotBlank() }?.let { _amount.value = it }
+                extracted.currency.takeIf { it.isNotBlank() }?.let { _currency.value = it }
+                extracted.invoiceDate?.takeIf { it.isNotBlank() }?.let { _invoiceDate.value = it }
+                extracted.dueDate?.takeIf { it.isNotBlank() }?.let { _dueDate.value = it }
 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -92,25 +84,36 @@ class InvoiceViewModel : ViewModel() {
             }
         }
     }
+
+    override fun onCleared() {
+        super.onCleared()
+        try {
+            recognizer.close()
+        } catch (e: Exception) {
+            // Ignore failure during recognizer cleanup
+        }
+    }
     
-    // Instead of directly making API call, this returns the filled transaction
-    // so DashboardScreen can pass it to TransactionViewModel
-    fun getPendingTransaction(): Transaction? {
+    // Returns the parsed transaction so DashboardScreen can pass it to TransactionViewModel
+    fun getInvoiceTransaction(): Transaction? {
         if (_vendor.value.isBlank() || _amount.value.isBlank() || _invoiceDate.value.isBlank()) return null
         
         val parsedAmount = try { BigDecimal(_amount.value) } catch (e: Exception) { BigDecimal.ZERO }
         
         return Transaction(
-            id = "pending_${System.currentTimeMillis()}",
+            id = "invoice_${System.currentTimeMillis()}",
             accountId = "INVOICE",
             amount = parsedAmount,
             type = "DEBIT",
             timestamp = "${_invoiceDate.value}T00:00:00Z",
             description = _vendor.value,
-            status = "PENDING",
-            source = "INVOICE"
+            status = "COMPLETED",
+            source = "LOCAL_INVOICE",
+            syncStatus = "LOCAL_ONLY"
         )
     }
+
+    fun getPendingTransaction(): Transaction? = getInvoiceTransaction()
 
     fun clearData() {
         _vendor.value = ""

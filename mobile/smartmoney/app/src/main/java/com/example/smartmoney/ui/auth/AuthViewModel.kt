@@ -130,6 +130,16 @@ class AuthViewModel(
         _authState.value = AuthState.Idle
     }
 
+    /**
+     * Proactively verifies remote session validity against GET /api/auth/me.
+     * Automatically clears expired session and triggers logout if rejected.
+     */
+    fun validateSession() {
+        viewModelScope.launch(dispatchers.io) {
+            authRepository.validateSession()
+        }
+    }
+
     class Factory(
         private val authRepository: AuthRepository,
         private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()

@@ -3,6 +3,8 @@ package com.example.smartmoney.core.di
 import android.content.Context
 import com.example.smartmoney.core.coroutine.DefaultDispatcherProvider
 import com.example.smartmoney.core.coroutine.DispatcherProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import com.example.smartmoney.data.local.UserPreferencesRepository
 import com.example.smartmoney.data.local.database.AppDatabase
 import com.example.smartmoney.data.remote.RetrofitClient
@@ -40,6 +42,9 @@ interface AppContainer {
     val userPreferencesRepository: UserPreferencesRepository
     val rahaRepository: com.example.smartmoney.domain.repository.RahaRepository
     val mpesaTransactionIngestionService: com.example.smartmoney.core.sms.ingestion.MpesaTransactionIngestionService
+    val bankTransactionIngestionService: com.example.smartmoney.core.sms.ingestion.BankTransactionIngestionService
+    val appLockManager: com.example.smartmoney.core.security.AppLockManager
+    val networkMonitor: com.example.smartmoney.core.network.NetworkMonitor
 
     /**
      * Creates or provides a [BankAccountRepository] scoped to a specific user ID.
@@ -54,6 +59,14 @@ class DefaultAppContainer(
     private val context: Context,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : AppContainer {
+
+    init {
+        RetrofitClient.onSessionExpiredListener = {
+            kotlinx.coroutines.CoroutineScope(dispatchers.io).launch {
+                authRepository.signOut()
+            }
+        }
+    }
 
     override val database: AppDatabase by lazy {
         AppDatabase.getDatabase(context)
@@ -161,5 +174,23 @@ class DefaultAppContainer(
             userIdProvider = { authRepository.currentUserId() },
             dispatchers = dispatchers
         )
+    }
+
+    override val bankTransactionIngestionService: com.example.smartmoney.core.sms.ingestion.BankTransactionIngestionService by lazy {
+        com.example.smartmoney.core.sms.ingestion.BankTransactionIngestionService(
+            transactionDao = database.transactionDao(),
+            accountDao = database.accountDao(),
+            userIdProvider = { authRepository.currentUserId() },
+            dispatchers = dispatchers
+        )
+    }
+
+    override val appLockManager: com.example.smartmoney.core.security.AppLockManager by lazy {
+        val storage = com.example.smartmoney.core.security.SecurityStorageHelper(context)
+        com.example.smartmoney.core.security.AppLockManager(storage)
+    }
+
+    override val networkMonitor: com.example.smartmoney.core.network.NetworkMonitor by lazy {
+        com.example.smartmoney.core.network.LiveNetworkMonitor(context)
     }
 }

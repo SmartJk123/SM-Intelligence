@@ -85,6 +85,7 @@ import com.example.smartmoney.ui.transactions.TransactionScreen
 import com.example.smartmoney.ui.transactions.TransactionViewModel
 import com.example.smartmoney.ui.analytics.AnalyticsViewModel
 import com.example.smartmoney.ui.analytics.AnalyticsScreen
+import com.example.smartmoney.ui.cashflow.CashFlowScreen
 import com.example.smartmoney.ui.reports.ReportsViewModel
 import com.example.smartmoney.ui.reports.ReportsScreen
 import kotlinx.coroutines.launch
@@ -131,7 +132,7 @@ fun DashboardScreen(
         val minor = investmentUiState.portfolioValuationMinor ?: investmentUiState.totalPrincipalMinor
         val explicitInvestments = java.math.BigDecimal(minor).divide(java.math.BigDecimal(100))
         val alreadyInRepo = investmentUiState.investments.any {
-            it.name.contains("M-Shwari", ignoreCase = true)
+            it.name.contains("M-Shwari", ignoreCase = true) || it.name.contains("MSHWARI", ignoreCase = true)
         }
         if (alreadyInRepo) {
             explicitInvestments
@@ -315,7 +316,22 @@ fun DashboardScreen(
                 }
             }
             composable(Screen.CashFlow.route) {
-                FeaturePlaceholderScreen(Screen.CashFlow, onBack = { navController.popBackStack() })
+                CashFlowScreen(
+                    homeViewModel = homeViewModel,
+                    transactionViewModel = transactionViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToTransactions = {
+                        navController.popBackStack(Screen.Dashboard.route, inclusive = false)
+                        coroutineScope.launch {
+                            bottomBarPagerState.scrollToPage(2)
+                        }
+                    },
+                    onNavigateToReports = {
+                        if (reportsViewModel != null) {
+                            navController.navigate(Screen.Reports.route)
+                        }
+                    }
+                )
             }
             composable(Screen.Budgets.route) {
                 BudgetScreen(

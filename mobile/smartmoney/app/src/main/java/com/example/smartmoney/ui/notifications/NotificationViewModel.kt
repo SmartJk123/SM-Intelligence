@@ -68,6 +68,22 @@ class NotificationViewModel(
     ) { list, filter ->
         when (filter) {
             "UNREAD" -> list.filter { !it.isRead }
+            "INFLOW" -> list.filter {
+                it.type.equals("CREDIT", ignoreCase = true) ||
+                it.title.contains("inflow", ignoreCase = true) ||
+                it.title.contains("received", ignoreCase = true)
+            }
+            "OUTFLOW" -> list.filter {
+                it.type.equals("DEBIT", ignoreCase = true) ||
+                it.title.contains("outflow", ignoreCase = true) ||
+                it.title.contains("paid", ignoreCase = true)
+            }
+            "SYSTEM" -> list.filter {
+                !it.type.equals("CREDIT", ignoreCase = true) &&
+                !it.type.equals("DEBIT", ignoreCase = true) &&
+                !it.title.contains("inflow", ignoreCase = true) &&
+                !it.title.contains("outflow", ignoreCase = true)
+            }
             else -> list
         }
     }.stateIn(

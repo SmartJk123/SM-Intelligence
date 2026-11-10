@@ -92,6 +92,14 @@ class AuthRepositoryImpl(
         remoteDataSource.signOut()
     }
 
+    override suspend fun validateSession(): Result<Unit> = withContext(dispatchers.io) {
+        remoteDataSource.validateRemoteSession()
+    }
+
+    override suspend fun refreshSession(): Result<Unit> = withContext(dispatchers.io) {
+        remoteDataSource.refreshSession()
+    }
+
     override fun currentUserId(): String? = remoteDataSource.currentUserId()
 
     override fun currentUserName(): String? = remoteDataSource.currentUserName()

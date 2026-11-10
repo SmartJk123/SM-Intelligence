@@ -40,6 +40,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE providerTransactionId = :providerTxId LIMIT 1")
     suspend fun findTransactionByProviderId(providerTxId: String): TransactionEntity?
 
+    @Query("DELETE FROM transactions WHERE providerTransactionId = :providerTxId AND id != :retainedId")
+    suspend fun removeSupersededDuplicates(providerTxId: String, retainedId: String)
+
     @Query("DELETE FROM transactions WHERE userId = :userId AND (accountId = :accountId OR accountId IN (SELECT accountId FROM accounts WHERE id = :accountId AND userId = :userId))")
     suspend fun deleteTransactionsForAccount(userId: String, accountId: String)
 
