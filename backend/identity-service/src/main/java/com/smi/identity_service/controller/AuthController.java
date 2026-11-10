@@ -1,5 +1,6 @@
 package com.smi.identity_service.controller;
 
+import com.smi.identity_service.activity.ActivityLog;
 import com.smi.identity_service.domain.User;
 import com.smi.identity_service.dto.AuthResponse;
 import com.smi.identity_service.dto.ChangePasswordRequest;
@@ -19,7 +20,16 @@ import com.smi.identity_service.dto.UserProfileResponse;
 import com.smi.identity_service.dto.VerifyEmailRequest;
 import com.smi.identity_service.exception.AccountSuspendedException;
 import com.smi.identity_service.exception.InvalidCredentialsException;
+import com.smi.identity_service.exception.StatusException;
+import com.smi.identity_service.security.AdminAccounts;
 import com.smi.identity_service.security.JwtService;
+import com.smi.identity_service.service.RequestDevice;
+import com.smi.identity_service.settings.PlatformSettings;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import java.time.OffsetDateTime;
+import java.util.List;
+import com.smi.identity_service.service.EmailService;
 import com.smi.identity_service.service.EmailVerificationService;
 import com.smi.identity_service.service.MfaService;
 import com.smi.identity_service.service.PasswordResetService;
@@ -51,27 +61,50 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final EmailVerificationService emailVerificationService;
     private final MfaService mfaService;
+    private final EmailService emailService;
+    private final ActivityLog activity;
+    private final PlatformSettings settings;
+    private final AdminAccounts adminAccounts;
+
+    /** One signed-in device of the current user, for the Security and Profile pages. */
+    public record SessionView(UUID id, String device, String userAgent, String ipAddress, OffsetDateTime signedInAt,
+                              boolean current) {
+    }
 
     public AuthController(UserService userService,
                           JwtService jwtService,
                           PasswordResetService passwordReset,
                           RefreshTokenService refreshTokenService,
                           EmailVerificationService emailVerificationService,
-                          MfaService mfaService) {
+                          MfaService mfaService,
+                          EmailService emailService,
+                          ActivityLog activity,
+                          PlatformSettings settings,
+                          AdminAccounts adminAccounts) {
         this.userService = userService;
         this.jwtService = jwtService;
         this.passwordReset = passwordReset;
         this.refreshTokenService = refreshTokenService;
         this.emailVerificationService = emailVerificationService;
         this.mfaService = mfaService;
+        this.emailService = emailService;
+        this.activity = activity;
+        this.settings = settings;
+        this.adminAccounts = adminAccounts;
     }
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+        if (settings.flag("system", "maintenanceMode")) {
+            throw new StatusException(HttpStatus.SERVICE_UNAVAILABLE, "MAINTENANCE",
+                    "SmartMoney is down for maintenance. Please try again later.");
+        }
         User user = userService.registerUser(request);
-        String token = jwtService.generateToken(user);
-        String refreshToken = refreshTokenService.createRefreshToken(user);
+        RefreshTokenService.Issued session = refreshTokenService.issue(user);
+        String token = session.accessToken();
+        String refreshToken = session.refreshToken();
         emailVerificationService.sendVerificationEmail(user);
+        onSignUp(user);
 
         AuthResponse response = new AuthResponse(
                 token,
@@ -90,14 +123,34 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        User user = userService.authenticate(request);
+        refuseWhileLockedOut(request.getEmailAddress());
+        boolean firstSignIn = userService.findByEmail(request.getEmailAddress())
+                .map(existing -> existing.getLastLoginAt() == null)
+                .orElse(false);
+        User user;
+        try {
+            user = userService.authenticate(request);
+        } catch (InvalidCredentialsException error) {
+            activity.audit(ActivityLog.Actor.unknown(request.getEmailAddress()), "SIGN_IN_FAILED", "USER", null,
+                    request.getEmailAddress(), "Wrong email address or password", ActivityLog.FAILURE);
+            throw error;
+        } catch (AccountSuspendedException error) {
+            activity.audit(ActivityLog.Actor.unknown(request.getEmailAddress()), "SIGN_IN_BLOCKED", "USER", null,
+                    request.getEmailAddress(), "Suspended account tried to sign in", ActivityLog.FAILURE);
+            activity.notifyAdmins("Security", "WARNING", "Suspended account tried to sign in",
+                    request.getEmailAddress() + " tried to sign in while suspended.");
+            throw error;
+        }
+        refuseByPolicy(user);
+        onSignIn(user, firstSignIn);
         if (Boolean.TRUE.equals(user.getMfaEnabled())) {
             String mfaChallengeToken = jwtService.generateMfaChallengeToken(user);
             return ResponseEntity.ok(AuthResponse.mfaChallenge(mfaChallengeToken));
         }
 
-        String token = jwtService.generateToken(user);
-        String refreshToken = refreshTokenService.createRefreshToken(user);
+        RefreshTokenService.Issued session = refreshTokenService.issue(user);
+        String token = session.accessToken();
+        String refreshToken = session.refreshToken();
 
         AuthResponse response = new AuthResponse(
                 token,
@@ -147,8 +200,34 @@ public class AuthController {
     ) {
         User user = resolveAuthenticatedUser(authHeader);
         userService.changePassword(user.getId(), request);
-        refreshTokenService.revokeAllForUser(user.getId());
+        // Every other device is signed out; the one that changed the password stays signed in.
+        refreshTokenService.revokeAllExcept(user.getId(), jwtService.extractSessionId(authHeader.substring(7)));
+        activity.audit(ActivityLog.Actor.of(user), "PASSWORD_CHANGED", user, "Other sessions signed out");
         return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    }
+
+    /** The current user's signed-in devices, newest first. */
+    @GetMapping("/sessions")
+    public List<SessionView> sessions(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        User user = resolveAuthenticatedUser(authHeader);
+        UUID current = jwtService.extractSessionId(authHeader.substring(7));
+        return refreshTokenService.activeSessions(user.getId()).stream()
+                .map(session -> new SessionView(session.getId(), RequestDevice.describe(session.getUserAgent()),
+                        session.getUserAgent(), session.getIpAddress(), session.getCreatedAt(),
+                        session.getId().equals(current)))
+                .toList();
+    }
+
+    /** Signs one of the current user's devices out. */
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> revokeSession(@RequestHeader(value = "Authorization", required = false) String authHeader,
+                                              @PathVariable UUID id) {
+        User user = resolveAuthenticatedUser(authHeader);
+        if (!refreshTokenService.revokeSession(user.getId(), id)) {
+            return ResponseEntity.notFound().build();
+        }
+        activity.audit(ActivityLog.Actor.of(user), "SESSION_REVOKED", user, "Signed out another device");
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/refresh")
@@ -170,12 +249,84 @@ public class AuthController {
             if (jwtService.isTokenValid(token)) {
                 try {
                     UUID userId = jwtService.extractUserId(token);
-                    refreshTokenService.revokeAllForUser(userId);
+                    UUID sessionId = jwtService.extractSessionId(token);
+                    // Signing out ends this device only; older tokens without a session end them all.
+                    if (sessionId != null) {
+                        refreshTokenService.revokeSession(userId, sessionId);
+                    } else {
+                        refreshTokenService.revokeAllForUser(userId);
+                    }
+                    userService.findById(userId).ifPresent(user ->
+                            activity.audit(ActivityLog.Actor.of(user), "SIGN_OUT", user, null));
                 } catch (Exception ignored) {
                 }
             }
         }
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+    }
+
+    /** Too many wrong passwords for this address recently: refuse before checking the password again. */
+    private void refuseWhileLockedOut(String email) {
+        int max = settings.number("security", "maxFailedAttempts");
+        if (max <= 0 || email == null) {
+            return;
+        }
+        int minutes = Math.max(1, settings.number("security", "lockoutMinutes"));
+        long failures = activity.countRecent("SIGN_IN_FAILED", email.trim().toLowerCase(),
+                OffsetDateTime.now().minusMinutes(minutes));
+        if (failures >= max) {
+            activity.audit(ActivityLog.Actor.unknown(email), "SIGN_IN_BLOCKED", "USER", null, email,
+                    "Locked out after " + failures + " failed attempts", ActivityLog.FAILURE);
+            throw new StatusException(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_ATTEMPTS",
+                    "Too many failed sign-in attempts. Try again in " + minutes + " minutes or reset your password.");
+        }
+    }
+
+    /** Maintenance keeps customers out; the staff domain rule keeps staff to approved addresses. */
+    private void refuseByPolicy(User user) {
+        if (!user.isPlatformAdmin()) {
+            if (settings.flag("system", "maintenanceMode")) {
+                throw new StatusException(HttpStatus.SERVICE_UNAVAILABLE, "MAINTENANCE",
+                        "SmartMoney is down for maintenance. Please try again later.");
+            }
+            return;
+        }
+        var domains = settings.list("security", "adminEmailDomains");
+        String email = user.getEmailAddress();
+        String domain = email.substring(email.indexOf('@') + 1);
+        boolean allowed = domains.isEmpty() || adminAccounts.isAdminEmail(email)
+                || domains.stream().map(d -> d.startsWith("@") ? d.substring(1) : d).anyMatch(domain::equalsIgnoreCase);
+        if (!allowed) {
+            activity.audit(ActivityLog.Actor.of(user), "SIGN_IN_BLOCKED", user, "Email domain not allowed for staff");
+            throw new StatusException(HttpStatus.FORBIDDEN, "DOMAIN_NOT_ALLOWED",
+                    "Staff sign in is limited to approved email domains.");
+        }
+    }
+
+    /** Audit, notify the administrators and send the welcome email, which goes out off the request thread. */
+    private void onSignUp(User user) {
+        activity.audit(ActivityLog.Actor.of(user), "SIGN_UP", user,
+                "ORGANIZATION".equals(user.getAccountType()) ? "Organisation account" : "Individual account");
+        activity.notifyAdmins("Customer", "INFO", "New sign up",
+                user.getName() + " (" + user.getEmailAddress() + ") created "
+                        + ("ORGANIZATION".equals(user.getAccountType())
+                        ? "an organisation account" + (user.getOrganizationName() == null ? "" : " for " + user.getOrganizationName())
+                        : "an individual account") + ".");
+        String email = user.getEmailAddress();
+        String name = user.getName();
+        String accountType = user.getAccountType();
+        Thread.ofVirtual().start(() -> emailService.sendWelcome(email, name, accountType));
+    }
+
+    private void onSignIn(User user, boolean firstSignIn) {
+        activity.audit(ActivityLog.Actor.of(user), "SIGN_IN", user, firstSignIn ? "First sign in" : null);
+        if (user.isPlatformAdmin()) {
+            activity.notifyAdmins("Security", "INFO", "Administrator signed in",
+                    user.getEmailAddress() + " signed in to the platform.");
+        } else if (firstSignIn) {
+            activity.notifyAdmins("Customer", "INFO", "New customer signed in",
+                    user.getName() + " (" + user.getEmailAddress() + ") signed in for the first time.");
+        }
     }
 
     private User resolveAuthenticatedUser(String authHeader) {
@@ -192,6 +343,11 @@ public class AuthController {
         User user = userService.findById(userId)
                 .filter(candidate -> candidate.getDeletedAt() == null)
                 .orElseThrow(() -> new InvalidCredentialsException("User associated with token not found"));
+        // A signed-out or revoked session stops working at once, not when the token expires.
+        UUID sessionId = jwtService.extractSessionId(token);
+        if (sessionId != null && !refreshTokenService.isSessionActive(sessionId)) {
+            throw new InvalidCredentialsException("This session was signed out");
+        }
         // A suspension takes effect on the next request, not when the token expires.
         if (user.isSuspended()) {
             throw new AccountSuspendedException();

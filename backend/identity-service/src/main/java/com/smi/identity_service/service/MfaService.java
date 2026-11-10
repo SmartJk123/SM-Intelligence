@@ -107,8 +107,9 @@ public class MfaService {
             userRepository.save(user);
         }
 
-        String accessToken = jwtService.generateToken(user);
-        String refreshToken = refreshTokenService.createRefreshToken(user);
+        RefreshTokenService.Issued issued = refreshTokenService.issue(user);
+        String accessToken = issued.accessToken();
+        String refreshToken = issued.refreshToken();
 
         return new AuthResponse(
                 accessToken,

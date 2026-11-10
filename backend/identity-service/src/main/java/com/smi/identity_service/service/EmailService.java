@@ -1,17 +1,21 @@
 package com.smi.identity_service.service;
 
+import com.smi.identity_service.activity.EmailTemplates;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
- * Sends organisation invitation emails, through the same SMTP settings as the
- * password reset emails (SMTP_HOST and the rest, see PasswordResetMailer).
+ * Sends the account emails (welcome, invites, organisation setup) through the
+ * same SMTP settings as the password reset emails (SMTP_HOST and the rest, see
+ * PasswordResetMailer). The wording comes from EmailTemplates, which an
+ * administrator can edit, and every email is kept in the admin Outbox.
  *
- * A new account gets a one-time link to choose its own password, never a
- * password in the email. Every method returns whether the email was sent
- * instead of throwing, because a mail outage must not undo an organisation or
- * membership already saved; the caller reports emailSent=false and the admin
- * can follow up.
+ * Every method returns whether the email was sent instead of throwing, because
+ * a mail outage must not undo an account or membership already saved; the
+ * caller reports emailSent=false and the admin can follow up.
  */
 @Service
 public class EmailService {
@@ -25,37 +29,65 @@ public class EmailService {
         this.loginUrl = loginUrl;
     }
 
+    /** Sent after a customer signs up on the web app. accountType is INDIVIDUAL or ORGANIZATION. */
+    public boolean sendWelcome(String toEmail, String toName, String accountType) {
+        return mailer.sendTemplate(toEmail, EmailTemplates.WELCOME, values(
+                "name", toName,
+                "email", toEmail,
+                "accountType", "ORGANIZATION".equalsIgnoreCase(accountType) ? "organisation" : "individual",
+                "loginUrl", loginUrl));
+    }
+
+    /**
+     * Sent when an administrator adds a customer. Carries a temporary password and a
+     * one-time link to choose their own; both are hidden in the outbox copy.
+     */
+    public boolean sendCustomerInvite(String toEmail, String toName, String temporaryPassword, String setupLink,
+                                      String organisationName) {
+        return mailer.sendTemplate(toEmail, EmailTemplates.CUSTOMER_INVITE, values(
+                "name", toName,
+                "email", toEmail,
+                "temporaryPassword", temporaryPassword,
+                "setupLink", setupLink,
+                "loginUrl", loginUrl,
+                "organisationLine", organisationName == null ? "" : " as part of " + organisationName));
+    }
+
     public boolean sendOrganizationOwnerSetup(String toEmail, String toName, String organizationName,
                                               String setupLink) {
-        return mailer.send(toEmail, "You're set up as the owner of " + organizationName + " on SmartMoney",
-                "Hi " + toName + ",\n\n"
-                        + "An account has been created for you as the owner of \"" + organizationName
-                        + "\" on SmartMoney.\n\n"
-                        + setupInstructions(toEmail, setupLink));
+        return mailer.sendTemplate(toEmail, EmailTemplates.ORGANISATION_OWNER_SETUP, values(
+                "name", toName,
+                "email", toEmail,
+                "organisation", organizationName,
+                "setupLink", setupLink,
+                "loginUrl", loginUrl));
     }
 
     public boolean sendMemberSetup(String toEmail, String toName, String organizationName, String role,
                                    String setupLink) {
-        return mailer.send(toEmail, "You've been added to " + organizationName + " on SmartMoney",
-                "Hi " + toName + ",\n\n"
-                        + "An account has been created for you as " + role + " on \"" + organizationName
-                        + "\" on SmartMoney.\n\n"
-                        + setupInstructions(toEmail, setupLink));
+        return mailer.sendTemplate(toEmail, EmailTemplates.MEMBER_SETUP, values(
+                "name", toName,
+                "email", toEmail,
+                "organisation", organizationName,
+                "role", role,
+                "setupLink", setupLink,
+                "loginUrl", loginUrl));
     }
 
     public boolean sendExistingUserAddedToOrganization(String toEmail, String toName, String organizationName,
                                                         String role) {
-        return mailer.send(toEmail, "You've been added to " + organizationName + " on SmartMoney",
-                "Hi " + toName + ",\n\n"
-                        + "Your existing SmartMoney account has been added to \"" + organizationName + "\" as "
-                        + role + ".\n\n"
-                        + "Sign in at " + loginUrl + " with your usual password.\n");
+        return mailer.sendTemplate(toEmail, EmailTemplates.EXISTING_MEMBER_ADDED, values(
+                "name", toName,
+                "organisation", organizationName,
+                "role", role,
+                "loginUrl", loginUrl));
     }
 
-    private String setupInstructions(String toEmail, String setupLink) {
-        return "Choose your password with this link (it works once and expires in 7 days):\n\n"
-                + setupLink + "\n\n"
-                + "Then sign in at " + loginUrl + " with " + toEmail + ".\n"
-                + "If the link has expired, use \"Forgot password?\" on the sign-in page.\n";
+    private static Map<String, String> values(String... pairs) {
+        Map<String, String> values = new HashMap<>();
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            values.put(pairs[i], pairs[i + 1]);
+        }
+        return values;
     }
 }

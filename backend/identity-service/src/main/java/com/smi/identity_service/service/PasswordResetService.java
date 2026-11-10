@@ -1,10 +1,12 @@
 package com.smi.identity_service.service;
 
+import com.smi.identity_service.activity.ActivityLog;
 import com.smi.identity_service.domain.PasswordResetToken;
 import com.smi.identity_service.domain.User;
 import com.smi.identity_service.exception.InvalidResetTokenException;
 import com.smi.identity_service.repository.PasswordResetTokenRepository;
 import com.smi.identity_service.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -55,6 +57,19 @@ public class PasswordResetService {
         this.validMinutes = validMinutes;
     }
 
+    private ActivityLog activity;
+
+    @Autowired(required = false)
+    public void setActivityLog(ActivityLog activity) {
+        this.activity = activity;
+    }
+
+    private void audit(User user, String action) {
+        if (activity != null) {
+            activity.audit(ActivityLog.Actor.of(user), action, user, null);
+        }
+    }
+
     /** Emails a reset link when the address belongs to an active account. Silent otherwise. */
     public void requestReset(String emailAddress) {
         if (emailAddress == null || emailAddress.isBlank()) {
@@ -73,6 +88,7 @@ public class PasswordResetService {
         String to = user.getEmailAddress();
         String name = user.getName();
         Thread.ofVirtual().start(() -> mailer.sendResetLink(to, name, link, validMinutes));
+        audit(user, "PASSWORD_RESET_REQUESTED");
     }
 
     /**
@@ -111,6 +127,7 @@ public class PasswordResetService {
         user.setUpdatedAt(now);
         users.save(user);
         tokens.findByUserIdAndUsedAtIsNull(user.getId()).forEach(open -> open.setUsedAt(now));
+        audit(user, "PASSWORD_RESET_COMPLETED");
     }
 
     private static String hash(String token) {

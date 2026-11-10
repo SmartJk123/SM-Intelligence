@@ -100,6 +100,27 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    /**
+     * A customer added by an administrator. accountType is INDIVIDUAL or ORGANIZATION;
+     * organizationName is shown on the customer's profile for an organisation account.
+     * Refuses an email that already has an account.
+     */
+    public User createCustomer(String name, String emailAddress, String phoneNumber, String rawPassword,
+                               String accountType, String organizationName) {
+        String email = emailAddress.trim().toLowerCase();
+        if (userRepository.findByEmailAddressAndDeletedAtIsNull(email).isPresent()) {
+            throw new UserAlreadyExistsException("A user with email '" + email + "' already exists");
+        }
+        String validatedPhoneNumber = normalizeAndValidatePhoneNumber(phoneNumber);
+        User user = new User(name.trim(), email, validatedPhoneNumber, passwordEncoder.encode(rawPassword));
+        user.setAccountType(accountType);
+        user.setOrganizationName(organizationName);
+        if (adminAccounts.isAdminEmail(email)) {
+            user.setRole(User.ROLE_PLATFORM_ADMIN);
+        }
+        return userRepository.save(user);
+    }
+
     public User updatePhoneNumber(UUID userId, String newPhoneNumber) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));

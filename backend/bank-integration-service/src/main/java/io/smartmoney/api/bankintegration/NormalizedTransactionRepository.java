@@ -7,6 +7,10 @@ import java.util.Optional;
 
 public interface NormalizedTransactionRepository extends JpaRepository<NormalizedTransactionEntity, Long> {
 
+    /** Newest first, for the admin portal's Transactions page. */
+    List<NormalizedTransactionEntity> findAllByOrderByCreatedAtDesc(org.springframework.data.domain.Pageable page);
+
+
     Optional<NormalizedTransactionEntity> findFirstByBankIdAndExternalEventId(
             String bankId, String externalEventId);
 
