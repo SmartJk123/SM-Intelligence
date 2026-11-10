@@ -1,0 +1,14 @@
+meta {
+  name: Get Preferences
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{notificationsBaseUrl}}/api/notifications/preferences?userId=00000000-0000-0000-0000-000000000001
+  auth: none
+}
+
+params:query {
+  userId: 00000000-0000-0000-0000-000000000001
+}

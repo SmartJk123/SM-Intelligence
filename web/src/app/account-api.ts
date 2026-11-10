@@ -70,9 +70,20 @@ export class AccountApi {
     this.kind.set(session.user.kind);
     this.setupCompleted.set(session.user.setupCompleted);
   }
-  async login(input: { email: string; password: string }) {
+  /**
+   * Signs in. With two-factor authentication on, resolves to the challenge id to
+   * send with the authenticator code (verifyMfa) instead of signing in.
+   */
+  async login(input: { email: string; password: string }): Promise<string | void> {
+    const result = await firstValueFrom(
+      this.http.post<Session | { mfaRequired: true; challenge: string }>('/api/auth/login', input).pipe(timeout(95000)),
+    );
+    if ('mfaRequired' in result && result.mfaRequired) return result.challenge;
+    this.acceptSession(result as Session);
+  }
+  async verifyMfa(challenge: string, code: string) {
     this.acceptSession(
-      await firstValueFrom(this.http.post<Session>('/api/auth/login', input).pipe(timeout(95000))),
+      await firstValueFrom(this.http.post<Session>('/api/auth/mfa', { challenge, code }).pipe(timeout(30000))),
     );
   }
   async register(input: Registration): Promise<'sign-in' | void> {

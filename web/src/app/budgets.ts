@@ -27,7 +27,7 @@ interface BudgetView {
         <button class="button" (click)="adding.set(!adding())">{{ adding() ? 'Cancel' : 'Add budget' }}</button>
       </header>
       @if (adding()) {
-        <form class="dashboard-panel" (ngSubmit)="save()" style="margin-bottom: 20px">
+        <form class="dashboard-panel" (submit)="$event.preventDefault(); save()" style="margin-bottom: 20px">
           <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: end">
             <label style="flex: 1; min-width: 180px">
               <span style="display: block; font-size: 12px; margin-bottom: 4px; color: #6b8095">Category</span>

@@ -1,6 +1,7 @@
 package com.smi.identity_service.security;
 
 import com.smi.identity_service.domain.User;
+import com.smi.identity_service.repository.RefreshTokenRepository;
 import com.smi.identity_service.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -31,10 +32,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final RefreshTokenRepository sessions;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserRepository userRepository) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserRepository userRepository,
+                                   RefreshTokenRepository sessions) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
+        this.sessions = sessions;
+    }
+
+    /** A token tied to a session (claim "sid") stops working once that session is signed out or revoked. */
+    private boolean sessionActive(String token) {
+        UUID sessionId = jwtService.extractSessionId(token);
+        return sessionId == null || sessions.findById(sessionId).map(row -> row.getRevokedAt() == null).orElse(false);
     }
 
     @Override
@@ -44,7 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             String token = header.substring(7);
-            if (jwtService.isTokenValid(token)) {
+            if (jwtService.isTokenValid(token) && sessionActive(token)) {
                 UUID userId = jwtService.extractUserId(token);
                 userRepository.findById(userId)
                         .filter(user -> user.getDeletedAt() == null && !user.isSuspended())

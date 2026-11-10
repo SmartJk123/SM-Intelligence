@@ -1,0 +1,14 @@
+meta {
+  name: Get Unread Count
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{notificationsBaseUrl}}/api/notifications/unread-count?userId=00000000-0000-0000-0000-000000000001
+  auth: none
+}
+
+params:query {
+  userId: 00000000-0000-0000-0000-000000000001
+}

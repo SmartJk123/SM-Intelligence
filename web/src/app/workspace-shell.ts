@@ -55,7 +55,7 @@ export const workspaceLinks = [
         <span class="ws-avatar">{{ api.initials() }}</span>
         <div>
           <strong>{{
-            api.kind() === 'organization' ? 'Company workspace' : 'Personal workspace'
+            api.kind() === 'organization' ? 'Organisation workspace' : 'Personal workspace'
           }}</strong
           ><small>Every shilling. One clear view.</small>
         </div>
