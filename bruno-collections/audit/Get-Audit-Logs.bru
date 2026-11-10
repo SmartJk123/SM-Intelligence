@@ -1,0 +1,18 @@
+meta {
+  name: Get Audit Logs
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{auditBaseUrl}}/api/audit?page=0&size=20
+  auth: none
+}
+
+params:query {
+  page: 0
+  size: 20
+  ~sourceService: accounts-service
+  ~tableName: accounts
+  ~action: UPDATE
+}

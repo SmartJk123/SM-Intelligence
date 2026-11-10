@@ -1,0 +1,10 @@
+meta {
+  name: Get Audit Log By Id
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{auditBaseUrl}}/api/audit/{{auditLogId}}
+  auth: none
+}
