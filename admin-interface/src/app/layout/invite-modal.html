@@ -234,10 +234,10 @@
           <p class="text-[13px] mb-4" style="color: var(--text-2)">
             @if (sentTemporaryPassword()) {
               The account was created and <strong>{{ recipientEmail() }}</strong> was emailed a temporary password and
-              a link to choose their own. The link expires in 7 days. A copy is in Notifications, Outbox.
+              a link to choose their own. The link expires in 2 days. A copy is in Notifications, Outbox.
             } @else {
               The account was created and <strong>{{ recipientEmail() }}</strong> was emailed a link to choose
-              their password. The link expires in 7 days.
+              their password. The link expires in 2 days.
             }
           </p>
         } @else {
