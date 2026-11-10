@@ -24,6 +24,12 @@ export interface InvestmentForecast {
   years: number;
   interestMinor: number;
   projectedMinor: number;
+  /** Estimated worth today: the value grown at the annual rate from the valuation date to today (capped at maturity). */
+  valueTodayMinor: number;
+  /** Interest earned so far, from the valuation date to today. */
+  earnedSoFarMinor: number;
+  /** How long it has been held, e.g. "10 months". */
+  heldFor: string;
   /** Projected value at the end of each calendar year up to maturity (at most 30 points). */
   yearly: { year: number; valueMinor: number }[];
 }
@@ -57,6 +63,8 @@ export function forecast(inv: ForecastInput, today = new Date()): InvestmentFore
   const years = maturity ? Math.max(0, (maturity.getTime() - from.getTime()) / DAY_MS / YEAR_DAYS) : 1;
   const valueAt = (t: number) => Math.round(baseMinor * (1 + (rate / 100) * t));
   const projectedMinor = valueAt(years);
+  const elapsed = Math.max(0, (today.getTime() - from.getTime()) / DAY_MS / YEAR_DAYS);
+  const valueTodayMinor = valueAt(maturity ? Math.min(years, elapsed) : elapsed);
 
   const yearly: { year: number; valueMinor: number }[] = [];
   const endYear = maturity ? maturity.getUTCFullYear() : from.getUTCFullYear() + 1;
@@ -75,6 +83,9 @@ export function forecast(inv: ForecastInput, today = new Date()): InvestmentFore
     years,
     interestMinor: projectedMinor - baseMinor,
     projectedMinor,
+    valueTodayMinor,
+    earnedSoFarMinor: valueTodayMinor - baseMinor,
+    heldFor: describeMonths(months(start < from ? start : from, today)),
     yearly,
   };
 }

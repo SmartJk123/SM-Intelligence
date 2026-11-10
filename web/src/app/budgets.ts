@@ -151,20 +151,29 @@ const field = 'width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px
                 }
               </p>
             </div>
+            @if (allocatedCount()) {
+              <button class="button secondary" type="button" (click)="showAllocated.set(!showAllocated())">
+                {{ showAllocated() ? 'Hide allocated' : 'Show allocated (' + allocatedCount() + ')' }}
+              </button>
+            }
           </div>
+          @if (allocateMessage()) { <p class="dashboard-footnote positive" role="status">{{ allocateMessage() }}</p> }
           @if (!expenses().length) {
             <p class="muted">No posted expenses yet this month. They appear here as your banks report them.</p>
           } @else {
             @if (!list.length) {
               <p class="muted" style="margin-bottom: 10px">Add a budget first, then allocate expenses to it.</p>
             }
+            @if (!visibleExpenses().length) {
+              <p class="muted">Everything this month is allocated. Use "Show allocated" to review or change them.</p>
+            } @else {
             <div class="dashboard-table-wrap" tabindex="0" aria-label="This month's expenses">
               <table>
                 <thead>
                   <tr><th>Date</th><th>Paid to</th><th style="text-align: right">Amount</th><th>Allocated to</th></tr>
                 </thead>
                 <tbody>
-                  @for (e of expenses(); track e.id) {
+                  @for (e of visibleExpenses(); track e.id) {
                     <tr>
                       <td>{{ e.date | date: 'd MMM' }}</td>
                       <td>{{ e.description }}</td>
@@ -172,15 +181,16 @@ const field = 'width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px
                       <td>
                         <select
                           [attr.aria-label]="'Budget for ' + e.description"
-                          [value]="e.allocatedTo ?? ''"
                           [disabled]="allocating() === e.id || !list.length"
                           (change)="allocate(e, $any($event.target).value)"
                           style="padding: 6px 10px; border-radius: 8px; border: 1px solid #dce6f1; background: #fff; min-width: 160px"
                         >
-                          <option value="">Not allocated</option>
-                          @for (b of list; track b.id) { <option [value]="b.category">{{ b.category }}</option> }
+                          <option value="" [selected]="!e.allocatedTo">Not allocated</option>
+                          @for (b of list; track b.id) {
+                            <option [value]="b.category" [selected]="e.allocatedTo === b.category">{{ b.category }}</option>
+                          }
                           @if (e.allocatedTo && !hasBudget(e.allocatedTo)) {
-                            <option [value]="e.allocatedTo">{{ e.allocatedTo }} (no budget)</option>
+                            <option [value]="e.allocatedTo" selected>{{ e.allocatedTo }} (no budget)</option>
                           }
                         </select>
                       </td>
@@ -189,6 +199,7 @@ const field = 'width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px
                 </tbody>
               </table>
             </div>
+            }
             @if (allocateError()) { <p class="field-error" style="margin-top: 10px">{{ allocateError() }}</p> }
           }
         </article>
@@ -210,6 +221,12 @@ export class Budgets {
   readonly customCategory = signal('');
   readonly limit = signal('');
   readonly allocating = signal<string | null>(null);
+  /** Allocated expenses are hidden from the list unless the customer asks to see them. */
+  readonly showAllocated = signal(false);
+  readonly allocateMessage = signal('');
+  readonly allocatedCount = computed(() => this.expenses().filter((e) => e.allocatedTo).length);
+  readonly visibleExpenses = computed(() =>
+    this.showAllocated() ? this.expenses() : this.expenses().filter((e) => !e.allocatedTo));
   readonly allocateError = signal('');
 
   /** Suggested categories that do not have a budget yet. */
@@ -296,11 +313,15 @@ export class Budgets {
 
   async allocate(expense: ExpenseView, category: string): Promise<void> {
     this.allocateError.set('');
+    this.allocateMessage.set('');
     this.allocating.set(expense.id);
     try {
       await firstValueFrom(
         this.http.post('/api/workspace/allocations', { transactionId: expense.id, category }).pipe(timeout(15000)),
       );
+      this.allocateMessage.set(category
+        ? expense.description + ' (' + (expense.amountMinor / 100).toFixed(2) + ' KES) allocated to ' + category + '.'
+        : 'Allocation cleared for ' + expense.description + '.');
       await this.load();
     } catch (error: any) {
       this.allocateError.set(error?.error?.error || 'That allocation could not be saved. Please retry.');

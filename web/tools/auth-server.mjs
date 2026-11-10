@@ -33,7 +33,7 @@ async function investmentsFor(callInvestments, session) {
 
 /** The budget category of a transaction: the customer's allocation, else the bank's narrative. */
 function categoryOf(tx, prefs) {
-  return prefs?.allocations?.[tx.id] || tx.description || 'Uncategorized';
+  return prefs?.allocations?.[tx.id] || tx.description || 'Not allocated';
 }
 
 function describedNarrative(narrative, institution) {
@@ -124,9 +124,8 @@ async function sendDashboard(send, call, session, searchParams, prefs) {
         // A bare reference/account number is not a name, so it falls back to
         // the bank instead of showing digits where a person expects a name.
         description: tx.counterparty || describedNarrative(tx.description, institution),
-        // Placeholder: categories-service is not wired up yet, so the bank's
-        // narrative stands in for a real category name.
-        category: tx.description || 'Uncategorized',
+        // What the customer allocated it to, else the bank's narrative.
+        category: categoryOf(tx, prefs),
         direction: tx.transactionType,
         amountMinor: toMinor(tx.amount),
         status: tx.status,

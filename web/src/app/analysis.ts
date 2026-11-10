@@ -95,19 +95,29 @@ interface AnalyticsData {
           <div class="panel-heading">
             <div>
               <h2>Investment interest forecast</h2>
-              <p>Simple interest: current value × interest rate (% a year) × time to maturity. Estimates, not guaranteed returns.</p>
+              <p>Simple interest at the annual rate: amount invested × rate (% a year) × time held. Estimates, not guaranteed returns.</p>
             </div>
           </div>
-          @if (!forecasts().rows.length) {
-            <p class="muted">
-              @if (d.investments?.length) { Add an interest rate to your investments to see their forecast. }
-              @else { No investments recorded yet. Add one on the Investments page with its interest rate. }
-            </p>
-          } @else {
+          @if (!d.investments?.length) {
+            <p class="muted">No investments recorded yet. Add one on the Investments page with its interest rate.</p>
+          }
+          @for (i of withoutRate(); track i.id) {
+            <form class="forecast-rate" (submit)="$event.preventDefault(); saveRate(i, rateInput.value)">
+              <span><strong>{{ i.name }}</strong> needs its interest rate for a forecast.</span>
+              <label>Interest rate (% a year)
+                <input #rateInput type="number" min="0" max="100" step="0.01" required placeholder="e.g. 12" />
+              </label>
+              <button class="button" [disabled]="savingRate() === i.id">{{ savingRate() === i.id ? 'Saving…' : 'Save rate' }}</button>
+            </form>
+          }
+          @if (rateError()) { <p class="field-error">{{ rateError() }}</p> }
+          @if (forecasts().rows.length) {
             <div class="dashboard-metrics">
-              <article><p>Value today</p><strong>{{ forecasts().baseMinor / 100 | currency: 'KES' : 'code' }}</strong></article>
-              <article><p>Forecast interest</p><strong class="positive">+{{ forecasts().interestMinor / 100 | currency: 'KES' : 'code' }}</strong></article>
-              <article><p>Forecast at maturity</p><strong>{{ forecasts().projectedMinor / 100 | currency: 'KES' : 'code' }}</strong></article>
+              <article><p>Amount invested</p><strong>{{ forecasts().baseMinor / 100 | currency: 'KES' : 'code' }}</strong></article>
+              <article><p>Worth today (estimated)</p><strong>{{ forecasts().todayMinor / 100 | currency: 'KES' : 'code' }}</strong>
+                <small class="positive">+{{ (forecasts().todayMinor - forecasts().baseMinor) / 100 | currency: 'KES' : 'code' }} earned so far</small></article>
+              <article><p>Forecast interest</p><strong class="positive">+{{ forecasts().interestMinor / 100 | currency: 'KES' : 'code' }}</strong><small>over the full term</small></article>
+              <article><p>Worth at maturity</p><strong>{{ forecasts().projectedMinor / 100 | currency: 'KES' : 'code' }}</strong></article>
             </div>
             <div class="viz-plot" aria-label="Forecast value by year">
               <div class="viz-axis">
@@ -127,7 +137,7 @@ interface AnalyticsData {
             <div class="dashboard-table-wrap" tabindex="0" aria-label="Forecast by investment">
               <table>
                 <thead>
-                  <tr><th>Investment</th><th>Rate</th><th>Term</th><th>Time to maturity</th><th style="text-align: right">Value today</th><th style="text-align: right">Forecast</th></tr>
+                  <tr><th>Investment</th><th>Rate</th><th>Term</th><th>Time to maturity</th><th style="text-align: right">Invested</th><th style="text-align: right">Worth today</th><th style="text-align: right">At maturity</th></tr>
                 </thead>
                 <tbody>
                   @for (row of forecasts().rows; track row.id) {
@@ -137,6 +147,10 @@ interface AnalyticsData {
                       <td>{{ row.f.termLabel ?? 'No maturity date' }}@if (row.f.termLength) {<br /><small class="muted">{{ row.f.termLength }}</small>}</td>
                       <td>{{ row.f.remaining ?? '1 year shown' }}</td>
                       <td style="text-align: right">{{ row.f.baseMinor / 100 | currency: 'KES' : '' : '1.0-0' }}</td>
+                      <td style="text-align: right">
+                        {{ row.f.valueTodayMinor / 100 | currency: 'KES' : '' : '1.0-0' }}<br />
+                        <small class="muted">held {{ row.f.heldFor }}</small>
+                      </td>
                       <td style="text-align: right">
                         {{ row.f.projectedMinor / 100 | currency: 'KES' : '' : '1.0-0' }}<br />
                         <small class="positive">+{{ row.f.interestMinor / 100 | currency: 'KES' : '' : '1.0-0' }}</small>
@@ -194,11 +208,36 @@ export class Analysis {
     return {
       rows,
       baseMinor: rows.reduce((s, r) => s + r.f.baseMinor, 0),
+      todayMinor: rows.reduce((s, r) => s + r.f.valueTodayMinor, 0),
       interestMinor: rows.reduce((s, r) => s + r.f.interestMinor, 0),
       projectedMinor: rows.reduce((s, r) => s + r.f.projectedMinor, 0),
       byYear: [...years.entries()].sort((a, b) => a[0] - b[0]).slice(0, 30).map(([year, valueMinor]) => ({ year, valueMinor })),
     };
   });
+  /** Investments with no interest rate yet, offered an inline rate field. */
+  readonly withoutRate = computed(() => (this.data()?.investments ?? []).filter((i) => i.interestRate === null || i.interestRate === undefined));
+  readonly savingRate = signal<string | null>(null);
+  readonly rateError = signal('');
+
+  /** Saves just the interest rate, keeping the rest of the investment as it is. */
+  async saveRate(i: NonNullable<AnalyticsData['investments']>[number], value: string): Promise<void> {
+    const rate = Number(value);
+    if (value === '' || !Number.isFinite(rate) || rate < 0 || rate > 100) { this.rateError.set('Enter a rate between 0 and 100.'); return; }
+    this.rateError.set('');
+    this.savingRate.set(i.id);
+    try {
+      await firstValueFrom(this.http.post('/api/workspace/investments', {
+        id: i.id, name: i.name, type: i.type, principalMinor: i.principalMinor, currentValueMinor: i.currentValueMinor,
+        valuationDate: i.valuationDate, maturityDate: i.maturityDate, interestRate: rate,
+      }).pipe(timeout(15000)));
+      await this.load();
+    } catch (error: any) {
+      this.rateError.set(error?.error?.error || 'The rate could not be saved. Please retry.');
+    } finally {
+      this.savingRate.set(null);
+    }
+  }
+
   readonly maxYearly = computed(() => Math.max(1, ...this.forecasts().byYear.map((y) => y.valueMinor)));
 
   constructor() {
