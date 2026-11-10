@@ -34,8 +34,8 @@ public class PasswordResetService {
 
     /** A new link for the same account is not sent more often than this. */
     private static final long RESEND_AFTER_SECONDS = 60;
-    /** How long a first-password link from an invite stays valid: 7 days. */
-    public static final long SETUP_VALID_MINUTES = 7 * 24 * 60;
+    /** How long a first-password link from an invite stays valid: 2 days. */
+    public static final long SETUP_VALID_MINUTES = 2 * 24 * 60;
 
     private final UserRepository users;
     private final PasswordResetTokenRepository tokens;

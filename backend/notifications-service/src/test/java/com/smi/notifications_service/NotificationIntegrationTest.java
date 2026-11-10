@@ -2,7 +2,6 @@ package com.smi.notifications_service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smi.notifications_service.domain.Notification;
-import com.smi.notifications_service.domain.NotificationPreference;
 import com.smi.notifications_service.dto.CreateNotificationRequest;
 import com.smi.notifications_service.dto.UpdatePreferenceRequest;
 import com.smi.notifications_service.repository.NotificationOutboxRepository;

@@ -58,6 +58,10 @@ public class Investment {
     @Column(name = "maturity_date")
     private LocalDate maturityDate;
 
+    /** Annual interest rate in percent (12.5 means 12.5% a year); null when not entered. */
+    @Column(name = "annual_interest_rate", precision = 7, scale = 4)
+    private BigDecimal interestRate;
+
     @Column(name = "status", nullable = false)
     private String status = "ACTIVE";
 
@@ -100,6 +104,8 @@ public class Investment {
     public void setProductType(String productType) { this.productType = productType; }
     public BigDecimal getContributions() { return contributions; }
     public void setContributions(BigDecimal contributions) { this.contributions = contributions; }
+    public BigDecimal getInterestRate() { return interestRate; }
+    public void setInterestRate(BigDecimal interestRate) { this.interestRate = interestRate; }
     public LocalDate getStartDate() { return startDate; }
     public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
     public LocalDate getMaturityDate() { return maturityDate; }
