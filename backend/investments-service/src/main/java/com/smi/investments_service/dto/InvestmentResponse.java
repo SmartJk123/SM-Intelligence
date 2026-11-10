@@ -15,5 +15,7 @@ public record InvestmentResponse(
         BigDecimal currentValue,
         LocalDate valuationDate,
         LocalDate maturityDate,
-        String status) {
+        String status,
+        BigDecimal interestRate,
+        LocalDate startDate) {
 }

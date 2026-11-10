@@ -94,6 +94,10 @@ public class InvestmentService {
         if (request.currentValue() != null && request.currentValue().signum() < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The current value cannot be negative");
         }
+        if (request.interestRate() != null
+                && (request.interestRate().signum() < 0 || request.interestRate().compareTo(BigDecimal.valueOf(100)) > 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The interest rate must be between 0 and 100 percent");
+        }
         if (request.valuationDate() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter the valuation date");
         }
@@ -103,6 +107,9 @@ public class InvestmentService {
                 ? "Not specified" : request.institution().trim());
         investment.setContributions(request.principal());
         investment.setMaturityDate(request.maturityDate());
+        if (request.interestRate() != null) {
+            investment.setInterestRate(request.interestRate());
+        }
         // The schema requires maturity_date >= start_date, and an older holding can
         // already have matured, so the start is the earlier of the two dates.
         LocalDate start = investment.getStartDate() == null ? request.valuationDate() : investment.getStartDate();
@@ -134,6 +141,7 @@ public class InvestmentService {
         LocalDate valuationDate = latest == null ? investment.getStartDate() : latest.getValuationDate();
         return new InvestmentResponse(investment.getId(), investment.getName(), label, investment.getInstitution(),
                 investment.getCurrency(), investment.getContributions(), currentValue, valuationDate,
-                investment.getMaturityDate(), investment.getStatus());
+                investment.getMaturityDate(), investment.getStatus(), investment.getInterestRate(),
+                investment.getStartDate());
     }
 }

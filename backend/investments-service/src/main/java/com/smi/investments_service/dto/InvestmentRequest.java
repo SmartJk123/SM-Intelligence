@@ -11,6 +11,7 @@ import java.util.UUID;
  * @param principal     the amount put in
  * @param currentValue  what it is worth on valuationDate; null when not known yet
  * @param institution   who holds it; "Not specified" when left out
+ * @param interestRate  annual interest rate in percent (0 to 100); null keeps the saved rate
  */
 public record InvestmentRequest(
         UUID ownerId,
@@ -20,5 +21,6 @@ public record InvestmentRequest(
         BigDecimal currentValue,
         LocalDate valuationDate,
         LocalDate maturityDate,
-        String institution) {
+        String institution,
+        BigDecimal interestRate) {
 }
