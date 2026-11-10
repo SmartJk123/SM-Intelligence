@@ -1,0 +1,33 @@
+meta {
+  name: Create Notification
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{notificationsBaseUrl}}/api/notifications
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "eventType": "TRANSACTION_ALERT",
+    "severity": "INFO",
+    "title": "Deposit Received",
+    "message": "KES 25,000.00 received into account",
+    "referenceId": "b0000000-0000-0000-0000-000000000001",
+    "referenceType": "TRANSACTION",
+    "metadata": "{\"source\":\"M-Pesa\"}",
+    "deliveryChannels": ["IN_APP", "SMS"]
+  }
+}
+
+vars:post-response {
+  notificationId: res.body.id
+}

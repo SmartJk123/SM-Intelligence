@@ -1,0 +1,14 @@
+meta {
+  name: Mark Notification As Read
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{notificationsBaseUrl}}/api/notifications/{{notificationId}}/read?userId=00000000-0000-0000-0000-000000000001
+  auth: none
+}
+
+params:query {
+  userId: 00000000-0000-0000-0000-000000000001
+}
