@@ -149,7 +149,9 @@ class MpesaTransactionIngestionService(
                     description = structuredDescription,
                     providerTransactionId = reference,
                     createdAt = nowIso,
-                    updatedAt = nowIso
+                    updatedAt = nowIso,
+                    source = "LOCAL_SMS",
+                    syncStatus = "LOCAL_ONLY"
                 )
 
                 // 7. Atomic Insert into Room (ABORT on conflict)

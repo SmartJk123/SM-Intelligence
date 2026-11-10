@@ -16,7 +16,9 @@ import java.math.BigDecimal
         Index(value = ["accountId"]),
         Index(value = ["timestamp"]),
         Index(value = ["userId", "timestamp"]),
-        Index(value = ["userId", "accountId", "timestamp"])
+        Index(value = ["userId", "accountId", "timestamp"]),
+        Index(value = ["source"]),
+        Index(value = ["syncStatus"])
     ]
 )
 data class TransactionEntity(
@@ -30,7 +32,9 @@ data class TransactionEntity(
     val description: String? = null,
     val providerTransactionId: String? = null,
     val createdAt: String? = null,
-    val updatedAt: String? = null
+    val updatedAt: String? = null,
+    val source: String = "REMOTE",
+    val syncStatus: String = "SYNCED"
 ) {
     fun toDomain(): Transaction = Transaction(
         id = id,
@@ -41,7 +45,10 @@ data class TransactionEntity(
         description = description,
         providerTransactionId = providerTransactionId,
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        status = "COMPLETED",
+        source = source,
+        syncStatus = syncStatus
     )
 
     companion object {
@@ -55,7 +62,9 @@ data class TransactionEntity(
             description = tx.description,
             providerTransactionId = tx.providerTransactionId,
             createdAt = tx.createdAt,
-            updatedAt = tx.updatedAt
+            updatedAt = tx.updatedAt,
+            source = tx.source,
+            syncStatus = tx.syncStatus
         )
     }
 }

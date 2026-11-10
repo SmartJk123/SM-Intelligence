@@ -113,7 +113,7 @@ fun MpesaTrackingSettingsCard(
 
                     Column {
                         Text(
-                            text = "Offline M-PESA Ingestion",
+                            text = "Offline SMS & Bank Ingestion",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -156,7 +156,7 @@ fun MpesaTrackingSettingsCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Automatically captures M-PESA transaction notifications completely offline on your device. 100% private, with zero network calls and no sensitive SMS permissions.",
+                text = "Automatically captures M-PESA, KCB Bank, and NCBA Bank transaction notifications completely offline on your device. 100% private, with zero network calls and no sensitive SMS permissions.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp

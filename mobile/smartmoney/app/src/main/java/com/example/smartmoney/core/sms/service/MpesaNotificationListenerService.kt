@@ -6,8 +6,11 @@ import android.service.notification.StatusBarNotification
 import androidx.annotation.RequiresApi
 import com.example.smartmoney.SmartMoneyApplication
 import com.example.smartmoney.core.notification.NotificationHelper
+import com.example.smartmoney.core.sms.ingestion.BankIngestionResult
 import com.example.smartmoney.core.sms.ingestion.MpesaIngestionResult
+import com.example.smartmoney.core.sms.model.ParsedBankMovement
 import com.example.smartmoney.core.sms.model.ParsedFinancialMovement
+import com.example.smartmoney.core.sms.parser.BankTransactionParser
 import com.example.smartmoney.core.sms.parser.MpesaTransactionParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,15 +19,16 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Background notification listener that intercepts incoming M-PESA confirmation notifications
- * posted by SMS messaging apps (Google Messages, Samsung Messages) or official M-PESA applications.
+ * Background notification listener that intercepts incoming M-PESA and Bank (KCB & NCBA) confirmation notifications
+ * posted by SMS messaging apps (Google Messages, Samsung Messages) or official financial applications.
  *
  * Runs 100% offline with zero external network connectivity and requires no restricted SMS permissions.
  */
 class MpesaNotificationListenerService : NotificationListenerService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val parser = MpesaTransactionParser()
+    private val mpesaParser = MpesaTransactionParser()
+    private val bankParser = BankTransactionParser()
 
     override fun onDestroy() {
         super.onDestroy()
@@ -49,30 +53,37 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         // 1. Avoid infinite feedback loops by ignoring notifications posted by SmartMoney itself
         if (sbn.packageName == packageName) return
 
-        // 2. Fast pre-filter to ignore notifications with no financial or M-PESA indicators
+        // 2. Fast pre-filter to ignore notifications with no financial or M-PESA/Bank indicators
         if (!NotificationContentExtractor.isCandidateNotification(sbn)) return
 
         // 3. Extract candidate message bodies from notification extras
         val candidateTexts = NotificationContentExtractor.extractCandidateTexts(sbn)
         if (candidateTexts.isEmpty()) return
 
-        // 4. Parse candidates with MpesaTransactionParser (requires Android O+)
+        // 4. Parse candidates with M-PESA or Bank parsers (requires Android O+)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-        var matchedMovement: ParsedFinancialMovement? = null
+        var matchedMpesaMovement: ParsedFinancialMovement? = null
+        var matchedBankMovement: ParsedBankMovement? = null
+
         for (candidate in candidateTexts) {
-            val movement = parser.parse(candidate)
-            if (movement != null) {
-                matchedMovement = movement
+            val mpesaMovement = mpesaParser.parse(candidate)
+            if (mpesaMovement != null) {
+                matchedMpesaMovement = mpesaMovement
+                break
+            }
+
+            val bankMovement = bankParser.parse(candidate)
+            if (bankMovement != null) {
+                matchedBankMovement = bankMovement
                 break
             }
         }
 
-        val movement = matchedMovement ?: return
+        if (matchedMpesaMovement == null && matchedBankMovement == null) return
 
         // 5. Ingest parsed movement into Room database
         val app = applicationContext as? SmartMoneyApplication ?: return
-        val ingestionService = app.container.mpesaTransactionIngestionService
         val notificationDao = app.container.database.notificationDao()
 
         // Acquire a brief CPU wake lock (safety timeout: 10 seconds) to ensure the CPU
@@ -80,7 +91,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         val powerManager = getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
         val wakeLock = powerManager?.newWakeLock(
             android.os.PowerManager.PARTIAL_WAKE_LOCK,
-            "smartmoney:mpesa_notification_ingest"
+            "smartmoney:financial_notification_ingest"
         )?.apply {
             setReferenceCounted(false)
             acquire(10_000)
@@ -88,41 +99,89 @@ class MpesaNotificationListenerService : NotificationListenerService() {
 
         serviceScope.launch {
             try {
-                when (val result = ingestionService.ingest(movement)) {
-                    is MpesaIngestionResult.Success -> {
-                        NotificationHelper.recordMpesaIngestionAlert(
-                            context = applicationContext,
-                            notificationDao = notificationDao,
-                            amount = movement.amount,
-                            direction = movement.direction.name,
-                            reference = movement.reference,
-                            description = result.transaction.description
-                        )
-                    }
+                // A. Handle M-PESA transaction
+                if (matchedMpesaMovement != null) {
+                    val mpesaService = app.container.mpesaTransactionIngestionService
+                    when (val result = mpesaService.ingest(matchedMpesaMovement)) {
+                        is MpesaIngestionResult.Success -> {
+                            NotificationHelper.recordMpesaIngestionAlert(
+                                context = applicationContext,
+                                notificationDao = notificationDao,
+                                amount = matchedMpesaMovement.amount,
+                                direction = matchedMpesaMovement.direction.name,
+                                reference = matchedMpesaMovement.reference,
+                                description = result.transaction.description
+                            )
+                        }
 
-                    is MpesaIngestionResult.Duplicate -> {
-                        // Already imported; silent deduplication
-                    }
+                        is MpesaIngestionResult.Duplicate -> {
+                            // Silent deduplication
+                        }
 
-                    is MpesaIngestionResult.MissingAccount -> {
-                        NotificationHelper.postSystemNotification(
-                            context = applicationContext,
-                            title = "M-PESA Ingestion Paused",
-                            message = "Transaction ${movement.reference} detected, but no M-PESA account is linked. Please link your M-PESA account."
-                        )
-                    }
+                        is MpesaIngestionResult.MissingAccount -> {
+                            NotificationHelper.postSystemNotification(
+                                context = applicationContext,
+                                title = "M-PESA Ingestion Paused",
+                                message = "Transaction ${matchedMpesaMovement.reference} detected, but no M-PESA account is linked. Please link your M-PESA account."
+                            )
+                        }
 
-                    is MpesaIngestionResult.AmbiguousAccount -> {
-                        NotificationHelper.postSystemNotification(
-                            context = applicationContext,
-                            title = "M-PESA Ambiguity",
-                            message = "Multiple M-PESA accounts detected. Please specify your target account in settings."
-                        )
-                    }
+                        is MpesaIngestionResult.AmbiguousAccount -> {
+                            NotificationHelper.postSystemNotification(
+                                context = applicationContext,
+                                title = "M-PESA Ambiguity",
+                                message = "Multiple M-PESA accounts detected. Please specify your target account in settings."
+                            )
+                        }
 
-                    is MpesaIngestionResult.InvalidMovement,
-                    is MpesaIngestionResult.DatabaseError -> {
-                        // Tolerate unparsable movements or persistence errors without crashing the service
+                        is MpesaIngestionResult.InvalidMovement,
+                        is MpesaIngestionResult.DatabaseError -> {
+                            // Tolerate unparsable movements or persistence errors without crashing the service
+                        }
+                    }
+                }
+
+                // B. Handle Commercial Bank transaction (KCB or NCBA)
+                if (matchedBankMovement != null) {
+                    val bankService = app.container.bankTransactionIngestionService
+                    val bankDisplayName = matchedBankMovement.institution.displayName
+                    when (val result = bankService.ingest(matchedBankMovement)) {
+                        is BankIngestionResult.Success -> {
+                            NotificationHelper.recordBankIngestionAlert(
+                                context = applicationContext,
+                                notificationDao = notificationDao,
+                                bankName = bankDisplayName,
+                                amount = matchedBankMovement.amount,
+                                direction = matchedBankMovement.direction.name,
+                                reference = matchedBankMovement.reference,
+                                description = result.transaction.description
+                            )
+                        }
+
+                        is BankIngestionResult.Duplicate -> {
+                            // Silent deduplication
+                        }
+
+                        is BankIngestionResult.MissingAccount -> {
+                            NotificationHelper.postSystemNotification(
+                                context = applicationContext,
+                                title = "$bankDisplayName Ingestion Paused",
+                                message = "Transaction ${matchedBankMovement.reference} detected, but no $bankDisplayName account is linked."
+                            )
+                        }
+
+                        is BankIngestionResult.AmbiguousAccount -> {
+                            NotificationHelper.postSystemNotification(
+                                context = applicationContext,
+                                title = "$bankDisplayName Ambiguity",
+                                message = "Multiple $bankDisplayName accounts detected. Please specify your target account in settings."
+                            )
+                        }
+
+                        is BankIngestionResult.InvalidMovement,
+                        is BankIngestionResult.DatabaseError -> {
+                            // Tolerate persistence errors safely
+                        }
                     }
                 }
             } catch (_: Exception) {

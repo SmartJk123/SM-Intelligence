@@ -25,6 +25,15 @@ class MainViewModel(
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    init {
+        // Cold-start session validation (Gap 1): verify persisted token against backend
+        viewModelScope.launch(dispatchers.io) {
+            if (authRepository.isUserLoggedIn()) {
+                authRepository.validateSession()
+            }
+        }
+    }
+
     // Determine start destination: "onboarding", "signup", "login", or "dashboard"
     val startDestination: StateFlow<String?> = combine(
         userPreferencesRepository.hasSeenOnboarding,

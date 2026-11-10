@@ -33,8 +33,109 @@ class RahaViewModel(
     )
     val uiState: StateFlow<RahaUiState> = _uiState.asStateFlow()
 
+    private var lastBriefedRoute: String? = null
+    private var currentPageData: Map<String, String> = emptyMap()
+    private var nudgeJob: kotlinx.coroutines.Job? = null
+
     fun openSheet() {
-        _uiState.update { it.copy(isOpen = true, hasUnreadAlert = false) }
+        dismissPromptNudge()
+        _uiState.update { it.copy(isOpen = true, hasUnreadAlert = false, isPromptNudgeVisible = false) }
+    }
+
+    fun openForScreen(
+        route: String,
+        title: String,
+        pageData: Map<String, String> = emptyMap()
+    ) {
+        dismissPromptNudge()
+        val normalizedRoute = route.lowercase().trim()
+        val shouldFetchBriefing = (lastBriefedRoute != normalizedRoute) || _uiState.value.messages.isEmpty()
+
+        currentPageData = pageData
+        lastBriefedRoute = normalizedRoute
+
+        _uiState.update {
+            it.copy(
+                isOpen = true,
+                hasUnreadAlert = false,
+                isPromptNudgeVisible = false,
+                currentScreenRoute = normalizedRoute,
+                currentScreenTitle = title
+            )
+        }
+
+        if (shouldFetchBriefing) {
+            fetchPageBriefing(normalizedRoute, title, pageData)
+        }
+    }
+
+    fun triggerPromptNudgeForScreen(route: String) {
+        if (_uiState.value.isOpen) return
+
+        nudgeJob?.cancel()
+        nudgeJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(1200L)
+            if (_uiState.value.isOpen) return@launch
+
+            val nudge = rahaRepository.getPromptNudge(route)
+            _uiState.update {
+                it.copy(
+                    promptNudge = nudge,
+                    isPromptNudgeVisible = true
+                )
+            }
+
+            kotlinx.coroutines.delay(8000L)
+            _uiState.update { it.copy(isPromptNudgeVisible = false) }
+        }
+    }
+
+    fun dismissPromptNudge() {
+        nudgeJob?.cancel()
+        _uiState.update { it.copy(isPromptNudgeVisible = false) }
+    }
+
+    fun refreshScreenBriefing() {
+        val route = _uiState.value.currentScreenRoute ?: "dashboard"
+        val title = _uiState.value.currentScreenTitle ?: "Overview"
+        fetchPageBriefing(route, title, currentPageData)
+    }
+
+    private fun fetchPageBriefing(
+        route: String,
+        title: String,
+        pageData: Map<String, String>
+    ) {
+        _uiState.update { it.copy(isTyping = true) }
+
+        viewModelScope.launch {
+            val result = rahaRepository.getPageBriefing(
+                screenRoute = route,
+                screenTitle = title,
+                conversationId = _uiState.value.conversationId,
+                pageData = pageData
+            )
+
+            result.fold(
+                onSuccess = { briefing ->
+                    _uiState.update { current ->
+                        current.copy(
+                            messages = current.messages + briefing,
+                            conversationId = briefing.conversationId ?: current.conversationId,
+                            isTyping = false,
+                            quickReplies = if (briefing.quickReplies.isNotEmpty()) {
+                                briefing.quickReplies
+                            } else {
+                                current.quickReplies
+                            }
+                        )
+                    }
+                },
+                onFailure = {
+                    _uiState.update { it.copy(isTyping = false) }
+                }
+            )
+        }
     }
 
     fun closeSheet() {
@@ -49,6 +150,9 @@ class RahaViewModel(
             text = text.trim()
         )
 
+        val currentRoute = _uiState.value.currentScreenRoute
+        val currentTitle = _uiState.value.currentScreenTitle
+
         _uiState.update { current ->
             current.copy(
                 messages = current.messages + userMessage,
@@ -59,7 +163,10 @@ class RahaViewModel(
         viewModelScope.launch {
             val result = rahaRepository.sendMessage(
                 message = text.trim(),
-                conversationId = _uiState.value.conversationId
+                conversationId = _uiState.value.conversationId,
+                screenRoute = currentRoute,
+                screenTitle = currentTitle,
+                pageData = currentPageData
             )
 
             result.fold(
@@ -77,7 +184,7 @@ class RahaViewModel(
                         )
                     }
                 },
-                onFailure = { error ->
+                onFailure = {
                     val errorMessage = RahaMessage(
                         sender = RahaSender.RAHA,
                         text = "I encountered an issue retrieving that. Please try again in a moment.",
@@ -101,14 +208,20 @@ class RahaViewModel(
                 rahaRepository.clearConversation(currentConvId)
             }
         }
+        lastBriefedRoute = null
+        val currentRoute = _uiState.value.currentScreenRoute ?: "dashboard"
+        val currentTitle = _uiState.value.currentScreenTitle ?: "Overview"
+
         _uiState.update {
             it.copy(
-                messages = listOf(initialGreeting),
+                messages = emptyList(),
                 isTyping = false,
                 quickReplies = initialGreeting.quickReplies,
                 conversationId = null
             )
         }
+
+        fetchPageBriefing(currentRoute, currentTitle, currentPageData)
     }
 
     class Factory(

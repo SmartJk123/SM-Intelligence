@@ -85,6 +85,7 @@ import com.example.smartmoney.ui.transactions.TransactionScreen
 import com.example.smartmoney.ui.transactions.TransactionViewModel
 import com.example.smartmoney.ui.analytics.AnalyticsViewModel
 import com.example.smartmoney.ui.analytics.AnalyticsScreen
+import com.example.smartmoney.ui.cashflow.CashFlowScreen
 import com.example.smartmoney.ui.reports.ReportsViewModel
 import com.example.smartmoney.ui.reports.ReportsScreen
 import kotlinx.coroutines.launch
@@ -131,7 +132,7 @@ fun DashboardScreen(
         val minor = investmentUiState.portfolioValuationMinor ?: investmentUiState.totalPrincipalMinor
         val explicitInvestments = java.math.BigDecimal(minor).divide(java.math.BigDecimal(100))
         val alreadyInRepo = investmentUiState.investments.any {
-            it.name.contains("M-Shwari", ignoreCase = true)
+            it.name.contains("M-Shwari", ignoreCase = true) || it.name.contains("MSHWARI", ignoreCase = true)
         }
         if (alreadyInRepo) {
             explicitInvestments
@@ -156,6 +157,97 @@ fun DashboardScreen(
         }
     }
 
+    fun collectPageData(route: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        result["screenRoute"] = route
+        when (route) {
+            Screen.Dashboard.route -> {
+                result["totalLiquidBalance"] = homeUiState.totalBalance.toString()
+                result["totalInvestments"] = totalInvestmentBalance.toString()
+                result["monthlyIncome"] = homeUiState.totalCashIn.toString()
+                result["monthlyExpenses"] = homeUiState.totalCashOut.toString()
+                result["netSavings"] = (homeUiState.totalCashIn.subtract(homeUiState.totalCashOut)).toString()
+                result["accountsCount"] = homeUiState.bankAccounts.size.toString()
+                result["unreadNotifications"] = unreadNotifCount.toString()
+            }
+            Screen.Accounts.route -> {
+                val accState = accountViewModel.uiState.value
+                val totalBal = accState.bankAccounts.fold(java.math.BigDecimal.ZERO) { acc, b -> acc.add(b.balance) }
+                result["totalBalance"] = totalBal.toString()
+                result["accountsCount"] = accState.bankAccounts.size.toString()
+                if (accState.bankAccounts.isNotEmpty()) {
+                    result["accountsSummary"] = accState.bankAccounts.joinToString("; ") {
+                        "${it.bankName} (${it.cardType}): KES ${it.balance}"
+                    }
+                }
+            }
+            Screen.Transactions.route -> {
+                val txState = transactionViewModel.uiState.value
+                if (txState is com.example.smartmoney.ui.transactions.TransactionUiState.Success) {
+                    val txList = txState.transactions
+                    result["transactionCount"] = txList.size.toString()
+                    if (txList.isNotEmpty()) {
+                        result["recentTransactions"] = txList.take(5).joinToString("; ") {
+                            "${it.description ?: "Transaction"}: KES ${it.amount} (${it.type})"
+                        }
+                    }
+                }
+            }
+            Screen.Budgets.route -> {
+                val bState = budgetViewModel.uiState.value
+                result["budgetsCount"] = bState.budgets.size.toString()
+                val totalAllocated = java.math.BigDecimal(bState.totalAllocatedMinor).divide(java.math.BigDecimal(100))
+                val totalSpent = java.math.BigDecimal(bState.totalSpentMinor).divide(java.math.BigDecimal(100))
+                result["totalBudgetLimit"] = totalAllocated.toString()
+                result["totalBudgetSpent"] = totalSpent.toString()
+                result["totalBudgetRemaining"] = (totalAllocated.subtract(totalSpent)).coerceAtLeast(java.math.BigDecimal.ZERO).toString()
+                if (bState.budgets.isNotEmpty()) {
+                    result["budgetsSummary"] = bState.budgets.joinToString("; ") {
+                        "${it.budget.category}: Limit KES ${it.budget.allocatedMajor}, Spent KES ${it.spentMajor}"
+                    }
+                }
+            }
+            Screen.Investments.route -> {
+                result["totalInvestments"] = totalInvestmentBalance.toString()
+                result["mshwariBalance"] = mshwariInvestmentBalance.toString()
+                result["investmentsCount"] = investmentUiState.investments.size.toString()
+                if (investmentUiState.investments.isNotEmpty()) {
+                    result["investmentsSummary"] = investmentUiState.investments.joinToString("; ") {
+                        "${it.name} (${it.type}): KES ${it.currentValueMajor ?: it.principalMajor}"
+                    }
+                }
+            }
+            Screen.CashFlow.route -> {
+                result["monthlyIncome"] = homeUiState.totalCashIn.toString()
+                result["monthlyExpenses"] = homeUiState.totalCashOut.toString()
+                result["netSavings"] = (homeUiState.totalCashIn.subtract(homeUiState.totalCashOut)).toString()
+            }
+            Screen.Analytics.route -> {
+                result["monthlyIncome"] = homeUiState.totalCashIn.toString()
+                result["monthlyExpenses"] = homeUiState.totalCashOut.toString()
+            }
+            Screen.Reports.route -> {
+                result["reportTypes"] = "Monthly Statements, Tax Summary, Income vs Expenses"
+            }
+            Screen.Notifications.route -> {
+                result["unreadCount"] = unreadNotifCount.toString()
+                val totalCount = notificationViewModel?.notifications?.value?.size ?: 0
+                result["totalCount"] = totalCount.toString()
+            }
+            Screen.Settings.route -> {
+                result["userName"] = userName
+                result["userEmail"] = userEmail ?: ""
+            }
+            Screen.Invoice.route -> {
+                result["features"] = "Manual invoicing, OCR camera receipt scan, VAT calculator"
+            }
+            Screen.Menu.route -> {
+                result["sections"] = "Accounts, Transactions, Budgets, Investments, Cash Flow, Analytics, Reports, Settings"
+            }
+        }
+        return result
+    }
+
     MainResponsiveShell(
         navController = navController,
         userName = userName,
@@ -173,7 +265,8 @@ fun DashboardScreen(
             }
         },
         onSignOut = onLogout,
-        rahaViewModel = rahaViewModel
+        rahaViewModel = rahaViewModel,
+        pageDataProvider = { route -> collectPageData(route) }
     ) { paddingValues ->
         NavHost(
             navController = navController,
@@ -315,7 +408,22 @@ fun DashboardScreen(
                 }
             }
             composable(Screen.CashFlow.route) {
-                FeaturePlaceholderScreen(Screen.CashFlow, onBack = { navController.popBackStack() })
+                CashFlowScreen(
+                    homeViewModel = homeViewModel,
+                    transactionViewModel = transactionViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToTransactions = {
+                        navController.popBackStack(Screen.Dashboard.route, inclusive = false)
+                        coroutineScope.launch {
+                            bottomBarPagerState.scrollToPage(2)
+                        }
+                    },
+                    onNavigateToReports = {
+                        if (reportsViewModel != null) {
+                            navController.navigate(Screen.Reports.route)
+                        }
+                    }
+                )
             }
             composable(Screen.Budgets.route) {
                 BudgetScreen(

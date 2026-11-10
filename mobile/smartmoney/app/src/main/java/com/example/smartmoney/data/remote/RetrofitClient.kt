@@ -19,8 +19,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Singleton Retrofit client routing 100% of mobile application network requests
- * through the unified Production Render Gateway (https://api-gateway-cbby.onrender.com/).
- *
+ * through the unified Production oracle VM gateway running the microservices using kubernetes
  * Microservice routes via API Gateway:
  * - /api/auth/...         -> identity-service
  * - /api/accounts/...     -> accounts-service
@@ -33,7 +32,7 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
 
     /**
-     * Default Render Gateway URL used across production environments.
+     * Default oracle VM Gateway URL used across production environments.
      */
     const val DEFAULT_GATEWAY_URL: String = "http://145.241.250.59/"
 
@@ -64,6 +63,12 @@ object RetrofitClient {
      */
     var tokenProvider: (() -> String?)? = null
 
+    /**
+     * Callback invoked when an authenticated request returns 401/403 or when the active
+     * token is determined to have expired client-side. Triggers reactive auto-logout.
+     */
+    var onSessionExpiredListener: (() -> Unit)? = null
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -73,15 +78,29 @@ object RetrofitClient {
 
     private val authInterceptor = okhttp3.Interceptor { chain ->
         val original = chain.request()
+        val path = original.url.encodedPath
+        val isAuthEndpoint = path.contains("api/auth/login") || path.contains("api/auth/register")
         val token = tokenProvider?.invoke()
-        val request = if (!token.isNullOrBlank() && original.header("Authorization") == null) {
+
+        val cleanToken = token?.removePrefix("Bearer ")?.removePrefix("bearer ")?.trim()
+
+        val request = if (!cleanToken.isNullOrBlank() && original.header("Authorization") == null) {
             original.newBuilder()
-                .header("Authorization", "Bearer $token")
+                .header("Authorization", "Bearer $cleanToken")
                 .build()
         } else {
             original
         }
-        chain.proceed(request)
+
+        val response = chain.proceed(request)
+
+        // Reactive 401 Unauthorized Interceptor (Gap 2):
+        // Triggers auto-logout only when an authenticated core service explicitly rejects the session token
+        if (!isAuthEndpoint && response.code == 401) {
+            onSessionExpiredListener?.invoke()
+        }
+
+        response
     }
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
@@ -174,13 +193,4 @@ object RetrofitClient {
      */
     val bankIntegrationApi: BankIntegrationApi
         get() = _bankIntegrationApi ?: _retrofit.create(BankIntegrationApi::class.java).also { _bankIntegrationApi = it }
-
-    // Backward-compatibility helpers
-    fun useLocalBankIntegration() {
-        // In unified gateway, all services route through gateway
-    }
-
-    fun useRenderBankIntegration() {
-        // In unified gateway, all services route through gateway
-    }
 }

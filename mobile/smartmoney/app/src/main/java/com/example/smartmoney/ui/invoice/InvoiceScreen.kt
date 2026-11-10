@@ -1,6 +1,7 @@
 package com.example.smartmoney.ui.invoice
 
 import androidx.compose.material.icons.outlined.Delete
+import com.example.smartmoney.core.ocr.BitmapOcrOptimizer
 import kotlinx.coroutines.launch
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -56,15 +57,19 @@ fun InvoiceScreen(
     ) { uri: Uri? ->
         uri?.let {
             coroutineScope.launch {
-                val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val originalBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                         ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, it))
                     } else {
                         MediaStore.Images.Media.getBitmap(context.contentResolver, it)
                     }
                 }
-                imageBitmap = bitmap
-                viewModel.processImageForOcr(bitmap)
+                val optimized = BitmapOcrOptimizer.prepareForOcr(originalBitmap)
+                if (optimized != originalBitmap && !originalBitmap.isRecycled) {
+                    originalBitmap.recycle()
+                }
+                imageBitmap = optimized
+                viewModel.processImageForOcr(optimized)
             }
         }
     }
@@ -74,15 +79,19 @@ fun InvoiceScreen(
     ) { success ->
         if (success && photoUri != null) {
             coroutineScope.launch {
-                val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val originalBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                         ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, photoUri!!))
                     } else {
                         MediaStore.Images.Media.getBitmap(context.contentResolver, photoUri!!)
                     }
                 }
-                imageBitmap = bitmap
-                viewModel.processImageForOcr(bitmap)
+                val optimized = BitmapOcrOptimizer.prepareForOcr(originalBitmap)
+                if (optimized != originalBitmap && !originalBitmap.isRecycled) {
+                    originalBitmap.recycle()
+                }
+                imageBitmap = optimized
+                viewModel.processImageForOcr(optimized)
             }
         }
     }
@@ -174,6 +183,18 @@ fun InvoiceScreen(
                 }
             }
 
+            if (imageBitmap != null && !isScanning && (vendor.isNotBlank() || amount.isNotBlank())) {
+                SuggestionChip(
+                    onClick = {},
+                    label = { Text("✓ Details auto-extracted from invoice", style = MaterialTheme.typography.labelMedium) },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            }
+
             OutlinedTextField(
                 value = vendor,
                 onValueChange = { viewModel.onVendorChange(it) },
@@ -229,7 +250,7 @@ fun InvoiceScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = vendor.isNotBlank() && amount.isNotBlank() && invoiceDate.isNotBlank()
             ) {
-                Text("Save Pending Transaction")
+                Text("Save Transaction")
             }
             
             if (extractedText.isNotBlank()) {

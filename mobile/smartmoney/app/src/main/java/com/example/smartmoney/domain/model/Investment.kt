@@ -30,6 +30,7 @@ enum class InvestmentType(val displayName: String) {
  * @property currentValueMinor Current valuation in integer cents (null if unknown or unrecorded).
  * @property valuationDate Date the valuation was recorded.
  * @property maturityDate Maturity date for fixed-term instruments (null for open-ended funds like MMF).
+ * @property isAutoSynced True if this holding is derived from an auto-synced financial account (e.g. M-Shwari).
  */
 @Immutable
 data class Investment(
@@ -40,7 +41,8 @@ data class Investment(
     val principalMinor: Long,
     val currentValueMinor: Long? = null,
     val valuationDate: LocalDate,
-    val maturityDate: LocalDate? = null
+    val maturityDate: LocalDate? = null,
+    val isAutoSynced: Boolean = false
 ) {
     val principalMajor: Double
         get() = principalMinor / 100.0
@@ -77,6 +79,7 @@ data class Investment(
         if (maturityDate != null) {
             json.put("maturityDate", maturityDate.toString())
         }
+        json.put("isAutoSynced", isAutoSynced)
         return json
     }
 
@@ -101,6 +104,7 @@ data class Investment(
             } catch (_: Exception) {
                 null
             }
+            val isAutoSynced = json.optBoolean("isAutoSynced", false)
 
             return Investment(
                 id = id,
@@ -110,7 +114,8 @@ data class Investment(
                 principalMinor = principalMinor,
                 currentValueMinor = currentValueMinor,
                 valuationDate = valuationDate,
-                maturityDate = maturityDate
+                maturityDate = maturityDate,
+                isAutoSynced = isAutoSynced
             )
         }
     }

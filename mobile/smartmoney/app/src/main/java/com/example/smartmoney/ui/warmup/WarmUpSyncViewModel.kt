@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.smartmoney.core.coroutine.DefaultDispatcherProvider
 import com.example.smartmoney.core.coroutine.DispatcherProvider
 import com.example.smartmoney.domain.repository.AccountRepository
+import com.example.smartmoney.domain.repository.AuthRepository
 import com.example.smartmoney.domain.repository.TransactionRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -37,6 +38,7 @@ class WarmUpSyncViewModel(
     private val accountRepository: AccountRepository,
     private val transactionRepository: TransactionRepository,
     private val userId: String,
+    private val authRepository: AuthRepository? = null,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : ViewModel() {
 
@@ -110,11 +112,12 @@ class WarmUpSyncViewModel(
         private val accountRepository: AccountRepository,
         private val transactionRepository: TransactionRepository,
         private val userId: String,
+        private val authRepository: AuthRepository? = null,
         private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return WarmUpSyncViewModel(accountRepository, transactionRepository, userId, dispatchers) as T
+            return WarmUpSyncViewModel(accountRepository, transactionRepository, userId, authRepository, dispatchers) as T
         }
     }
 }

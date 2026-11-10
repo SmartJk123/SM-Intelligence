@@ -152,11 +152,14 @@ fun HomeScreen(
         val event = uiState.glowEvent ?: return@LaunchedEffect
         if (event.type == TopCardGlowType.NONE) return@LaunchedEffect
 
+        // Brief delay (300ms) ensuring the overview screen transition settles before the contour ignites
+        delay(300L)
+
         activeGlowType = event.type
-        // 1. Snappy ignite / surge in (280ms)
+        // 1. Snappy ignite / surge in (350ms)
         glowProgress.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
         )
         // 2. Hold peak illumination (1200ms)
         delay(1200L)

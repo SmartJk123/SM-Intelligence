@@ -27,13 +27,17 @@ import com.example.smartmoney.ui.raha.RahaViewModel
 import com.example.smartmoney.ui.theme.EnergyTheme
 import com.example.smartmoney.ui.transactions.TransactionViewModel
 import com.example.smartmoney.ui.analytics.AnalyticsViewModel
+import androidx.compose.runtime.DisposableEffect
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.smartmoney.ui.analytics.AnalyticsViewModelFactory
 import com.example.smartmoney.ui.reports.ReportsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     @androidx.compose.material3.ExperimentalMaterial3Api
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,6 +96,21 @@ class MainActivity : ComponentActivity() {
                         val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
                         var isWarmUpCompleted by rememberSaveable { mutableStateOf(startDestination == "dashboard") }
 
+                        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                        DisposableEffect(lifecycleOwner) {
+                            val observer = LifecycleEventObserver { _, event ->
+                                when (event) {
+                                    Lifecycle.Event.ON_STOP -> appContainer.appLockManager.onAppBackgrounded()
+                                    Lifecycle.Event.ON_START -> appContainer.appLockManager.onAppForegrounded()
+                                    else -> {}
+                                }
+                            }
+                            lifecycleOwner.lifecycle.addObserver(observer)
+                            onDispose {
+                                lifecycleOwner.lifecycle.removeObserver(observer)
+                            }
+                        }
+
                         LaunchedEffect(isLoggedIn) {
                             if (!isLoggedIn) {
                                 isWarmUpCompleted = false
@@ -133,7 +152,8 @@ class MainActivity : ComponentActivity() {
                                 key = "transaction_$currentUserId",
                                 factory = TransactionViewModel.Factory(
                                     repository = appContainer.transactionRepository,
-                                    userId = currentUserId
+                                    userId = currentUserId,
+                                    networkMonitor = appContainer.networkMonitor
                                 )
                             )
 
@@ -150,6 +170,8 @@ class MainActivity : ComponentActivity() {
                                 key = "investment_$currentUserId",
                                 factory = InvestmentViewModel.Factory(
                                     investmentRepository = appContainer.investmentRepository,
+                                    accountRepository = appContainer.accountRepository,
+                                    bankAccountRepository = appContainer.bankAccountRepository,
                                     userId = currentUserId
                                 )
                             )
@@ -197,13 +219,36 @@ class MainActivity : ComponentActivity() {
                                 )
                             )
 
-                            if (!isWarmUpCompleted) {
+                            val isAppLocked by appContainer.appLockManager.isAppLocked.collectAsState()
+
+                            if (isAppLocked) {
+                                com.example.smartmoney.ui.security.AppLockScreen(
+                                    appLockManager = appContainer.appLockManager,
+                                    onUnlockSuccess = { appContainer.appLockManager.unlock() },
+                                    onSignOut = {
+                                        val db = appContainer.database
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            try {
+                                                db.clearAllTables()
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                            }
+                                            UserProfileManager.clearSession()
+                                        }
+                                        appContainer.appLockManager.unlock()
+                                        authViewModel.signOut()
+                                        isWarmUpCompleted = false
+                                        showLogin = true
+                                    }
+                                )
+                            } else if (!isWarmUpCompleted) {
                                 val warmUpViewModel: com.example.smartmoney.ui.warmup.WarmUpSyncViewModel = viewModel(
                                     key = "warmup_$currentUserId",
                                     factory = com.example.smartmoney.ui.warmup.WarmUpSyncViewModel.Factory(
                                         accountRepository = appContainer.accountRepository,
                                         transactionRepository = appContainer.transactionRepository,
-                                        userId = currentUserId
+                                        userId = currentUserId,
+                                        authRepository = appContainer.authRepository
                                     )
                                 )
                                 com.example.smartmoney.ui.warmup.WarmUpSyncScreen(

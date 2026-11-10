@@ -79,6 +79,7 @@ fun MainResponsiveShell(
     onBannerClick: (Notification) -> Unit = {},
     onSignOut: () -> Unit = {},
     rahaViewModel: RahaViewModel? = null,
+    pageDataProvider: (String) -> Map<String, String> = { emptyMap() },
     content: @Composable (PaddingValues) -> Unit
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -173,6 +174,7 @@ fun MainResponsiveShell(
         isTopBarVisible = true
         isScrolling = false
         scrollStopJob?.cancel()
+        rahaViewModel?.triggerPromptNudgeForScreen(currentRoute)
     }
 
     fun navigateTo(targetRoute: String) {
@@ -267,11 +269,41 @@ fun MainResponsiveShell(
                             )
                         }
 
+                        // Proactive Prompt Bubble Emerging from Raha Icon
+                        if (rahaViewModel != null) {
+                            val rahaUiState by rahaViewModel.uiState.collectAsState()
+                            com.example.smartmoney.ui.raha.components.RahaPromptBubble(
+                                text = rahaUiState.promptNudge,
+                                isVisible = rahaUiState.isPromptNudgeVisible && !rahaUiState.isOpen,
+                                onClick = {
+                                    val currentScreenTitle = Screen.allScreens.find { it.route == currentRoute }?.title ?: "Overview"
+                                    val pageData = pageDataProvider(currentRoute)
+                                    rahaViewModel.openForScreen(
+                                        route = currentRoute,
+                                        title = currentScreenTitle,
+                                        pageData = pageData
+                                    )
+                                },
+                                onDismiss = {
+                                    rahaViewModel.dismissPromptNudge()
+                                },
+                                modifier = Modifier.align(Alignment.BottomStart)
+                            )
+                        }
+
                         // Raha AI Assistant Floating Button - Bottom Left
                         if (rahaViewModel != null) {
                             val rahaUiState by rahaViewModel.uiState.collectAsState()
                             RahaFloatingButton(
-                                onClick = { rahaViewModel.openSheet() },
+                                onClick = {
+                                    val currentScreenTitle = Screen.allScreens.find { it.route == currentRoute }?.title ?: "Overview"
+                                    val pageData = pageDataProvider(currentRoute)
+                                    rahaViewModel.openForScreen(
+                                        route = currentRoute,
+                                        title = currentScreenTitle,
+                                        pageData = pageData
+                                    )
+                                },
                                 hasUnreadAlert = rahaUiState.hasUnreadAlert,
                                 isBottomBarVisible = isBottomBarScreen && !isBottomBarCollapsed,
                                 modifier = Modifier.align(Alignment.BottomStart),

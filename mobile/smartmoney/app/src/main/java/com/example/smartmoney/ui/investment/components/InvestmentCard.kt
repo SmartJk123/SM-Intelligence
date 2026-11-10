@@ -141,10 +141,10 @@ fun InvestmentCard(
                 }
             }
 
-            // Return / Gain or Loss Pill (if valuation exists)
+            // Return / Gain or Loss Pill (if manual valuation exists)
             val gainLossMajor = investment.gainOrLossMajor
             val gainLossMinor = investment.gainOrLossMinor
-            if (gainLossMajor != null && gainLossMinor != null) {
+            if (!investment.isAutoSynced && gainLossMajor != null && gainLossMinor != null && gainLossMinor != 0L) {
                 Spacer(modifier = Modifier.height(10.dp))
                 val isPositive = gainLossMajor >= 0
                 val percentGain = if (investment.principalMajor > 0) {
@@ -216,35 +216,51 @@ fun InvestmentCard(
             )
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Action Buttons
-            Row(
-                horizontalArrangement = Arrangement.End,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                TextButton(onClick = onEdit) {
-                    Icon(
-                        imageVector = Icons.Outlined.Edit,
-                        contentDescription = "Edit investment",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Edit", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                TextButton(
-                    onClick = onDelete,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
+            // Action Buttons (or Source indicator for SMS-tracked accounts)
+            if (investment.isAutoSynced) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Delete,
-                        contentDescription = "Delete investment",
-                        modifier = Modifier.size(16.dp)
+                    Text(
+                        text = "Source (SMS)",
+                        fontSize = 11.sp,
+                        color = textMuted,
+                        fontWeight = FontWeight.Medium
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Delete", fontSize = 12.sp)
+                }
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    TextButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = "Edit investment",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Edit", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = "Delete investment",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Delete", fontSize = 12.sp)
+                    }
                 }
             }
         }

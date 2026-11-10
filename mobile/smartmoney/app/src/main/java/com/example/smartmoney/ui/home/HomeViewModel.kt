@@ -1,7 +1,5 @@
 package com.example.smartmoney.ui.home
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -62,6 +60,7 @@ class HomeViewModel(
     private var lastKnownBalance: BigDecimal? = null
     private var lastKnownTxIds = mutableSetOf<String>()
     private var isInitialDataLoaded = false
+    private var hasTriggeredInitialGlow = false
 
     private val _glowEvent = MutableStateFlow<TopCardGlowEvent?>(null)
     val glowEvent: StateFlow<TopCardGlowEvent?> = _glowEvent.asStateFlow()
@@ -117,15 +116,39 @@ class HomeViewModel(
         val isOnboarding = accounts.isEmpty() && bankAccounts.isEmpty()
         val showSheet = isOnboarding && !dismissedWelcome
 
-        // Detect live money movement after initial data has stabilized
+        // Detect live money movement & initial launch transaction illumination
         if (!isInitialDataLoaded) {
             if (accounts.isNotEmpty() || bankAccounts.isNotEmpty() || transactions.isNotEmpty()) {
                 lastKnownBalance = finalBalance
                 lastKnownTxIds.clear()
                 lastKnownTxIds.addAll(transactions.map { it.id })
                 isInitialDataLoaded = true
+
+                // On initial open / login, glow to the most recent transaction (credit -> green, debit -> red)
+                if (!hasTriggeredInitialGlow && transactions.isNotEmpty()) {
+                    val mostRecentTx = transactions.maxByOrNull { it.timestamp } ?: transactions.firstOrNull()
+                    if (mostRecentTx != null) {
+                        val isCredit = mostRecentTx.type.equals("CREDIT", ignoreCase = true) ||
+                                (mostRecentTx.amount > BigDecimal.ZERO && !mostRecentTx.type.equals("DEBIT", ignoreCase = true))
+                        val glowType = if (isCredit) TopCardGlowType.INFLOW_GREEN else TopCardGlowType.OUTFLOW_RED
+                        _glowEvent.value = TopCardGlowEvent(type = glowType)
+                        hasTriggeredInitialGlow = true
+                    }
+                }
             }
         } else {
+            // In case transactions became available on subsequent emission after accounts loaded
+            if (!hasTriggeredInitialGlow && transactions.isNotEmpty()) {
+                val mostRecentTx = transactions.maxByOrNull { it.timestamp } ?: transactions.firstOrNull()
+                if (mostRecentTx != null) {
+                    val isCredit = mostRecentTx.type.equals("CREDIT", ignoreCase = true) ||
+                            (mostRecentTx.amount > BigDecimal.ZERO && !mostRecentTx.type.equals("DEBIT", ignoreCase = true))
+                    val glowType = if (isCredit) TopCardGlowType.INFLOW_GREEN else TopCardGlowType.OUTFLOW_RED
+                    _glowEvent.value = TopCardGlowEvent(type = glowType)
+                    hasTriggeredInitialGlow = true
+                }
+            }
+
             val previousBalance = lastKnownBalance
             val currentTxIds = transactions.map { it.id }.toSet()
             val newTxList = transactions.filter { it.id !in lastKnownTxIds }
@@ -191,21 +214,6 @@ class HomeViewModel(
         _selectedMonth.value = month
     }
 
-    /**
-     * Shifts the selected analytics month one month into the past.
-     */
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun previousMonth() {
-        _selectedMonth.value = _selectedMonth.value.minusMonths(1)
-    }
-
-    /**
-     * Shifts the selected analytics month one month into the future.
-     */
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun nextMonth() {
-        _selectedMonth.value = _selectedMonth.value.plusMonths(1)
-    }
 
     /**
      * Synchronizes transactions and accounts from remote backend services off the Main thread.

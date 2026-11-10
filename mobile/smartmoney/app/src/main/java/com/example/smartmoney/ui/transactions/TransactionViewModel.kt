@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.smartmoney.core.network.NetworkMonitor
 import java.math.BigDecimal
 import com.example.smartmoney.data.remote.RetrofitClient
 
@@ -29,10 +30,32 @@ class TransactionViewModel(
     private val repository: TransactionRepository? = null,
     private val userId: String? = null,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
-    externalScope: CoroutineScope? = null
+    externalScope: CoroutineScope? = null,
+    private val networkMonitor: NetworkMonitor? = null
 ) : ViewModel() {
 
     private val scope = externalScope ?: viewModelScope
+
+    val isOnline: StateFlow<Boolean> = networkMonitor?.isOnline
+        ?.stateIn(
+            scope = scope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = networkMonitor.isCurrentlyOnline()
+        ) ?: MutableStateFlow(true).asStateFlow()
+
+    init {
+        if (networkMonitor != null && repository != null) {
+            scope.launch {
+                var wasOffline = false
+                isOnline.collect { online ->
+                    if (online && wasOffline) {
+                        refreshTransactions()
+                    }
+                    wasOffline = !online
+                }
+            }
+        }
+    }
 
     companion object {
         /**
@@ -45,7 +68,7 @@ class TransactionViewModel(
     private val _selectedFilter = MutableStateFlow("ALL")
     val selectedFilter: StateFlow<String> = _selectedFilter.asStateFlow()
 
-    private val _pendingInvoices = MutableStateFlow<List<Transaction>>(emptyList())
+    private val _localInvoices = MutableStateFlow<List<Transaction>>(emptyList())
 
     // Reactive StateFlow with WhileSubscribed(5_000) to stop background database observation when inactive
     val uiState: StateFlow<TransactionUiState> = if (repository != null) {
@@ -85,12 +108,12 @@ class TransactionViewModel(
     val filteredTransactions: StateFlow<List<Transaction>> = combine(
         uiState,
         _selectedFilter,
-        _pendingInvoices
-    ) { state, filter, pending ->
+        _localInvoices
+    ) { state, filter, localInv ->
         withContext(dispatchers.default) {
             val transactions = when (state) {
-                is TransactionUiState.Success -> pending + state.transactions
-                else -> pending
+                is TransactionUiState.Success -> localInv + state.transactions
+                else -> localInv
             }
             when (filter) {
                 "CREDIT" -> transactions.filter { it.type.equals("CREDIT", ignoreCase = true) }
@@ -109,12 +132,12 @@ class TransactionViewModel(
      */
     val allTransactions: StateFlow<List<Transaction>> = combine(
         uiState,
-        _pendingInvoices
-    ) { state, pending ->
+        _localInvoices
+    ) { state, localInv ->
         withContext(dispatchers.default) {
             when (state) {
-                is TransactionUiState.Success -> pending + state.transactions
-                else -> pending
+                is TransactionUiState.Success -> localInv + state.transactions
+                else -> localInv
             }
         }
     }.stateIn(
@@ -175,10 +198,11 @@ class TransactionViewModel(
         _selectedFilter.value = filter
     }
 
-    fun addPendingTransaction(transaction: Transaction) {
-        _pendingInvoices.value = _pendingInvoices.value + transaction
-        // In a real app, we'd also call InvoiceApi.uploadInvoice here
+    fun addInvoiceTransaction(transaction: Transaction) {
+        _localInvoices.value = _localInvoices.value + transaction
     }
+
+    fun addPendingTransaction(transaction: Transaction) = addInvoiceTransaction(transaction)
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
@@ -254,11 +278,12 @@ class TransactionViewModel(
     class Factory(
         private val repository: TransactionRepository? = null,
         private val userId: String? = null,
-        private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
+        private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
+        private val networkMonitor: NetworkMonitor? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return TransactionViewModel(repository, userId, dispatchers) as T
+            return TransactionViewModel(repository, userId, dispatchers, networkMonitor = networkMonitor) as T
         }
     }
 }

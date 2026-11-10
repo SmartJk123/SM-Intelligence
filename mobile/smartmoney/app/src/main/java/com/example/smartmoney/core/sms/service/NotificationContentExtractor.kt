@@ -19,7 +19,7 @@ object NotificationContentExtractor {
     )
 
     /**
-     * Determines whether the notification might represent an M-PESA transaction notification.
+     * Determines whether the notification might represent a financial transaction notification (M-PESA, KCB, or NCBA).
      * Performs fast pre-filtering before running full regex parsing.
      */
     fun isCandidateNotification(sbn: StatusBarNotification): Boolean {
@@ -32,7 +32,12 @@ object NotificationContentExtractor {
 
         val combined = "$title $text $bigText".uppercase(Locale.ROOT)
 
-        // Fast check: Contains M-PESA keywords or standard confirmation keyword
+        // 1. Fast check: Discard obvious non-financial security messages (OTP, activation code)
+        if (combined.contains("ACTIVATION CODE") || combined.contains("VALID FOR ONLY") || combined.contains("KAA CHONJO")) {
+            return false
+        }
+
+        // 2. M-PESA / M-Shwari indicator check
         val hasMpesaIndicator = combined.contains("MPESA") ||
                 combined.contains("M-PESA") ||
                 combined.contains("SAFARICOM") ||
@@ -44,9 +49,28 @@ object NotificationContentExtractor {
             return true
         }
 
-        // Check if coming from a known SMS app and contains monetary currency keyword
-        val isKnownSmsApp = KNOWN_SMS_PACKAGES.contains(packageName)
+        // 3. Bank indicators (KCB & NCBA)
+        val hasBankIndicator = combined.contains("KCB") ||
+                combined.contains("NCBA") ||
+                combined.contains("MBN") ||
+                title.contains("522") ||
+                combined.contains("PAY TO M-PESA BILLER")
+
+        val hasBankAction = combined.contains("DEBITED") ||
+                combined.contains("CREDITED") ||
+                combined.contains("SENT FROM") ||
+                combined.contains("RECEIVED IN") ||
+                combined.contains("HAS BEEN RECEIVED") ||
+                combined.contains("HAS BEEN PROCESSED")
+
         val hasMoneyIndicator = combined.contains("KSH") || combined.contains("KES")
+        val isKnownSmsApp = KNOWN_SMS_PACKAGES.contains(packageName)
+
+        if ((hasBankIndicator || isKnownSmsApp) && hasMoneyIndicator && hasBankAction) {
+            return true
+        }
+
+        // 4. Fallback for generic financial confirmation from known SMS app
         return isKnownSmsApp && hasMoneyIndicator && hasConfirmedKeyword
     }
 
