@@ -1,0 +1,58 @@
+name: Frontend CI
+
+# Builds and tests the two Angular apps on every pull request that touches them,
+# so a broken build or a failing test is caught before review, not after merge.
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'admin-interface/**'
+      - 'web/**'
+      - '.github/workflows/frontend-ci.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'admin-interface/**'
+      - 'web/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  admin-interface:
+    name: Admin portal - test and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-interface
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: admin-interface/package-lock.json
+      - run: npm ci
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+
+  web:
+    name: Customer web app - test and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Unit tests
+        run: npx ng test --watch=false
+      - name: Adapter tests
+        run: npm run test:auth
+      - name: Production build
+        run: npm run build

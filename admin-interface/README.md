@@ -31,6 +31,20 @@ is not running.
 
 To produce a production bundle, run `npm run build`. The output is written to `dist/smartmoney-admin`.
 
+## Tests
+
+Unit tests use Vitest with jsdom, the same setup as the web app. Test files sit next to the code as
+`*.spec.ts`.
+
+```powershell
+npm test              # run every test once
+npm run test:watch    # rerun tests as files change
+```
+
+The tests cover sign-in state and token expiry, the route guards, staff role permissions, CSV export
+and date formatting. The Frontend CI workflow (`.github/workflows/frontend-ci.yml`) runs the tests and
+a production build on every pull request that changes `admin-interface` or `web`.
+
 ## Technology
 
 The portal is built with Angular 21 standalone components, using signals and zoneless change
@@ -186,9 +200,8 @@ native build binaries came from the existing `Smartwallet` project. Tailwind CSS
 `@tailwindcss/*` packages came from the existing `spotternavbar/spotter-navbar` project.
 
 `package.json` lists all of these as normal dependencies, so a plain `npm install` with network
-access will replace the local copies. The `vitest`, `jsdom` and `prettier` packages were removed
-from the generated scaffold because they could not be installed, so there is no `npm test` script
-yet.
+access will replace the local copies. `vitest` and `jsdom` are installed from the registry for the
+unit tests (see [Tests](#tests)).
 
 ## Current limitations
 
@@ -204,7 +217,8 @@ yet.
   cookie needs a server-side session adapter like the web app's `web/tools/auth-server.mjs`.
 - **Detail views.** Bank and organisation details open as in-page drawers rather than as routes, so
   they cannot be linked to directly.
-- **Automated tests.** No test runner is installed. The build is the only check.
+- **Automated tests.** Unit tests cover the core services and guards. The pages themselves
+  (Customers, Audit log, Settings and the rest) do not have tests yet.
 - **Live bank connectivity.** The panel reports real credential state, real notification counts and
   a real four step connection test. No amount or balance passes through the admin surface.
 
