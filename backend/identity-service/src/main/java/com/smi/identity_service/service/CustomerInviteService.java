@@ -91,6 +91,24 @@ public class CustomerInviteService {
                 org == null ? null : org.getName());
     }
 
+    /**
+     * Sends the welcome email again, with a new temporary password and setup link,
+     * to a customer who has never signed in (for example when the first email failed).
+     */
+    public Result resend(UUID userId, UUID adminId) {
+        String temporaryPassword = temporaryPassword();
+        User user = users.resetTemporaryPassword(userId, temporaryPassword);
+        String orgName = user.getOrganizationName();
+
+        boolean sent = email.sendCustomerInvite(user.getEmailAddress(), user.getName(), temporaryPassword,
+                passwordResets.setupLink(user), orgName);
+
+        ActivityLog.Actor admin = users.findById(adminId).map(ActivityLog.Actor::of).orElse(ActivityLog.Actor.system());
+        activity.audit(admin, "CUSTOMER_INVITE_RESENT", user, sent ? "Invite emailed again" : "Invite email not sent");
+
+        return new Result(UserSummaryResponse.fromUser(user), sent, null, orgName);
+    }
+
     private static String temporaryPassword() {
         StringBuilder password = new StringBuilder(12);
         for (int i = 0; i < 12; i++) {

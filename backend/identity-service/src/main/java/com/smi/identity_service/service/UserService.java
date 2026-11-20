@@ -281,6 +281,21 @@ public class UserService {
     }
 
     /**
+     * Replaces the password of a customer who has never signed in with a new
+     * temporary one, so a lost or failed invite can be sent again.
+     */
+    public User resetTemporaryPassword(UUID userId, String rawPassword) {
+        User user = getActiveUser(userId);
+        if (user.getLastLoginAt() != null) {
+            throw new IllegalArgumentException(
+                    "This customer has already signed in. Ask them to use \"Forgot password\" instead.");
+        }
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        user.setUpdatedAt(OffsetDateTime.now());
+        return userRepository.save(user);
+    }
+
+    /**
      * Introspects an access token according to RFC 7662 standards.
      * Verifies cryptographic signature, expiration, and ensures user is active.
      */

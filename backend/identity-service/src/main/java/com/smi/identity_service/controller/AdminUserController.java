@@ -70,6 +70,16 @@ public class AdminUserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(customerInvites.create(request, adminId));
     }
 
+    /**
+     * Sends the welcome email again with a new temporary password and setup link.
+     * Only for customers who have never signed in; 400 otherwise.
+     */
+    @PostMapping("/{id}/resend-invite")
+    public ResponseEntity<CustomerInviteService.Result> resendInvite(@PathVariable UUID id,
+                                                                     @AuthenticationPrincipal UUID adminId) {
+        return ResponseEntity.ok(customerInvites.resend(id, adminId));
+    }
+
     /** Suspend or restore access. Refuses to suspend the calling admin. */
     @PatchMapping("/{id}/status")
     public ResponseEntity<UserSummaryResponse> changeStatus(@PathVariable UUID id,
